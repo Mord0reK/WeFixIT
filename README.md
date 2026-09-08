@@ -7,7 +7,7 @@ Wykorzystywana jest baza danych MariaDB. Pusta wersja znajduje się w pliku [pla
 
 Poniżej znajduje się diagram wykorzystywanej bazy danych.
 
-![](database-diagram-WeFixIT.svg)
+![Diagram schematu bazy danych WeFixIT](database-diagram-WeFixIT.svg)
 
 ## Zarządzanie
 System oferuje rozbudowany panel administracyjny który pozwala dostosować działanie i zachowanie aplikacji.
