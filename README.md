@@ -5,6 +5,10 @@ System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników 
 ## Baza danych
 Wykorzystywana jest baza danych MariaDB. Pusta wersja znajduje się w pliku [placeholder] a wersja z danymi testowymi w [placeholder].
 
+Poniżej znajduje się diagram wykorzystywanej bazy danych.
+
+![](database-diagram-WeFixIT.svg)
+
 ## Zarządzanie
 System oferuje rozbudowany panel administracyjny który pozwala dostosować działanie i zachowanie aplikacji.
 
