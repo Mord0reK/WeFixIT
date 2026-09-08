@@ -218,6 +218,12 @@ CREATE TABLE rezerwacje (
     ) NOT NULL DEFAULT 'oczekujaca',
     komentarz_klienta VARCHAR(1000) NULL,
     anulowano DATETIME NULL,
+    CONSTRAINT chk_rezerwacje_anulowanie
+        CHECK (
+            (status_rezerwacji = 'anulowana' AND anulowano IS NOT NULL)
+            OR
+            (status_rezerwacji <> 'anulowana' AND anulowano IS NULL)
+        ),
     utworzono DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     zaktualizowano DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
