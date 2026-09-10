@@ -1,0 +1,188 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "pl-PL"
+
+tone_instructions: >
+  Pisz po polsku, krótko i technicznie. Zgłaszaj tylko problemy mające
+  praktyczne znaczenie. Unikaj pochwał, dygresji i uwag stylistycznych
+  bez wpływu na poprawność, bezpieczeństwo lub utrzymanie kodu.
+
+early_access: false
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+
+  high_level_summary: true
+  high_level_summary_in_walkthrough: false
+  high_level_summary_instructions: |
+    Napisz krótkie podsumowanie faktycznych zmian w PR po polsku.
+    Maksymalnie 5–8 zwięzłych punktów.
+    Nie twórz release notes, rozbudowanych sekcji ani nie powtarzaj
+    komentarzy z code review.
+
+  review_status: false
+  review_details: false
+  review_progress: false
+  commit_status: false
+
+  collapse_walkthrough: true
+
+  changed_files_summary: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+
+  assess_linked_issues: false
+  related_issues: false
+  related_prs: false
+
+  suggested_labels: false
+  suggested_reviewers: false
+
+  in_progress_fortune: false
+  poem: false
+
+  enable_prompt_for_ai_agents: false
+
+  slop_detection:
+    enabled: false
+
+  path_filters:
+    - "!assets/css/app.css"
+
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        Projekt WeFixIT jest prostym modularnym monolitem SSR.
+
+        Celem review jest wykrywanie błędów przed mergem PR, zarówno
+        oczywistych, jak i trudnych do zauważenia.
+
+        Zgłaszaj komentarz tylko, gdy wskazujesz konkretną, realną ścieżkę
+        do błędu runtime, regresji, luki bezpieczeństwa, utraty lub
+        niespójności danych, błędnej authorization albo naruszenia jawnego
+        wymagania projektu.
+
+        Priorytet mają:
+        - błędy logiki i regresje,
+        - błędy runtime,
+        - nieobsłużone edge cases,
+        - problemy bezpieczeństwa,
+        - błędy authentication, authorization i ownership,
+        - SQL injection i niepoprawna obsługa danych wejściowych,
+        - race conditions i problemy z integralnością danych,
+        - błędne założenia dotyczące stanu aplikacji,
+        - problemy wynikające z niepoprawnej obsługi błędów,
+        - niezgodność z wymaganiami i ustalonym stackiem projektu,
+        - kod działający dla typowego przypadku, ale zawodzący dla
+          poprawnych danych brzegowych. (edge cases)
+
+        Nie zgłaszaj:
+        - kosmetycznych zmian stylu,
+        - alternatywnego formatowania,
+        - zmian nazw bez konkretnej korzyści,
+        - refactorów, które nie rozwiązują realnego problemu,
+        - abstrakcji tworzonych na zapas,
+        - poprawnego kodu tylko dlatego, że można go napisać inaczej,
+        - hipotetycznych problemów bez realnej ścieżki wykonania.
+
+        Każdy komentarz review powinien być krótki i konkretny:
+        - wskaż problem,
+        - podaj jego praktyczny skutek,
+        - zaproponuj konkretną poprawkę.
+
+        Jeżeli poprawka jest lokalna, jednoznaczna i bezpieczna, użyj
+        committable code suggestion możliwego do zastosowania bezpośrednio
+        przez GitHub Apply suggestion.
+
+        Nie proponuj dużej przebudowy kodu, jeżeli problem można naprawić
+        małą lokalną zmianą.
+
+        Ustalony stack projektu:
+        - PHP 8.2 bez frameworków,
+        - Apache,
+        - proceduralne MySQLi i prepared statements,
+        - MariaDB 11.4,
+        - HTML5,
+        - Tailwind CSS 4.3.3 standalone CLI,
+        - vanilla JavaScript,
+        - Docker Compose wyłącznie do developmentu,
+        - aplikacja musi działać również przez XAMPP.
+
+        Nie proponuj:
+        - Laravel,
+        - Symfony,
+        - ORM,
+        - React,
+        - Vue,
+        - npm,
+        - Bun,
+        - osobnego REST API,
+        - dodatkowej infrastruktury bez konkretnej potrzeby.
+
+        Preferuj proste rozwiązania zgodne z istniejącą architekturą.
+
+    - path: "**/*.php"
+      instructions: |
+        Kod PHP ma być zgodny z PHP 8.2.
+
+        Sprawdzaj szczególnie:
+        - proceduralne MySQLi,
+        - prepared statements dla wszystkich dynamicznych danych SQL,
+        - SQL injection,
+        - poprawną obsługę błędów operacji bazodanowych,
+        - server-side validation,
+        - escaping danych wyświetlanych w HTML,
+        - CSRF przy operacjach zmieniających stan,
+        - kontrolę sesji,
+        - kontrolę roli użytkownika,
+        - ownership zasobów na chronionych endpointach,
+        - password_hash() i password_verify(),
+        - brak sekretów i credentials w kodzie,
+        - niebezpieczne przekierowania i manipulację parametrami,
+        - poprawny podział odpowiedzialności pomiędzy konfigurację,
+          DB, authentication, authorization, walidację, logikę biznesową,
+          actions i widoki.
+
+        Actions i kontrolery powinny koordynować operacje, a nie zawierać
+        całej logiki biznesowej ani dużych fragmentów HTML.
+
+        Nie proponuj klas, wzorców projektowych ani dodatkowych warstw
+        tylko po to, aby zastąpić poprawny proceduralny kod.
+
+  auto_review:
+    enabled: true
+    description_keyword: ""
+    labels: []
+    auto_incremental_review: false
+    drafts: false
+
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    title:
+      mode: "off"
+    description:
+      mode: "off"
+    issue_assessment:
+      mode: "off"
+    custom_checks: []
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: false
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
+    custom: []
+
+chat:
+  art: false
+  auto_reply: true
