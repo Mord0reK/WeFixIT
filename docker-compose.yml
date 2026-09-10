@@ -20,8 +20,7 @@ services:
     image: mariadb:11.4
     volumes:
       - db_data:/var/lib/mysql
-    # Po utworzeniu database.sql:
-    # - ./database.sql:/docker-entrypoint-initdb.d/database.sql:ro,z
+      - ./database-z-danymi-testowymi.sql:/docker-entrypoint-initdb.d/database.sql:ro,z
     environment:
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MARIADB_DATABASE: ${DB_NAME}
