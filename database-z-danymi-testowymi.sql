@@ -1,9 +1,3 @@
-CREATE DATABASE IF NOT EXISTS wefixit
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
-USE wefixit;
-
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
@@ -275,3 +269,64 @@ CREATE TABLE rezerwacje (
         usluga_id
     )
 ) ENGINE = InnoDB;
+
+INSERT INTO uzytkownicy (id, imie, nazwisko, email, telefon, haslo_hash, rola, aktywny) VALUES
+(1, 'Administrator', 'Systemu', 'admin@wefixit.pl', '+48123456780', '$2y$12$5WalVqOzwEO80XzP7g65ReJzpBkI4o.kBX2ZJHfXOjmv0ZDPuVR8a', 'admin', TRUE),
+(2, 'Tomasz', 'Serwisant', 'tomasz.serwisant@wefixit.pl', '+48123456781', '$2y$12$5WalVqOzwEO80XzP7g65ReJzpBkI4o.kBX2ZJHfXOjmv0ZDPuVR8a', 'pracownik', TRUE),
+(3, 'Marcin', 'Elektronik', 'marcin.elektronik@wefixit.pl', '+48123456782', '$2y$12$5WalVqOzwEO80XzP7g65ReJzpBkI4o.kBX2ZJHfXOjmv0ZDPuVR8a', 'pracownik', TRUE),
+(4, 'Jan', 'Kowalski', 'jan.kowalski@example.com', '+48987654321', '$2y$12$5WalVqOzwEO80XzP7g65ReJzpBkI4o.kBX2ZJHfXOjmv0ZDPuVR8a', 'klient', TRUE),
+(5, 'Anna', 'Nowak', 'anna.nowak@example.com', '+48987654322', '$2y$12$5WalVqOzwEO80XzP7g65ReJzpBkI4o.kBX2ZJHfXOjmv0ZDPuVR8a', 'klient', TRUE),
+(6, 'Piotr', 'Wisniewski', 'piotr.wisniewski@example.com', '+48987654323', '$2y$12$5WalVqOzwEO80XzP7g65ReJzpBkI4o.kBX2ZJHfXOjmv0ZDPuVR8a', 'klient', TRUE);
+
+INSERT INTO pracownicy (id, uzytkownik_id, opis, aktywny) VALUES
+(1, 2, 'Specjalista od diagnostyki PC, montażu zestawów komputerowych oraz instalacji systemów.', TRUE),
+(2, 3, 'Inżynier mikroelektroniki: naprawy płyt głównych, lutowanie BGA, czyszczenie i konserwacja laptopów.', TRUE);
+
+INSERT INTO kategorie_uslug (id, nazwa, opis, aktywna) VALUES
+(1, 'Diagnostyka i Konserwacja', 'Podstawowe przeglądy sprzętu, czyszczenie układów chłodzenia i wymiana past termoprzewodzących.', TRUE),
+(2, 'Naprawy Sprzętowe PC i Laptopów', 'Wymiana uszkodzonych podzespołów, matryc, gniazd zasilania oraz naprawy płyt głównych.', TRUE),
+(3, 'Oprogramowanie i Systemy', 'Instalacja systemów operacyjnych, usuwanie złośliwego oprogramowania oraz konfiguracja sterowników.', TRUE),
+(4, 'Archiwalna Kategoria', 'Kategoria wycofana z oferty do testów dezaktywacji.', FALSE);
+
+INSERT INTO uslugi (id, kategoria_id, nazwa, opis, czas_trwania_minuty, cena, aktywna) VALUES
+(1, 1, 'Konserwacja układu chłodzenia laptopa', 'Czyszczenie z kurzu, wymiana termopadów oraz nałożenie pasty termoprzewodzącej wysokiej klasy.', 60, 150.00, TRUE),
+(2, 1, 'Kompleksowa diagnostyka sprzętowa', 'Testy obciążeniowe CPU, GPU, pamięci RAM oraz weryfikacja SMART dysków SSD/HDD.', 45, 80.00, TRUE),
+(3, 2, 'Wymiana matrycy w laptopie', 'Demontaż uszkodzonego panelu LCD i montaż nowej matrycy (cena bez kosztu części).', 90, 180.00, TRUE),
+(4, 2, 'Naprawa sekcji zasilania płyty głównej', 'Lutowanie uszkodzonych tranzystorów MOSFET, wymiana przetwornic i gniazd DC.', 120, 350.00, TRUE),
+(5, 3, 'Instalacja systemu Linux lub Windows', 'Instalacja czystego systemu z kompletem najnowszych sterowników i podstawowym pakietem biurowym.', 60, 120.00, TRUE),
+(6, 3, 'Usunięcie wirusów i optymalizacja', 'Odwirusowanie, oczyszczenie autostartu oraz konfiguracja zapory sieciowej.', 45, 100.00, TRUE),
+(7, 2, 'Wycofana usługa naprawy napędów DVD', 'Nieświadczona już usługa pozostawiona do testu zachowania integralności.', 30, 50.00, FALSE);
+
+INSERT INTO uslugi_pracownikow (pracownik_id, usluga_id, aktywne) VALUES
+(1, 1, TRUE),
+(1, 2, TRUE),
+(1, 5, TRUE),
+(1, 6, TRUE),
+(2, 1, TRUE),
+(2, 2, TRUE),
+(2, 3, TRUE),
+(2, 4, TRUE),
+(2, 7, FALSE);
+
+INSERT INTO godziny_pracy (pracownik_id, dzien_tygodnia, czas_rozpoczecia, czas_zakonczenia, aktywne) VALUES
+(1, 1, '08:00:00', '16:00:00', TRUE),
+(1, 2, '08:00:00', '16:00:00', TRUE),
+(1, 3, '08:00:00', '16:00:00', TRUE),
+(1, 4, '08:00:00', '16:00:00', TRUE),
+(1, 5, '08:00:00', '16:00:00', TRUE),
+(2, 1, '10:00:00', '14:00:00', TRUE),
+(2, 1, '14:30:00', '18:00:00', TRUE),
+(2, 2, '10:00:00', '18:00:00', TRUE),
+(2, 3, '10:00:00', '18:00:00', TRUE),
+(2, 4, '10:00:00', '18:00:00', TRUE),
+(2, 5, '09:00:00', '15:00:00', TRUE);
+
+INSERT INTO rezerwacje (
+    id, uzytkownik_id, pracownik_id, usluga_id, czas_rozpoczecia, czas_zakonczenia,
+    cena_historyczna, status_rezerwacji, komentarz_klienta, anulowano
+) VALUES
+(1, 4, 1, 1, '2026-05-10 09:00:00', '2026-05-10 10:00:00', 150.00, 'zrealizowana', 'Laptop grzał się przy renderingu, po czyszczeniu temperatury w normie.', NULL),
+(2, 5, 2, 4, '2026-05-15 11:00:00', '2026-05-15 13:00:00', 350.00, 'w_trakcie', 'Płyta nie reaguje na włącznik po zalaniu herbatą.', NULL),
+(3, 6, 1, 5, '2026-05-20 10:00:00', '2026-05-20 11:00:00', 120.00, 'potwierdzona', 'Proszę o zachowanie plików z pulpitu przed formatem.', NULL),
+(4, 4, 2, 3, '2026-05-21 14:30:00', '2026-05-21 16:00:00', 180.00, 'oczekujaca', 'Pęknięta matryca 15.6 cala IPS 144Hz.', NULL),
+(5, 5, 1, 2, '2026-05-12 13:00:00', '2026-05-12 13:45:00', 80.00, 'anulowana', 'Klientka zrezygnowała z diagnostyki, zakupiła nowy sprzęt.', '2026-05-11 18:20:00');
