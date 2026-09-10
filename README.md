@@ -10,7 +10,7 @@ Poniżej znajduje się diagram wykorzystywanej bazy danych.
 ![Diagram schematu bazy danych WeFixIT](database-diagram-WeFixIT.svg)
 
 ### Wersja pusta
-Pusta edycja bazy danych jak sama nazwa wskazuje nie zawiera żadnych danych w sobie. Zalecana jest do użycia w środowisku produkcyjnym.
+Pusta edycja bazy danych jak sama nazwa wskazuje nie zawiera żadnych danych w sobie. Zalecane użycie w środowisku produkcyjnym.
 
 ### Wersja testowa
 Testowa edycja bazy danych zawiera wszystko co wersja pusta plus dane testowe. Zalecana ona jest do użycia w celach testowych.
@@ -21,6 +21,8 @@ Zawiera:
 - Jednego administratora
 - Dwóch pracowników
 - Trzech klientów
+
+Hasło do każdego z użytkowników to: **haslo123**
 
 ## Zarządzanie
 System oferuje rozbudowany panel administracyjny który pozwala dostosować działanie i zachowanie aplikacji.
