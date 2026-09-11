@@ -1,0 +1,59 @@
+name: wefixit-dev
+
+services:
+  wefixit-dev:
+    build:
+      context: .
+      dockerfile: dev.Dockerfile
+      target: app
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - .:/var/www/html:z
+    env_file:
+      - .env
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  mariadb:
+    image: mariadb:11.4
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./database-z-danymi-testowymi.sql:/docker-entrypoint-initdb.d/database.sql:ro,z
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - --connect
+        - --innodb_initialized
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  tailwind-watcher:
+    build:
+      context: .
+      dockerfile: dev.Dockerfile
+      target: tailwind
+    working_dir: /app
+    volumes:
+      - .:/app:z
+    command:
+      - tailwindcss
+      - -i
+      - /app/assets/css/input.css
+      - -o
+      - /app/assets/css/app.css
+      - --watch=always
+      - --poll
+    restart: unless-stopped
+
+volumes:
+  db_data:
