@@ -32,8 +32,6 @@ Pusta edycja bazy danych jak sama nazwa wskazuje nie zawiera żadnych danych w s
 ### Wersja testowa
 Testowa edycja bazy danych zawiera wszystko co wersja pusta plus dane testowe. Zalecana ona jest do użycia w celach testowych.
 
-<!-- haslo: haslo123 bo znjac zycie zapomne -->
-
 #### Konta testowe
 
 | Rola | Imię i nazwisko | E-mail | Hasło |
