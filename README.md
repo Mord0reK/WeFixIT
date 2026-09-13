@@ -2,6 +2,23 @@
 
 System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników i administratorów.
 
+## Spis treści
+
+- [Technologie](#Technologie)
+- [Baza danych](#Baza-danych)
+- [Zakres projektu](#zakres-projektu)
+- [Wymagania](#wymagania)
+- [Uruchomienie przez Docker](#uruchomienie-przez-docker)
+- [Uruchomienie przez XAMPP](#uruchomienie-przez-xampp)
+- [Autorzy](#Autorzy)
+
+## Technologie
+Projekt wykorzystuje następujące technologie:
+- PHP 8.2 + Apache, proceduralne MySQLi
+- MariaDB 11.4
+- HTML5, Tailwind CSS 4.3.3 standalone CLI, vanilla JS
+- Docker Compose v2, kompatybilność XAMPP
+
 ## Baza danych
 Wykorzystywana jest baza danych MariaDB. Pusta wersja znajduje się w pliku [database-czysta.sql](database-czysta.sql), a wersja z danymi testowymi w [database-z-danymi-testowymi.sql](database-z-danymi-testowymi.sql).
 
@@ -17,21 +34,37 @@ Testowa edycja bazy danych zawiera wszystko co wersja pusta plus dane testowe. Z
 
 <!-- haslo: haslo123 bo znjac zycie zapomne -->
 
-Zawiera:
-- Jednego administratora
-- Dwóch pracowników
-- Trzech klientów
+#### Konta testowe
 
-Hasło do każdego z użytkowników to: **haslo123**
+| Rola | Imię i nazwisko | E-mail | Hasło |
+|------|-----------------|--------|-------|
+| Administrator | Administrator Systemu | `admin@wefixit.pl` | `haslo123` |
+| Pracownik | Tomasz Serwisant | `tomasz.serwisant@wefixit.pl` | `haslo123` |
+| Pracownik | Marcin Elektronik | `marcin.elektronik@wefixit.pl` | `haslo123` |
+| Klient | Jan Kowalski | `jan.kowalski@example.com` | `haslo123` |
+| Klient | Anna Nowak | `anna.nowak@example.com` | `haslo123` |
+| Klient | Piotr Wiśniewski | `piotr.wisniewski@example.com` | `haslo123` |
 
-## Zarządzanie
-System oferuje rozbudowany panel administracyjny który pozwala dostosować działanie i zachowanie aplikacji.
+## Zakres projektu
 
-Takie jak:
-- [placeholder]
-- rownież [placeholder]
-- no i oczywiscie [placeholder]
-<!-- jakies glowne wyrozniki tutaj przydaloby sie dac -->
+WeFixIT to system rezerwacji dla serwisu komputerowego z trzema rolami: klient, pracownik, administrator.
+
+### Zrealizowano w Etapie 1
+
+- Schemat bazy MariaDB 11.4: 7 tabel (`uzytkownicy`, `pracownicy`, `kategorie_uslug`, `uslugi`, `uslugi_pracownikow`, `godziny_pracy`, `rezerwacje`).
+- Relacje 1:N oraz relacja N:M pracownik–usługa przez `uslugi_pracownikow`.
+- Integralność: klucze obce, `UNIQUE` na e-mail, `CHECK` na ceny / czasy / statusy, `ON DELETE RESTRICT`.
+- Diagram ERD: `database-diagram-WeFixIT.svg`.
+- Dane testowe: 1 administrator, 2 pracowników, 3 klientów, usługi, grafik i rezerwacje.
+- Środowisko uruchomieniowe: Docker Compose dev + prod oraz instrukcja pod XAMPP.
+
+### Planowane w Etapie 2 - Użytkownicy i logowanie
+
+- Rejestracja konta klienta z walidacją po stronie serwera.
+- Logowanie i wylogowanie z obsługą sesji.
+- Podział na role: klient, pracownik, administrator.
+- Ochrona stron i endpointów przed dostępem bez roli / sesji.
+- Profil użytkownika: podgląd i edycja podstawowych danych.
 
 ## Wymagania
 
