@@ -48,9 +48,9 @@ services:
     command:
       - tailwindcss
       - -i
-      - /app/assets/css/input.css
+      - /app/public/assets/css/input.css
       - -o
-      - /app/assets/css/app.css
+      - /app/public/assets/css/app.css
       - --watch=always
       - --poll
     restart: unless-stopped

@@ -52,7 +52,7 @@ WeFixIT to system rezerwacji dla serwisu komputerowego z trzema rolami: klient, 
 - Schemat bazy MariaDB 11.4: 7 tabel (`uzytkownicy`, `pracownicy`, `kategorie_uslug`, `uslugi`, `uslugi_pracownikow`, `godziny_pracy`, `rezerwacje`).
 - Relacje 1:N oraz relacja N:M pracownik–usługa przez `uslugi_pracownikow`.
 - Integralność: klucze obce, `UNIQUE` na e-mail, `CHECK` na ceny / czasy / statusy, `ON DELETE RESTRICT`.
-- Diagram ERD: `database-diagram-WeFixIT.svg`.
+- Diagram ERD: `database-diagram-WeFixIT.png`.
 - Dane testowe: 1 administrator, 2 pracowników, 3 klientów, usługi, grafik i rezerwacje.
 - Środowisko uruchomieniowe: Docker Compose dev + prod oraz instrukcja pod XAMPP.
 
@@ -91,7 +91,7 @@ Docker uruchamia aplikację razem z serwerem MariaDB oraz automatycznie ładuje 
 3. Zbuduj obrazy i uruchom kontenery:
 
    ```bash
-   docker compose -f docker-compose.dev.yml up --build
+   docker compose -f docker/docker-compose.dev.yml up --build
    ```
 
 4. Otwórz aplikację w przeglądarce: [http://localhost:8080](http://localhost:8080).
@@ -99,14 +99,14 @@ Docker uruchamia aplikację razem z serwerem MariaDB oraz automatycznie ładuje 
 Aby zatrzymać aplikację, użyj `Ctrl+C` albo uruchom:
 
 ```bash
-docker compose -f docker-compose.dev.yml down
+docker compose -f docker/docker-compose.dev.yml down
 ```
 
 Baza danych jest przechowywana w wolumenie Dockera. Aby rozpocząć od nowej bazy i ponownie załadować dane testowe, usuń także wolumen:
 
 ```bash
-docker compose -f docker-compose.dev.yml down -v
-docker compose -f docker-compose.dev.yml up --build
+docker compose -f docker/docker-compose.dev.yml down -v
+docker compose -f docker/docker-compose.dev.yml up --build
 ```
 
 ## Uruchomienie przez XAMPP
