@@ -48,7 +48,7 @@ reviews:
     enabled: false
 
   path_filters:
-    - "!assets/css/app.css"
+    - "!public/assets/css/app.css"
 
   path_instructions:
     - path: "**/*"

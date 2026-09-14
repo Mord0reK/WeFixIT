@@ -87,7 +87,7 @@ jobs:
       fail-fast: false
       matrix:
         file:
-          - database/database-czysta.sql
+          - database/database.sql
           - database/database-z-danymi-testowymi.sql
 
     services:

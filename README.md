@@ -20,7 +20,7 @@ Projekt wykorzystuje następujące technologie:
 - Docker Compose v2, kompatybilność XAMPP
 
 ## Baza danych
-Wykorzystywana jest baza danych MariaDB. Pusta wersja znajduje się w pliku [database-czysta.sql](database/database-czysta.sql), a wersja z danymi testowymi w [database-z-danymi-testowymi.sql](database/database-z-danymi-testowymi.sql).
+Wykorzystywana jest baza danych MariaDB. Pusta wersja znajduje się w pliku [database-czysta.sql](database/database-czysta.sql), a wersja z danymi testowymi w [database.sql](database/database.sql).
 
 Poniżej znajduje się diagram wykorzystywanej bazy danych.
 
@@ -126,7 +126,7 @@ Aktualna wersja repozytorium nie ma jeszcze automatycznej konfiguracji połącze
 
 1. Zainstalować XAMPP i uruchomić moduły **Apache** oraz **MySQL**.
 2. Rozpakować projekt do `C:\xampp\htdocs\WeFixIT` (Windows) albo odpowiednika katalogu `htdocs` na danym systemie.
-3. Otworzyć [phpMyAdmin](http://localhost/phpmyadmin), utworzyć bazę `wefixit` i zaimportować plik [database-z-danymi-testowymi.sql](database/database-z-danymi-testowymi.sql). Na potrzeby produkcyjne można użyć [database-czysta.sql](database/database-czysta.sql).
+3. Otworzyć [phpMyAdmin](http://localhost/phpmyadmin), utworzyć bazę `wefixit` i zaimportować plik [database.sql](database/database.sql). Na potrzeby produkcyjne można użyć [database-czysta.sql](database/database-czysta.sql).
 4. W pliku `index.php` zmienić host bazy danych z `mariadb` na `localhost`:
 
    ```php
