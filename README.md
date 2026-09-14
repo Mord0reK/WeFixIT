@@ -24,7 +24,7 @@ Wykorzystywana jest baza danych MariaDB. Pusta wersja znajduje się w pliku [dat
 
 Poniżej znajduje się diagram wykorzystywanej bazy danych.
 
-![Diagram schematu bazy danych WeFixIT](database-diagram-WeFixIT.svg)
+![Diagram schematu bazy danych WeFixIT](database-diagram-WeFixIT.png)
 
 ### Wersja pusta
 Pusta edycja bazy danych jak sama nazwa wskazuje nie zawiera żadnych danych w sobie. Zalecane użycie w środowisku produkcyjnym.
