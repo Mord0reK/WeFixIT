@@ -87,8 +87,8 @@ jobs:
       fail-fast: false
       matrix:
         file:
-          - database-czysta.sql
-          - database-z-danymi-testowymi.sql
+          - ../database-czysta.sql
+          - ../database-z-danymi-testowymi.sql
 
     services:
       mariadb:
