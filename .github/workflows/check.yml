@@ -87,8 +87,8 @@ jobs:
       fail-fast: false
       matrix:
         file:
-          - ../database-czysta.sql
-          - ../database-z-danymi-testowymi.sql
+          - database/database-czysta.sql
+          - database/database-z-danymi-testowymi.sql
 
     services:
       mariadb:
@@ -226,7 +226,7 @@ jobs:
           set -euo pipefail
 
           "$HOME/.cache/wefixit/tailwindcss" \
-            -i assets/css/input.css \
+            -i public/assets/css/input.css \
             -o /tmp/wefixit-app.css
 
       - name: Check committed CSS
@@ -234,21 +234,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          if cmp --silent assets/css/app.css /tmp/wefixit-app.css; then
-            echo "assets/css/app.css jest aktualny."
+          if cmp --silent public/assets/css/app.css /tmp/wefixit-app.css; then
+            echo "public/assets/css/app.css jest aktualny."
             exit 0
           fi
 
-          echo "::error file=assets/css/app.css::Skompilowany CSS jest nieaktualny."
+          echo "::error file=public/assets/css/app.css::Skompilowany CSS jest nieaktualny."
           echo
           echo "Przebuduj plik poleceniem:"
-          echo "tailwindcss -i assets/css/input.css -o assets/css/app.css"
+          echo "tailwindcss -i public/assets/css/input.css -o public/assets/css/app.css"
           echo
           echo "Pierwsze 200 linii różnic:"
 
           diff \
             --unified \
-            assets/css/app.css \
+            public/assets/css/app.css \
             /tmp/wefixit-app.css \
             | head -n 200 || true
 
