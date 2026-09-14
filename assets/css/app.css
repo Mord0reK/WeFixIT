@@ -296,9 +296,6 @@
       max-width: 96rem;
     }
   }
-  .contents {
-    display: contents;
-  }
   .flex {
     display: flex;
   }
