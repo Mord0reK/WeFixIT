@@ -176,27 +176,7 @@ jobs:
 
           mkdir -p "$(dirname "$binary")"
 
-          curl \
-            --fail \
-            --location \
-            --silent \
-            --show-error \
-            --output /tmp/tailwind-sha256sums.txt \
-            "${release_url}/sha256sums.txt"
-
-          expected_checksum="$(
-            awk '
-              $2 == "tailwindcss-linux-x64" ||
-              $2 == "*tailwindcss-linux-x64" {
-                print $1
-              }
-            ' /tmp/tailwind-sha256sums.txt
-          )"
-
-          if [[ -z "$expected_checksum" ]]; then
-            echo "::error::Nie znaleziono checksum dla tailwindcss-linux-x64."
-            exit 1
-          fi
+          expected_checksum="dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a"
 
           if [[ ! -f "$binary" ]]; then
             curl \
