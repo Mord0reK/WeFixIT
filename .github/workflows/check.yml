@@ -1,0 +1,276 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: "8.2"
+  TAILWIND_VERSION: "4.3.3"
+
+jobs:
+  php_lint:
+    name: PHP lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+
+      - name: Show PHP version
+        run: php --version
+
+      - name: Check PHP syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          files=()
+
+          while IFS= read -r -d '' file; do
+            files+=("$file")
+          done < <(
+            find . \
+              -type f \
+              -name '*.php' \
+              -not -path './vendor/*' \
+              -not -path './.git/*' \
+              -print0
+          )
+
+          if (( ${#files[@]} == 0 )); then
+            echo "::error::Nie znaleziono żadnych plików PHP."
+            exit 1
+          fi
+
+          failed=0
+
+          for file in "${files[@]}"; do
+            if ! php -l "$file"; then
+              failed=1
+            fi
+          done
+
+          if (( failed != 0 )); then
+            echo "::error::Wykryto błędy składni PHP."
+            exit 1
+          fi
+
+          echo "Sprawdzono plików PHP: ${#files[@]}"
+
+  sql_import:
+    name: SQL import (${{ matrix.file }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        file:
+          - database/database-czysta.sql
+          - database/database-z-danymi-testowymi.sql
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: ci-root-password
+          MARIADB_DATABASE: wefixit_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+          --health-start-period 15s
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install MariaDB client
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install \
+            --yes \
+            --no-install-recommends \
+            mariadb-client
+
+      - name: Verify SQL file exists
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! -s "${{ matrix.file }}" ]]; then
+            echo "::error file=${{ matrix.file }}::Plik SQL nie istnieje albo jest pusty."
+            exit 1
+          fi
+
+      - name: Import ${{ matrix.file }}
+        shell: bash
+        env:
+          MYSQL_PWD: ci-root-password
+        run: |
+          set -euo pipefail
+
+          mariadb \
+            --protocol=tcp \
+            --host=127.0.0.1 \
+            --port=3306 \
+            --user=root \
+            --database=wefixit_ci \
+            < "${{ matrix.file }}"
+
+          echo "Plik ${{ matrix.file }} został poprawnie zaimportowany."
+
+  tailwind:
+    name: Tailwind CSS build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Restore Tailwind CLI
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/wefixit/tailwindcss
+          key: tailwind-${{ runner.os }}-${{ runner.arch }}-${{ env.TAILWIND_VERSION }}
+
+      - name: Download and verify Tailwind CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          binary="$HOME/.cache/wefixit/tailwindcss"
+          release_url="https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAILWIND_VERSION}"
+
+          mkdir -p "$(dirname "$binary")"
+
+          expected_checksum="dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a"
+
+          if [[ ! -f "$binary" ]]; then
+            curl \
+              --fail \
+              --location \
+              --silent \
+              --show-error \
+              --output "$binary" \
+              "${release_url}/tailwindcss-linux-x64"
+          fi
+
+          chmod 0755 "$binary"
+
+          actual_checksum="$(sha256sum "$binary" | awk '{ print $1 }')"
+
+          if [[ "$actual_checksum" != "$expected_checksum" ]]; then
+            echo "::error::Checksum Tailwind CLI jest nieprawidłowy."
+            rm -f "$binary"
+            exit 1
+          fi
+
+          "$binary" --help >/dev/null
+
+      - name: Build Tailwind CSS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          "$HOME/.cache/wefixit/tailwindcss" \
+            -i public/assets/css/input.css \
+            -o /tmp/wefixit-app.css
+
+      - name: Check committed CSS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if cmp --silent public/assets/css/app.css /tmp/wefixit-app.css; then
+            echo "public/assets/css/app.css jest aktualny."
+            exit 0
+          fi
+
+          echo "::error file=public/assets/css/app.css::Skompilowany CSS jest nieaktualny."
+          echo
+          echo "Przebuduj plik poleceniem:"
+          echo "tailwindcss -i public/assets/css/input.css -o public/assets/css/app.css"
+          echo
+          echo "Pierwsze 200 linii różnic:"
+
+          diff \
+            --unified \
+            public/assets/css/app.css \
+            /tmp/wefixit-app.css \
+            | head -n 200 || true
+
+          exit 1
+
+  ci_result:
+    name: CI result
+    if: always()
+    needs:
+      - php_lint
+      - sql_import
+      - tailwind
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Verify all jobs succeeded
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          php_result="${{ needs.php_lint.result }}"
+          sql_result="${{ needs.sql_import.result }}"
+          tailwind_result="${{ needs.tailwind.result }}"
+
+          echo "PHP lint:     $php_result"
+          echo "SQL import:   $sql_result"
+          echo "Tailwind CSS: $tailwind_result"
+
+          if [[ "$php_result" != "success" ]]; then
+            echo "::error::PHP lint nie zakończył się sukcesem."
+            exit 1
+          fi
+
+          if [[ "$sql_result" != "success" ]]; then
+            echo "::error::Co najmniej jeden plik SQL nie został poprawnie zaimportowany."
+            exit 1
+          fi
+
+          if [[ "$tailwind_result" != "success" ]]; then
+            echo "::error::Walidacja Tailwind CSS nie zakończyła się sukcesem."
+            exit 1
+          fi
+
+          echo "Wszystkie testy CI zakończyły się sukcesem."

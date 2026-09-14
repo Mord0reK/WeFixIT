@@ -9,9 +9,9 @@ services:
     ports:
       - "127.0.0.1:8080:80"
     volumes:
-      - .:/var/www/html:z
+      - ..:/var/www/html:z
     env_file:
-      - .env
+      - ../.env
     depends_on:
       mariadb:
         condition: service_healthy
@@ -20,7 +20,7 @@ services:
     image: mariadb:11.4
     volumes:
       - db_data:/var/lib/mysql
-      - ./database-z-danymi-testowymi.sql:/docker-entrypoint-initdb.d/database.sql:ro,z
+      - ../database/database-z-danymi-testowymi.sql:/docker-entrypoint-initdb.d/database.sql:ro,z
     environment:
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MARIADB_DATABASE: ${DB_NAME}
@@ -44,7 +44,7 @@ services:
       target: tailwind
     working_dir: /app
     volumes:
-      - .:/app:z
+      - ..:/app:z
     command:
       - tailwindcss
       - -i

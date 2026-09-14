@@ -2,21 +2,20 @@ name: wefixit
 
 services:
   wefixit:
-    image: ghcr.io/mord0rek/wefixit:latest
+    image: ghcr.io/mord0rek/wefixit:${IMAGE_TAG:-latest}
     ports:
       - "127.0.0.1:8080:80"
     env_file:
-      - .env
+      - ../.env
     restart: unless-stopped
     depends_on:
       mariadb:
         condition: service_healthy
 
   mariadb:
-    image: mariadb:11.4
+    image: ghcr.io/mord0rek/wefixit-db:${IMAGE_TAG:-latest}
     volumes:
       - db_data:/var/lib/mysql
-      - ./database-czysta.sql:/docker-entrypoint-initdb.d/database.sql:ro,z
     environment:
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MARIADB_DATABASE: ${DB_NAME}
