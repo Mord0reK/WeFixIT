@@ -27,12 +27,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: ${{ env.PHP_VERSION }}
           coverage: none
@@ -80,19 +80,19 @@ jobs:
 
   sql_import:
     name: SQL import (${{ matrix.file }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     strategy:
       fail-fast: false
       matrix:
         file:
+          - database/database-czysta.sql
           - database/database.sql
-          - database/database-z-danymi-testowymi.sql
 
     services:
       mariadb:
-        image: mariadb:11.4
+        image: mariadb:11.4@sha256:65ad406b90f2d23a0d75d8cdadb075f9c421f70d8c93f020b9513e9ab9b29a78 # mariadb:11.4
         env:
           MARIADB_ROOT_PASSWORD: ci-root-password
           MARIADB_DATABASE: wefixit_ci
@@ -107,7 +107,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
@@ -151,17 +151,17 @@ jobs:
 
   tailwind:
     name: Tailwind CSS build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
       - name: Restore Tailwind CLI
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: ~/.cache/wefixit/tailwindcss
           key: tailwind-${{ runner.os }}-${{ runner.arch }}-${{ env.TAILWIND_VERSION }}
@@ -241,7 +241,7 @@ jobs:
       - php_lint
       - sql_import
       - tailwind
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 2
 
     steps:
