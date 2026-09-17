@@ -22,10 +22,10 @@ services:
       - db_data:/var/lib/mysql
       - ../database/database.sql:/docker-entrypoint-initdb.d/database.sql:ro,z
     environment:
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MARIADB_DATABASE: ${DB_NAME}
-      MARIADB_USER: ${DB_USER}
-      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD must be set}
+      MARIADB_DATABASE: ${DB_NAME:?DB_NAME must be set}
+      MARIADB_USER: ${DB_USER:?DB_USER must be set}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
     healthcheck:
       test:
         - CMD
