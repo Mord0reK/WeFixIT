@@ -7,9 +7,7 @@ DROP TABLE IF EXISTS uslugi_pracownikow;
 DROP TABLE IF EXISTS pracownicy;
 DROP TABLE IF EXISTS uslugi;
 DROP TABLE IF EXISTS kategorie_uslug;
-DROP TABLE IF EXISTS uskugi_kategorie;
 DROP TABLE IF EXISTS uzytkownicy;
-DROP TABLE IF EXISTS uzytkownik;
 
 SET FOREIGN_KEY_CHECKS = 1;
 

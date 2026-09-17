@@ -71,6 +71,14 @@ Do uruchomienia aplikacji należy wybrać jedną z poniższych metod:
 - Docker z obsługą Compose,
 - XAMPP z Apache, PHP i MySQL.
 
+### Konfiguracja środowiska
+
+Plik `.env` jest jedynym źródłem konfiguracji aplikacji, w szczególności
+połączenia z bazą danych. Należy utworzyć go na podstawie `.env.example` i
+dostosować do wybranego środowiska. Plik `.env` znajduje się w katalogu
+głównym projektu, poza katalogiem `public/`, i jest ignorowany przez Git — nie
+trafia do repozytorium.
+
 ## Uruchomienie przez Docker
 
 Docker uruchamia aplikację razem z serwerem MariaDB oraz automatycznie ładuje testową bazę danych.
@@ -91,53 +99,49 @@ Docker uruchamia aplikację razem z serwerem MariaDB oraz automatycznie ładuje 
 3. Zbuduj obrazy i uruchom kontenery:
 
    ```bash
-   docker compose -f docker/docker-compose.dev.yml up --build
+   docker compose --env-file .env -f docker/docker-compose.dev.yml up --build
    ```
+
+   Polecenie wykonuj z katalogu głównego projektu, ponieważ właśnie stamtąd
+   Compose wczytuje plik `.env`. 
 
 4. Otwórz aplikację w przeglądarce: [http://localhost:8080](http://localhost:8080).
 
 Aby zatrzymać aplikację, użyj `Ctrl+C` albo uruchom:
 
 ```bash
-docker compose -f docker/docker-compose.dev.yml down
+docker compose --env-file .env -f docker/docker-compose.dev.yml down
 ```
 
 Baza danych jest przechowywana w wolumenie Dockera. Aby rozpocząć od nowej bazy i ponownie załadować dane testowe, usuń także wolumen:
 
 ```bash
-docker compose -f docker/docker-compose.dev.yml down -v
-docker compose -f docker/docker-compose.dev.yml up --build
+docker compose --env-file .env -f docker/docker-compose.dev.yml down -v
+docker compose --env-file .env -f docker/docker-compose.dev.yml up --build
 ```
 
 ## Uruchomienie przez XAMPP
 
-Docelowo uruchomienie przez XAMPP będzie wyglądało następująco:
-
-1. Pobierz ZIP aplikacji z sekcji **Releases** na GitHubie.
-2. Rozpakuj go w katalogu `htdocs`.
-3. Uruchom Apache i MySQL w panelu XAMPP.
-4. Otwórz aplikację pod adresem `http://localhost/WeFixIT`.
-
-ZIP z release będzie zawierał gotową wersję aplikacji i nie będzie zawierał plików narzędzi deweloperskich, takich jak konfiguracja CodeRabbit.
-
-### Obecny sposób uruchomienia
-
-Aktualna wersja repozytorium nie ma jeszcze automatycznej konfiguracji połączenia z bazą dla XAMPP. Przed użyciem tej metody należy jednorazowo:
+Uruchomienie przez XAMPP:
 
 1. Zainstalować XAMPP i uruchomić moduły **Apache** oraz **MySQL**.
 2. Rozpakować projekt do `C:\xampp\htdocs\WeFixIT` (Windows) albo odpowiednika katalogu `htdocs` na danym systemie.
 3. Otworzyć [phpMyAdmin](http://localhost/phpmyadmin), utworzyć bazę `wefixit` i zaimportować plik [database.sql](database/database.sql). Na potrzeby produkcyjne można użyć [database-czysta.sql](database/database-czysta.sql).
-4. W pliku `index.php` zmienić host bazy danych z `mariadb` na `localhost`:
+4. Utworzyć plik `.env` w katalogu głównym projektu na podstawie `.env.example` i ustawić dane XAMPP. Dla standardowej instalacji użyj:
 
-   ```php
-   $db = mysqli_connect('localhost', 'root', '', 'wefixit');
+   ```dotenv
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_NAME=wefixit
+   DB_USER=root
+   DB_PASSWORD=
    ```
 
-   Jeśli konto MySQL `root` ma ustawione hasło, należy wpisać je zamiast pustej wartości.
+   Jeśli konto MySQL `root` ma ustawione hasło, wpisz je w `DB_PASSWORD`. Nie należy edytować plików PHP — konfigurację zmienia się wyłącznie w `.env`.
 
-5. Otworzyć aplikację pod adresem [http://localhost/WeFixIT](http://localhost/WeFixIT).
+5. Otworzyć aplikację pod adresem [http://localhost/WeFixIT/public/](http://localhost/WeFixIT/public/). Alternatywnie można skonfigurować VirtualHost z `DocumentRoot` wskazującym na katalog `public/` i używać adresu ustawionego dla tego VirtualHosta.
 
-Instrukcja z jednym gotowym ZIP-em z sekcji **Releases** będzie obowiązywać po przygotowaniu release oraz dostosowaniu konfiguracji bazy do środowiska XAMPP. Automatyczne tworzenie release przez GitHub Actions nie jest obecnie skonfigurowane.
+W środowisku Docker wartość `DB_HOST` musi wynosić `mariadb`; w środowisku XAMPP — `localhost`.
 
 ## Autorzy
 
