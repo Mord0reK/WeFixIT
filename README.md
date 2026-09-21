@@ -24,7 +24,94 @@ Wykorzystywana jest baza danych MariaDB. Pusta wersja znajduje się w pliku [dat
 
 Poniżej znajduje się diagram wykorzystywanej bazy danych.
 
-![Diagram schematu bazy danych WeFixIT](database/database-diagram-WeFixIT.png)
+
+```mermaid
+erDiagram
+    uzytkownicy ||--o| pracownicy : "może być"
+    uzytkownicy ||--o{ rezerwacje : "tworzy"
+    kategorie_uslug ||--o{ uslugi : "zawiera"
+    pracownicy ||--o{ uslugi_pracownikow : "wykonuje"
+    uslugi ||--o{ uslugi_pracownikow : "jest przypisana"
+    pracownicy ||--o{ godziny_pracy : "ma"
+    uslugi_pracownikow ||--o{ rezerwacje : "dotyczy"
+
+    uzytkownicy {
+        INT id PK
+        VARCHAR imie
+        VARCHAR nazwisko
+        VARCHAR email UK
+        VARCHAR telefon
+        VARCHAR haslo_hash
+        ENUM rola
+        BOOLEAN aktywny
+        DATETIME utworzono
+        DATETIME zaktualizowano
+    }
+
+    kategorie_uslug {
+        INT id PK
+        VARCHAR nazwa UK
+        TEXT opis
+        BOOLEAN aktywna
+        DATETIME utworzono
+        DATETIME zaktualizowano
+    }
+
+    uslugi {
+        INT id PK
+        INT kategoria_id FK
+        VARCHAR nazwa
+        TEXT opis
+        SMALLINT czas_trwania_minuty
+        DECIMAL cena
+        BOOLEAN aktywna
+        DATETIME utworzono
+        DATETIME zaktualizowano
+    }
+
+    pracownicy {
+        INT id PK
+        INT uzytkownik_id FK, UK
+        TEXT opis
+        BOOLEAN aktywny
+        DATETIME utworzono
+        DATETIME zaktualizowano
+    }
+
+    uslugi_pracownikow {
+        INT pracownik_id PK, FK
+        INT usluga_id PK, FK
+        BOOLEAN aktywne
+        DATETIME przypisano
+        DATETIME zaktualizowano
+    }
+
+    godziny_pracy {
+        INT id PK
+        INT pracownik_id FK
+        TINYINT dzien_tygodnia
+        TIME czas_rozpoczecia
+        TIME czas_zakonczenia
+        BOOLEAN aktywne
+        DATETIME utworzono
+        DATETIME zaktualizowano
+    }
+
+    rezerwacje {
+        INT id PK
+        INT uzytkownik_id FK
+        INT pracownik_id FK
+        INT usluga_id FK
+        DATETIME czas_rozpoczecia
+        DATETIME czas_zakonczenia
+        DECIMAL cena_historyczna
+        ENUM status_rezerwacji
+        VARCHAR komentarz_klienta
+        DATETIME anulowano
+        DATETIME utworzono
+        DATETIME zaktualizowano
+    }
+```
 
 ### Wersja pusta
 Pusta edycja bazy danych jak sama nazwa wskazuje nie zawiera żadnych danych w sobie. Zalecane użycie w środowisku produkcyjnym.
