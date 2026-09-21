@@ -139,7 +139,7 @@ WeFixIT to system rezerwacji dla serwisu komputerowego z trzema rolami: klient, 
 - Schemat bazy MariaDB 11.4: 7 tabel (`uzytkownicy`, `pracownicy`, `kategorie_uslug`, `uslugi`, `uslugi_pracownikow`, `godziny_pracy`, `rezerwacje`).
 - Relacje 1:N oraz relacja N:M pracownik–usługa przez `uslugi_pracownikow`.
 - Integralność: klucze obce, `UNIQUE` na e-mail, `CHECK` na ceny / czasy / statusy, `ON DELETE RESTRICT`.
-- Diagram ERD: `database-diagram-WeFixIT.png`.
+- Diagram ERD: `database-diagram-WeFixIT.png` oraz w mermaid powyżej.
 - Dane testowe: 1 administrator, 2 pracowników, 3 klientów, usługi, grafik i rezerwacje.
 - Środowisko uruchomieniowe: Docker Compose dev + prod oraz instrukcja pod XAMPP.
 
