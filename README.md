@@ -33,7 +33,10 @@ erDiagram
     pracownicy ||--o{ uslugi_pracownikow : "wykonuje"
     uslugi ||--o{ uslugi_pracownikow : "jest przypisana"
     pracownicy ||--o{ godziny_pracy : "ma"
+    pracownicy ||--o{ nieobecnosci : "zgłasza"
+    uzytkownicy o|--o{ nieobecnosci : "rozpatruje"
     uslugi_pracownikow ||--o{ rezerwacje : "dotyczy"
+    uzytkownicy o|--o{ log_zdarzen : "jest aktorem"
 
     uzytkownicy {
         INT id PK
@@ -97,6 +100,20 @@ erDiagram
         DATETIME zaktualizowano
     }
 
+    nieobecnosci {
+        INT id PK
+        INT pracownik_id FK
+        DATE data_od
+        DATE data_do
+        ENUM rodzaj
+        ENUM status
+        VARCHAR powod
+        INT rozpatrzyl_id FK
+        DATETIME rozpatrzono
+        DATETIME utworzono
+        DATETIME zaktualizowano
+    }
+
     rezerwacje {
         INT id PK
         INT uzytkownik_id FK
@@ -110,6 +127,18 @@ erDiagram
         DATETIME anulowano
         DATETIME utworzono
         DATETIME zaktualizowano
+    }
+
+    log_zdarzen {
+        BIGINT id PK
+        INT aktor_id FK
+        VARCHAR akcja
+        VARCHAR obiekt_typ
+        INT obiekt_id
+        ENUM poziom
+        VARCHAR opis
+        JSON szczegoly
+        DATETIME utworzono
     }
 ```
 
@@ -136,10 +165,10 @@ WeFixIT to system rezerwacji dla serwisu komputerowego z trzema rolami: klient, 
 
 ### Zrealizowano w Etapie 1
 
-- Schemat bazy MariaDB 11.4: 7 tabel (`uzytkownicy`, `pracownicy`, `kategorie_uslug`, `uslugi`, `uslugi_pracownikow`, `godziny_pracy`, `rezerwacje`).
+- Schemat bazy MariaDB 11.4: 9 tabel (`uzytkownicy`, `pracownicy`, `kategorie_uslug`, `uslugi`, `uslugi_pracownikow`, `godziny_pracy`, `nieobecnosci`, `rezerwacje`, `log_zdarzen`).
 - Relacje 1:N oraz relacja N:M pracownik–usługa przez `uslugi_pracownikow`.
 - Integralność: klucze obce, `UNIQUE` na e-mail, `CHECK` na ceny / czasy / statusy, `ON DELETE RESTRICT`.
-- Diagram ERD: `database-diagram-WeFixIT.png` oraz w mermaid powyżej.
+- Aktualny diagram ERD w Mermaid powyżej.
 - Dane testowe: 1 administrator, 2 pracowników, 3 klientów, usługi, grafik i rezerwacje.
 - Środowisko uruchomieniowe: Docker Compose dev + prod oraz instrukcja pod XAMPP.
 

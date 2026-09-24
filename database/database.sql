@@ -1,6 +1,8 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS log_zdarzen;
+DROP TABLE IF EXISTS nieobecnosci;
 DROP TABLE IF EXISTS rezerwacje;
 DROP TABLE IF EXISTS godziny_pracy;
 DROP TABLE IF EXISTS uslugi_pracownikow;
@@ -193,6 +195,65 @@ CREATE TABLE godziny_pracy (
     )
 ) ENGINE = InnoDB;
 
+CREATE TABLE nieobecnosci (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    pracownik_id INT UNSIGNED NOT NULL,
+    data_od DATE NOT NULL,
+    data_do DATE NOT NULL,
+    rodzaj ENUM('urlop', 'choroba', 'inny') NOT NULL,
+    status ENUM(
+        'oczekujaca',
+        'zatwierdzona',
+        'odrzucona',
+        'anulowana'
+    ) NOT NULL DEFAULT 'oczekujaca',
+    powod VARCHAR(500) NULL,
+    rozpatrzyl_id INT UNSIGNED NULL,
+    rozpatrzono DATETIME NULL,
+    utworzono DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    zaktualizowano DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+
+    CONSTRAINT fk_nieobecnosci_pracownik
+        FOREIGN KEY (pracownik_id)
+        REFERENCES pracownicy (id)
+        ON UPDATE RESTRICT
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_nieobecnosci_rozpatrzyl
+        FOREIGN KEY (rozpatrzyl_id)
+        REFERENCES uzytkownicy (id)
+        ON UPDATE RESTRICT
+        ON DELETE RESTRICT,
+
+    CONSTRAINT chk_nieobecnosci_daty
+        CHECK (data_od <= data_do),
+
+    CONSTRAINT chk_nieobecnosci_rozpatrzenie
+        CHECK (
+            (
+                status IN ('zatwierdzona', 'odrzucona')
+                AND rozpatrzyl_id IS NOT NULL
+                AND rozpatrzono IS NOT NULL
+            )
+            OR
+            (
+                status IN ('oczekujaca', 'anulowana')
+                AND rozpatrzyl_id IS NULL
+                AND rozpatrzono IS NULL
+            )
+        ),
+
+    INDEX idx_nieobecnosci_pracownik_status_daty
+        (pracownik_id, status, data_od, data_do),
+
+    INDEX idx_nieobecnosci_status_data
+        (status, data_od)
+) ENGINE = InnoDB;
+
+
 CREATE TABLE rezerwacje (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     uzytkownik_id INT UNSIGNED NOT NULL,
@@ -266,6 +327,46 @@ CREATE TABLE rezerwacje (
     INDEX idx_rezerwacje_usluga (
         usluga_id
     )
+) ENGINE = InnoDB;
+
+CREATE TABLE log_zdarzen (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    aktor_id INT UNSIGNED NULL,
+    akcja VARCHAR(80) NOT NULL,
+    obiekt_typ VARCHAR(40) NULL,
+    obiekt_id INT UNSIGNED NULL,
+    poziom ENUM('info', 'warning', 'critical') NOT NULL DEFAULT 'info',
+    opis VARCHAR(500) NOT NULL,
+    szczegoly JSON NULL,
+    utworzono DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+
+    CONSTRAINT fk_log_zdarzen_aktor
+        FOREIGN KEY (aktor_id)
+        REFERENCES uzytkownicy (id)
+        ON UPDATE RESTRICT
+        ON DELETE RESTRICT,
+
+    CONSTRAINT chk_log_zdarzen_akcja
+        CHECK (TRIM(akcja) <> ''),
+
+    CONSTRAINT chk_log_zdarzen_opis
+        CHECK (TRIM(opis) <> ''),
+
+    CONSTRAINT chk_log_zdarzen_obiekt
+        CHECK (
+            (obiekt_typ IS NULL AND obiekt_id IS NULL)
+            OR
+            (obiekt_typ IS NOT NULL
+             AND TRIM(obiekt_typ) <> ''
+             AND obiekt_id IS NOT NULL)
+        ),
+
+    INDEX idx_log_zdarzen_obiekt (obiekt_typ, obiekt_id, utworzono),
+    INDEX idx_log_zdarzen_aktor (aktor_id, utworzono),
+    INDEX idx_log_zdarzen_poziom_czas (poziom, utworzono),
+    INDEX idx_log_zdarzen_czas (utworzono)
 ) ENGINE = InnoDB;
 
 INSERT INTO uzytkownicy (id, imie, nazwisko, email, telefon, haslo_hash, rola, aktywny) VALUES
