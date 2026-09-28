@@ -14,7 +14,7 @@ System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników 
 
 ## Technologie
 Projekt wykorzystuje następujące technologie:
-- PHP 8.2 + Apache, proceduralne MySQLi
+- PHP 8.2 + Apache, PDO
 - MariaDB 11.4
 - HTML5, Tailwind CSS 4.3.3 standalone CLI, vanilla JS
 - Docker Compose v2, kompatybilność XAMPP
