@@ -3,7 +3,8 @@ session_start();
 
 /*
     * Wczytywanie zmiennych środowiskowych z pliku .env
-    * w XAMPP trzeba wczytywanie wszystko z pliku .env, bo inaczej nie działa
+    * w XAMPP trzeba wczytywać wszystko z pliku .env, bo inaczej nie działa
+    * Docker lepszy i latwiejszy
  */
 $env = getenv();
 
