@@ -2,10 +2,9 @@
 
 language: "pl-PL"
 
-tone_instructions: >
-  Pisz po polsku, krótko i technicznie. Zgłaszaj tylko problemy mające
-  praktyczne znaczenie. Unikaj pochwał, dygresji i uwag stylistycznych
-  bez wpływu na poprawność, bezpieczeństwo lub utrzymanie kodu.
+tone_instructions: >-
+  Pisz po polsku, krótko i technicznie. Bez pochwał i dygresji.
+  W komentarzu wskaż problem, praktyczny skutek i konkretną poprawkę.
 
 early_access: false
 
@@ -53,81 +52,42 @@ reviews:
   path_instructions:
     - path: "**/*"
       instructions: |
-        Projekt WeFixIT jest prostym modularnym monolitem SSR.
+        Stosuj standardy projektu opisane w AGENTS.md.
 
-        Celem review jest wykrywanie błędów przed mergem PR, zarówno
-        oczywistych, jak i trudnych do zauważenia.
+        Review służy wykrywaniu rzeczywistych błędów przed mergem,
+        zarówno oczywistych, jak i trudnych do zauważenia.
 
-        Zgłaszaj komentarz tylko, gdy wskazujesz konkretną, realną ścieżkę
-        do błędu runtime, regresji, luki bezpieczeństwa, utraty lub
-        niespójności danych, błędnej authorization albo naruszenia jawnego
+        Zgłaszaj problem tylko wtedy, gdy możesz wskazać konkretną
+        ścieżkę wykonania prowadzącą do błędu runtime, regresji,
+        luki bezpieczeństwa, utraty lub niespójności danych,
+        błędnej authorization albo naruszenia funkcjonalnego
         wymagania projektu.
 
-        Priorytet mają:
-        - błędy logiki i regresje,
-        - błędy runtime,
-        - nieobsłużone edge cases,
-        - problemy bezpieczeństwa,
-        - błędy authentication, authorization i ownership,
-        - SQL injection i niepoprawna obsługa danych wejściowych,
-        - race conditions i problemy z integralnością danych,
-        - błędne założenia dotyczące stanu aplikacji,
-        - problemy wynikające z niepoprawnej obsługi błędów,
-        - niezgodność z wymaganiami i ustalonym stackiem projektu,
-        - kod działający dla typowego przypadku, ale zawodzący dla
-          poprawnych danych brzegowych. (edge cases)
+        Reguły formatowania, nazewnictwa i komentarzy są wskazówkami
+        dla implementacji, nie powodem do kosmetycznych uwag review.
 
-        Nie zgłaszaj:
-        - kosmetycznych zmian stylu,
-        - alternatywnego formatowania,
-        - zmian nazw bez konkretnej korzyści,
-        - refactorów, które nie rozwiązują realnego problemu,
-        - abstrakcji tworzonych na zapas,
-        - poprawnego kodu tylko dlatego, że można go napisać inaczej,
-        - hipotetycznych problemów bez realnej ścieżki wykonania.
+        Każdy komentarz powinien:
+        - wskazywać konkretny problem,
+        - wyjaśniać jego praktyczny skutek,
+        - proponować najmniejszą poprawkę rozwiązującą problem.
 
-        Każdy komentarz review powinien być krótki i konkretny:
-        - wskaż problem,
-        - podaj jego praktyczny skutek,
-        - zaproponuj konkretną poprawkę.
+        Dla lokalnej, jednoznacznej i bezpiecznej poprawki użyj
+        committable code suggestion nadającego się do GitHub
+        Apply suggestion.
 
-        Jeżeli poprawka jest lokalna, jednoznaczna i bezpieczna, użyj
-        committable code suggestion możliwego do zastosowania bezpośrednio
-        przez GitHub Apply suggestion.
+        Nie wymuszaj suggestion, jeśli poprawka wymaga decyzji
+        projektowej albo zmian w wielu miejscach.
 
-        Nie proponuj dużej przebudowy kodu, jeżeli problem można naprawić
-        małą lokalną zmianą.
-
-        Ustalony stack projektu:
-        - PHP 8.2 bez frameworków,
-        - Apache,
-        - proceduralne MySQLi i prepared statements,
-        - MariaDB 11.4,
-        - HTML5,
-        - Tailwind CSS 4.3.3 standalone CLI,
-        - vanilla JavaScript,
-        - Docker Compose wyłącznie do developmentu,
-        - aplikacja musi działać również przez XAMPP.
-
-        Nie proponuj:
-        - Laravel,
-        - Symfony,
-        - ORM,
-        - React,
-        - Vue,
-        - npm,
-        - Bun,
-        - osobnego REST API,
-        - dodatkowej infrastruktury bez konkretnej potrzeby.
-
-        Preferuj proste rozwiązania zgodne z istniejącą architekturą.
+        Nie proponuj niezwiązanych refactorów, dodatkowych warstw,
+        kosmetycznych zmian ani hipotetycznych problemów
+        bez uzasadnienia.
 
     - path: "**/*.php"
       instructions: |
         Kod PHP ma być zgodny z PHP 8.2.
 
         Sprawdzaj szczególnie:
-        - proceduralne MySQLi,
+        - proceduralne PDO,
         - prepared statements dla wszystkich dynamicznych danych SQL,
         - SQL injection,
         - poprawną obsługę błędów operacji bazodanowych,
