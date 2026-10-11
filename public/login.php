@@ -1,3 +1,15 @@
+<?php
+declare(strict_types=1);
+
+/*
+    Formularz logowania. Renderuje token CSRF i wysyła go w nagłówku X-CSRF-Token.
+*/
+require_once dirname(__DIR__) . '/app/csrf.php';
+
+header('Cache-Control: no-store');
+
+$csrfToken = csrf_token();
+?>
 <!DOCTYPE html>
 <html lang="pl">
 <head>
@@ -31,6 +43,11 @@
             </button>
         </form>
 
+        <p class="mt-4 text-center text-sm text-gray-600">
+            Nie masz konta?
+            <a href="register" class="text-blue-600 underline hover:text-blue-700">Załóż konto</a>
+        </p>
+
         <noscript>
             <p class="mt-4 text-sm text-red-600">Włącz JavaScript, aby się zalogować.</p>
         </noscript>
@@ -40,6 +57,7 @@
         const form = document.getElementById('login-form');
         const error = document.getElementById('login-error');
         const button = form.querySelector('button[type="submit"]');
+        const csrfToken = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
@@ -55,7 +73,7 @@
                 const response = await fetch(form.action, {
                     method: 'POST',
                     credentials: 'same-origin',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                     body: JSON.stringify({
                         email: form.elements.email.value.trim(),
                         password: form.elements.password.value

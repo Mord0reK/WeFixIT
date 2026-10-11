@@ -1,33 +1,35 @@
 <?php
 
-header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: no-store');
-
-// Wysłanie odpowiedzi JSON
-function loginJsonResponse(int $status, array $body): void
-{
-    http_response_code($status);
-    echo json_encode($body, JSON_UNESCAPED_UNICODE);
-    exit;
-}
+// Wspólne helpery odpowiedzi JSON i ochrony CSRF.
+require_once __DIR__ . '/../../../app/json.php';
+require_once __DIR__ . '/../../../app/csrf.php';
 
 // Sprawdzenie czy zapytanie w formacie JSON
 $contentType = strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '', 2)[0]));
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $contentType !== 'application/json') {
     header('Allow: POST');
-    loginJsonResponse(405, ['error' => 'Nieprawidłowe żądanie.']);
+    json_response(405, ['error' => 'Nieprawidłowe żądanie.']);
+}
+
+if (!csrf_start_session()) {
+    error_log('Nie udało się uruchomić sesji podczas logowania.');
+    json_response(500, ['error' => 'Nie udało się zalogować. Wystąpił problem z serwerem.']);
+}
+
+if (!csrf_verify(csrf_token_from_request())) {
+    json_response(403, ['error' => 'Sesja formularza wygasła. Odśwież stronę i spróbuj ponownie.']);
 }
 
 // Zamiana danych JSON na obiekt stdClass
 try {
     $data = json_decode(file_get_contents('php://input'), false, 512, JSON_THROW_ON_ERROR);
 } catch (JsonException $e) {
-    loginJsonResponse(400, ['error' => 'Nieprawidłowe żądanie.']);
+    json_response(400, ['error' => 'Nieprawidłowe żądanie.']);
 }
 
 if (!$data instanceof stdClass) {
-    loginJsonResponse(400, ['error' => 'Nieprawidłowe żądanie.']);
+    json_response(400, ['error' => 'Nieprawidłowe żądanie.']);
 }
 
 $email = isset($data->email) && is_string($data->email) ? trim($data->email) : '';
@@ -44,14 +46,14 @@ if (!is_string($password) || $password === '') {
 }
 
 if ($errors !== []) {
-    loginJsonResponse(422, ['error' => 'Nieprawidłowe dane logowania.', 'errors' => $errors]);
+    json_response(422, ['error' => 'Nieprawidłowe dane logowania.', 'errors' => $errors]);
 }
 
 try {
     require __DIR__ . '/../../config.php';
 
     if ($bazaErr || session_status() !== PHP_SESSION_ACTIVE) {
-        loginJsonResponse(500, ['error' => 'Nie udało się zalogować. Wystąpił problem z serwerem.']);
+        json_response(500, ['error' => 'Nie udało się zalogować. Wystąpił problem z serwerem.']);
     }
 
     $statement = $pdo->prepare(
@@ -62,18 +64,19 @@ try {
     $user = $statement->fetch(PDO::FETCH_ASSOC);
 
     if (!$user || !password_verify($password, $user['haslo_hash']) || (int) $user['aktywny'] !== 1) {
-        loginJsonResponse(401, ['error' => 'Nieprawidłowy e-mail lub hasło.']);
+        json_response(401, ['error' => 'Nieprawidłowy e-mail lub hasło.']);
     }
 
     if (!session_regenerate_id(true)) {
-        loginJsonResponse(500, ['error' => 'Nie udało się zalogować. Wystąpił problem z serwerem.']);
+        json_response(500, ['error' => 'Nie udało się zalogować. Wystąpił problem z serwerem.']);
     }
 
     $_SESSION['user_id'] = (int) $user['id'];
+    csrf_rotate_token();
 
-    loginJsonResponse(200, ['success' => true, 'user_id' => $_SESSION['user_id']]);
+    json_response(200, ['success' => true, 'user_id' => $_SESSION['user_id']]);
 
 } catch (Throwable $e) {
     error_log('Login endpoint: ' . $e->getMessage());
-    loginJsonResponse(500, ['error' => 'Nie udało się zalogować. Wystąpił problem z serwerem.']);
+    json_response(500, ['error' => 'Nie udało się zalogować. Wystąpił problem z serwerem.']);
 }

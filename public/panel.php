@@ -1,5 +1,13 @@
 <?php
+declare(strict_types=1);
+
+/*
+    Panel użytkownika. Chroniony sesją, wysyła token CSRF przy wylogowaniu.
+*/
 require_once dirname(__DIR__) . '/app/session.php';
+require_once dirname(__DIR__) . '/app/csrf.php';
+
+$csrfToken = csrf_token();
 ?>
 <!DOCTYPE html>
 <html lang="pl">
@@ -28,6 +36,7 @@ require_once dirname(__DIR__) . '/app/session.php';
         const form = document.getElementById('logout-form');
         const error = document.getElementById('logout-error');
         const button = form.querySelector('button[type="submit"]');
+        const csrfToken = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
@@ -42,7 +51,8 @@ require_once dirname(__DIR__) . '/app/session.php';
             try {
                 const response = await fetch(form.action, {
                     method: 'POST',
-                    credentials: 'same-origin'
+                    credentials: 'same-origin',
+                    headers: { 'X-CSRF-Token': csrfToken }
                 });
                 const data = await response.json();
 
