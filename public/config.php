@@ -1,5 +1,9 @@
 <?php
-session_start();
+
+// Sesja może już być uruchomiona, np. przez walidację tokenu CSRF przed wejściem w config.
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
 
 /*
     * Wczytywanie zmiennych środowiskowych z pliku .env
@@ -62,9 +66,9 @@ $pass = isset($env['DB_PASSWORD']) ? $env['DB_PASSWORD'] : '';
 $bazaErr = false;
 
 try {
-    $pdo = new PDO("mysql:host=$host;port=$port;dbname=$dbname", $user, $pass);
-    $pdo->query('SET NAMES utf8');
+    // charset w DSN ustawia utf8mb4, czyli obsługuje też 4-bajtowe znaki Unicode np. emoji.
+    $pdo = new PDO("mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4", $user, $pass);
 } catch (PDOException $e) {
-    $e->getMessage();
+    error_log('Połączenie z bazą nieudane: ' . $e->getMessage());
     $bazaErr = true;
 }
