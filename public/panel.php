@@ -2,11 +2,11 @@
 declare(strict_types=1);
 
 /*
-    Panel użytkownika. Chroniony sesją, wysyła token CSRF przy wylogowaniu.
+    Panel klienta. Strona chroniona — dane użytkownika pochodzą z weryfikacji w bazie.
 */
-require_once dirname(__DIR__) . '/app/session.php';
-require_once dirname(__DIR__) . '/app/csrf.php';
+require_once dirname(__DIR__) . '/app/auth.php';
 
+$user = require_login();
 $csrfToken = csrf_token();
 ?>
 <!DOCTYPE html>
@@ -21,7 +21,8 @@ $csrfToken = csrf_token();
     <main class="w-full max-w-sm rounded-lg bg-white p-6 shadow-sm">
         <h1 class="mb-4 text-2xl font-semibold">Panel użytkownika</h1>
         <p>Jesteś zalogowany. Ta strona jest dostępna tylko po zalogowaniu.</p>
-        <p class="mt-4 text-sm">Identyfikator użytkownika: <?= $userId ?></p>
+        <p class="mt-4 text-sm">Imię i nazwisko: <?= htmlspecialchars($user['imie'] . ' ' . $user['nazwisko'], ENT_QUOTES, 'UTF-8') ?></p>
+        <p class="mt-4 text-sm text-gray-600">Rola: <?= htmlspecialchars($user['rola'], ENT_QUOTES, 'UTF-8') ?></p>
 
         <form id="logout-form" action="api/auth/logout" method="post" class="mt-4">
             <p id="logout-error" role="alert" class="mb-4 hidden text-sm text-red-600"></p>
