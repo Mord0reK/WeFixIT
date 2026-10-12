@@ -9,6 +9,7 @@ declare(strict_types=1);
 */
 require_once __DIR__ . '/../../../app/json.php';
 require_once __DIR__ . '/../../../app/csrf.php';
+require_once __DIR__ . '/../../../app/session.php';
 
 // Odczyt pól tekstowych z obiektu JSON (hasła nie są przycinane).
 function registerTextField(stdClass $data, string $field): string
@@ -39,7 +40,7 @@ if ($contentType !== 'application/json') {
     json_response(415, ['error' => 'Oczekiwano zawartości w formacie JSON.']);
 }
 
-if (!csrf_start_session()) {
+if (!session_start_secure()) {
     error_log('Nie udało się uruchomić sesji podczas rejestracji.');
     json_response(500, ['error' => 'Nie udało się zarejestrować konta. Wystąpił problem z serwerem.']);
 }
