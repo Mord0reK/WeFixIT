@@ -91,12 +91,13 @@ function auth_login_user(int $userId): bool
     return true;
 }
 
-function auth_logout_user(): void
+function auth_logout_user(): bool
 {
     $_SESSION = [];
 
     if (session_status() === PHP_SESSION_ACTIVE && !session_destroy()) {
         error_log('Nie udało się usunąć sesji podczas wylogowania.');
+        return false;
     }
 
     // Wygaszamy cookie z zachowaniem jego parametrów, żeby przeglądarka usunęła właściwe.
