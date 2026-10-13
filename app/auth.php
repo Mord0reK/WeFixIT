@@ -100,6 +100,8 @@ function auth_logout_user(): bool
             'samesite' => $params['samesite'],
         ]);
     }
+
+    return true;
 }
 
 // Ścieżka bazowa aplikacji, żeby przekierowania działały też w podkatalogu XAMPP.
