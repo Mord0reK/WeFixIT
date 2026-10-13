@@ -117,7 +117,7 @@ function auth_logout_user(): void
 // Ścieżka bazowa aplikacji, żeby przekierowania działały też w podkatalogu XAMPP.
 function auth_base_path(): string
 {
-    return rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
+    return rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
 }
 
 function auth_role_home_path(string $role): string
