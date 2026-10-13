@@ -24,6 +24,8 @@ if (!csrf_verify(csrf_token_from_request())) {
     json_response(403, ['error' => 'Sesja formularza wygasła. Odśwież stronę i spróbuj ponownie.']);
 }
 
-auth_logout_user();
+if (!auth_logout_user()) {
+    json_response(500, ['error' => 'Nie udało się wylogować. Wystąpił problem z serwerem.']);
+}
 
 json_response(200, ['success' => true]);
