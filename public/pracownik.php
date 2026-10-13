@@ -24,6 +24,10 @@ $csrfToken = csrf_token();
         <p class="mt-4 text-sm">Imię i nazwisko: <?= htmlspecialchars($user['imie'] . ' ' . $user['nazwisko'], ENT_QUOTES, 'UTF-8') ?></p>
         <p class="mt-4 text-sm text-gray-600">Rola: <?= htmlspecialchars($user['rola'], ENT_QUOTES, 'UTF-8') ?></p>
 
+        <p class="mt-4 text-sm">
+            <a href="profil" class="text-blue-600 underline hover:text-blue-700">Mój profil</a>
+        </p>
+
         <form id="logout-form" action="api/auth/logout" method="post" class="mt-4">
             <p id="logout-error" role="alert" class="mb-4 hidden text-sm text-red-600"></p>
             <button type="submit"

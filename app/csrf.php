@@ -9,13 +9,16 @@ declare(strict_types=1);
     więc przeglądarka nie wyśle go z obcej domeny nawet przy zwykłym formularzu.
     Token porównujemy przez hash_equals(), żeby nie dało się go odgadywać po czasie.
 */
+require_once __DIR__ . '/session.php';
+
 function csrf_start_session(): bool
 {
     if (session_status() === PHP_SESSION_ACTIVE) {
         return true;
     }
 
-    return @session_start();
+    // Delegujemy do wspólnego startu sesji, żeby cookies miały HttpOnly i SameSite.
+    return session_start_secure();
 }
 
 // Token jest tworzony raz na sesję i odtąd zwracany z sesji.
