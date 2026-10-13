@@ -281,6 +281,9 @@
   .absolute {
     position: absolute;
   }
+  .static {
+    position: static;
+  }
   .container {
     width: 100%;
     @media (width >= 40rem) {

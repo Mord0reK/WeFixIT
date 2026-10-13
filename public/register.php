@@ -3,10 +3,16 @@ declare(strict_types=1);
 
 /*
     Formularz rejestracji. Renderuje token CSRF i wysyła go w nagłówku X-CSRF-Token.
+    Zalogowanego użytkownika przekierowuje na panel właściwy dla jego roli.
 */
-require_once dirname(__DIR__) . '/app/csrf.php';
+require_once dirname(__DIR__) . '/app/auth.php';
 
-header('Cache-Control: no-store');
+$user = current_user();
+
+if ($user !== null) {
+    header('Location: ' . auth_base_path() . '/' . auth_role_home_path($user['rola']));
+    exit;
+}
 
 $csrfToken = csrf_token();
 ?>

@@ -1,18 +1,29 @@
 <?php
+declare(strict_types=1);
 
-// Wspólne helpery odpowiedzi JSON i ochrony CSRF.
+/*
+    Endpoint logowania.
+
+    Weryfikuje dane, uruchamia sesję i zwraca rolę użytkownika, żeby frontend
+    wybrał panel właściwy dla tej roli. Komunikat błędu nie ujawnia, czy podany
+    e-mail istnieje.
+*/
 require_once __DIR__ . '/../../../app/json.php';
-require_once __DIR__ . '/../../../app/csrf.php';
+require_once __DIR__ . '/../../../app/auth.php';
 
-// Sprawdzenie czy zapytanie w formacie JSON
-$contentType = strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '', 2)[0]));
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $contentType !== 'application/json') {
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Allow: POST');
     json_response(405, ['error' => 'Nieprawidłowe żądanie.']);
 }
 
-if (!csrf_start_session()) {
+// Sprawdzenie czy zapytanie w formacie JSON
+$contentType = strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '', 2)[0]));
+
+if ($contentType !== 'application/json') {
+    json_response(415, ['error' => 'Oczekiwano zawartości w formacie JSON.']);
+}
+
+if (!session_start_secure()) {
     error_log('Nie udało się uruchomić sesji podczas logowania.');
     json_response(500, ['error' => 'Nie udało się zalogować. Wystąpił problem z serwerem.']);
 }
@@ -50,32 +61,31 @@ if ($errors !== []) {
 }
 
 try {
-    require __DIR__ . '/../../config.php';
-
-    if ($bazaErr || session_status() !== PHP_SESSION_ACTIVE) {
+    if ($bazaErr || !isset($pdo)) {
         json_response(500, ['error' => 'Nie udało się zalogować. Wystąpił problem z serwerem.']);
     }
 
     $statement = $pdo->prepare(
-        'SELECT id, haslo_hash, aktywny FROM uzytkownicy WHERE email = :email LIMIT 1'
+        'SELECT id, haslo_hash, rola, aktywny FROM uzytkownicy WHERE email = :email LIMIT 1'
     );
 
     $statement->execute(['email' => $email]);
     $user = $statement->fetch(PDO::FETCH_ASSOC);
 
-    if (!$user || !password_verify($password, $user['haslo_hash']) || (int) $user['aktywny'] !== 1) {
+    // Ten sam komunikat dla nieistniejącego e-maila, złego hasła i nieaktywnego konta.
+    if (!is_array($user) || !password_verify($password, $user['haslo_hash']) || (int) $user['aktywny'] !== 1) {
         json_response(401, ['error' => 'Nieprawidłowy e-mail lub hasło.']);
     }
 
-    if (!session_regenerate_id(true)) {
+    if (!auth_login_user((int) $user['id'])) {
         json_response(500, ['error' => 'Nie udało się zalogować. Wystąpił problem z serwerem.']);
     }
 
-    $_SESSION['user_id'] = (int) $user['id'];
-    csrf_rotate_token();
-
-    json_response(200, ['success' => true, 'user_id' => $_SESSION['user_id']]);
-
+    json_response(200, [
+        'success' => true,
+        'user_id' => (int) $user['id'],
+        'rola' => (string) $user['rola'],
+    ]);
 } catch (Throwable $e) {
     error_log('Login endpoint: ' . $e->getMessage());
     json_response(500, ['error' => 'Nie udało się zalogować. Wystąpił problem z serwerem.']);

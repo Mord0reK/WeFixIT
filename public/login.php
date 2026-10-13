@@ -3,10 +3,16 @@ declare(strict_types=1);
 
 /*
     Formularz logowania. Renderuje token CSRF i wysyła go w nagłówku X-CSRF-Token.
+    Zalogowanego użytkownika przekierowuje na panel właściwy dla jego roli.
 */
-require_once dirname(__DIR__) . '/app/csrf.php';
+require_once dirname(__DIR__) . '/app/auth.php';
 
-header('Cache-Control: no-store');
+$user = current_user();
+
+if ($user !== null) {
+    header('Location: ' . auth_base_path() . '/' . auth_role_home_path($user['rola']));
+    exit;
+}
 
 $csrfToken = csrf_token();
 ?>
@@ -58,6 +64,11 @@ $csrfToken = csrf_token();
         const error = document.getElementById('login-error');
         const button = form.querySelector('button[type="submit"]');
         const csrfToken = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        const rolePaths = <?= json_encode([
+            'klient' => auth_role_home_path('klient'),
+            'pracownik' => auth_role_home_path('pracownik'),
+            'admin' => auth_role_home_path('admin'),
+        ], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
@@ -87,7 +98,15 @@ $csrfToken = csrf_token();
                     return;
                 }
 
-                window.location.href = 'panel';
+                const target = rolePaths[data.rola];
+
+                if (typeof target !== 'string') {
+                    error.textContent = 'Nie udało się zalogować.';
+                    error.classList.remove('hidden');
+                    return;
+                }
+
+                window.location.href = target;
             } catch {
                 error.textContent = 'Nie udało się połączyć z serwerem. Spróbuj ponownie.';
                 error.classList.remove('hidden');

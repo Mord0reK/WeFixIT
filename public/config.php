@@ -1,9 +1,16 @@
 <?php
+declare(strict_types=1);
+
+/*
+    Konfiguracja aplikacji: wczytanie .env, uruchomienie sesji i połączenie PDO.
+
+    Udostępnia globalne $pdo oraz flagę $bazaErr opisującą stan połączenia.
+    Ścieżki budujemy względem __DIR__, więc działają także w podkatalogu.
+*/
+require_once __DIR__ . '/../app/session.php';
 
 // Sesja może już być uruchomiona, np. przez walidację tokenu CSRF przed wejściem w config.
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
+session_start_secure();
 
 /*
     * Wczytywanie zmiennych środowiskowych z pliku .env
