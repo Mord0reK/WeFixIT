@@ -12,6 +12,7 @@ require_once __DIR__ . '/session.php';
 require_once __DIR__ . '/csrf.php';
 require_once __DIR__ . '/json.php';
 require_once __DIR__ . '/../public/config.php';
+require_once __DIR__ . '/users.php';
 
 function auth_user_id(): ?int
 {
@@ -48,21 +49,7 @@ function current_user(bool $fresh = false): ?array
         return null;
     }
 
-    $pdo = $GLOBALS['pdo'] ?? null;
-
-    if (!$pdo instanceof PDO) {
-        error_log('Brak połączenia z bazą przy pobieraniu użytkownika.');
-        return null;
-    }
-
-    $statement = $pdo->prepare(
-        'SELECT id, imie, nazwisko, email, telefon, rola, aktywny
-         FROM uzytkownicy
-         WHERE id = :id
-         LIMIT 1'
-    );
-    $statement->execute(['id' => $userId]);
-    $row = $statement->fetch(PDO::FETCH_ASSOC);
+    $row = user_find_by_id($userId);
 
     // Dezaktywowane konto traci dostęp mimo poprawnego user_id w sesji.
     if (!is_array($row) || (int) $row['aktywny'] !== 1) {

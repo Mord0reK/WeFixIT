@@ -10,23 +10,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../../app/json.php';
 require_once __DIR__ . '/../../../app/csrf.php';
 require_once __DIR__ . '/../../../app/session.php';
-
-// Odczyt pól tekstowych z obiektu JSON (hasła nie są przycinane).
-function registerTextField(stdClass $data, string $field): string
-{
-    return isset($data->{$field}) && is_string($data->{$field}) ? trim($data->{$field}) : '';
-}
-
-function registerPasswordField(stdClass $data, string $field): ?string
-{
-    return isset($data->{$field}) && is_string($data->{$field}) ? $data->{$field} : null;
-}
-
-// Imię i nazwisko to nazwa, więc dopuszczamy litery z dowolnego alfabetu oraz typowe separatory.
-function registerValidName(string $value): bool
-{
-    return preg_match('/^[\p{L}\p{M} .\'\-]+$/u', $value) === 1;
-}
+require_once __DIR__ . '/../../../app/users.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Allow: POST');
@@ -60,40 +44,19 @@ if (!$data instanceof stdClass) {
     json_response(400, ['error' => 'Nieprawidłowe żądanie.']);
 }
 
-$imie = registerTextField($data, 'imie');
-$nazwisko = registerTextField($data, 'nazwisko');
-$email = registerTextField($data, 'email');
-$telefon = registerTextField($data, 'telefon');
-$password = registerPasswordField($data, 'password');
-$passwordPowtorzenie = registerPasswordField($data, 'password_powtorzenie');
+$dataArray = (array) $data;
 
-$errors = [];
+$imie = user_field($dataArray, 'imie');
+$nazwisko = user_field($dataArray, 'nazwisko');
+$email = user_field($dataArray, 'email');
+$telefon = user_field($dataArray, 'telefon');
+$password = user_field($dataArray, 'password', false);
+$passwordPowtorzenie = user_field($dataArray, 'password_powtorzenie', false);
 
-if ($imie === '' || mb_strlen($imie) > 100) {
-    $errors['imie'] = 'Podaj imię, maksymalnie 100 znaków.';
-} elseif (!registerValidName($imie)) {
-    $errors['imie'] = 'Imię może zawierać tylko litery oraz spację, kropkę lub myślnik.';
-}
-
-if ($nazwisko === '' || mb_strlen($nazwisko) > 100) {
-    $errors['nazwisko'] = 'Podaj nazwisko, maksymalnie 100 znaków.';
-} elseif (!registerValidName($nazwisko)) {
-    $errors['nazwisko'] = 'Nazwisko może zawierać tylko litery oraz spację, apostrof, kropkę lub myślnik.';
-}
-
-if (strlen($email) > 254 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-    $errors['email'] = 'Podaj prawidłowy adres e-mail.';
-}
-
-// Telefon w bazie jest wymagany, więc dopuszczamy tylko cyfry z typowymi separatorami.
-$cyfryTelefonu = preg_replace('/[^0-9]/', '', $telefon) ?? '';
-
-if (preg_match('/^\+?[0-9 ()-]{9,20}$/', $telefon) !== 1 || strlen($cyfryTelefonu) < 9) {
-    $errors['telefon'] = 'Podaj poprawny numer telefonu, na przykład +48123456789.';
-}
+$errors = user_profile_errors($dataArray);
 
 // Hasła obsługiwane są przez bcrypt, który ignoruje wszystko po 72 bajtach.
-if ($password === null || $password === '' || strlen($password) < 8) {
+if ($password === '' || strlen($password) < 8) {
     $errors['password'] = 'Hasło musi mieć co najmniej 8 znaków.';
 } elseif (strlen($password) > 72) {
     $errors['password'] = 'Hasło może mieć maksymalnie 72 znaki.';
@@ -106,16 +69,13 @@ if ($errors !== []) {
 }
 
 try {
-    require __DIR__ . '/../../config.php';
+    require_once __DIR__ . '/../../config.php';
 
     if ($bazaErr || session_status() !== PHP_SESSION_ACTIVE) {
         json_response(500, ['error' => 'Nie udało się zarejestrować konta. Wystąpił problem z serwerem.']);
     }
 
-    $istniejace = $pdo->prepare('SELECT 1 FROM uzytkownicy WHERE email = :email LIMIT 1');
-    $istniejace->execute(['email' => $email]);
-
-    if ($istniejace->fetchColumn() !== false) {
+    if (user_find_by_email($email) !== null) {
         json_response(409, [
             'error' => 'Konto z tym adresem e-mail już istnieje.',
             'errors' => ['email' => 'Konto z tym adresem e-mail już istnieje.'],
