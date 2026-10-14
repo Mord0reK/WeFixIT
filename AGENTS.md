@@ -203,6 +203,8 @@ i pracownika, przypisanie usługi, godziny pracy, nieobecności oraz konflikty.
 - Używaj statycznych, pełnych nazw klas Tailwind.
 - Nie składaj nazw klas z fragmentów stringów.
 - Nie edytuj ręcznie wygenerowanego app.css; przebuduj go ze źródeł.
+- W dev kontener tailwind-watcher przebudowuje app.css na żywo po zmianie
+  źródeł; nie uruchamiaj ręcznego builda, wystarczy odczekać na wynik.
 - Przy zmianie źródeł stylowania dołącz aktualny wynik builda.
 - Linki, fetch() i redirecty muszą działać również w podkatalogu XAMPP.
 - Nie zakładaj, że aplikacja zawsze działa w root domeny.

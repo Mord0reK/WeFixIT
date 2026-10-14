@@ -119,6 +119,16 @@ function auth_role_home_path(string $role): string
     };
 }
 
+// Czytelna nazwa roli do wyświetlenia w interfejsie.
+function auth_role_label(string $role): string
+{
+    return match ($role) {
+        'pracownik' => 'Pracownik',
+        'admin' => 'Administrator',
+        default => 'Klient',
+    };
+}
+
 function require_login(): array
 {
     $user = current_user();
@@ -139,37 +149,28 @@ function require_role(array $roles): array
         return $user;
     }
 
+    require_once __DIR__ . '/layout.php';
+
     http_response_code(403);
     header('Content-Type: text/html; charset=utf-8');
 
-    $basePath = auth_base_path();
-    $cssHref = htmlspecialchars($basePath . '/assets/css/app.css', ENT_QUOTES, 'UTF-8');
     $homeHref = htmlspecialchars(
-        $basePath . '/' . auth_role_home_path($user['rola']),
+        auth_base_path() . '/' . auth_role_home_path($user['rola']),
         ENT_QUOTES,
         'UTF-8'
     );
 
-    echo <<<HTML
-        <!DOCTYPE html>
-        <html lang="pl">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Brak dostępu — WeFixIT</title>
-            <link rel="stylesheet" href="{$cssHref}">
-        </head>
-        <body class="flex min-h-screen items-center justify-center bg-gray-100 p-4 text-gray-900">
-            <main class="w-full max-w-sm rounded-lg bg-white p-6 shadow-sm">
-                <h1 class="mb-4 text-2xl font-semibold">Brak dostępu</h1>
-                <p>Nie masz uprawnień do wyświetlenia tej strony.</p>
-                <p class="mt-4 text-sm">
-                    <a href="{$homeHref}" class="text-blue-600 underline hover:text-blue-700">Wróć do panelu</a>
-                </p>
-            </main>
-        </body>
-        </html>
-        HTML;
+    layout_head('Brak dostępu — WeFixIT');
+    ?>
+    <main class="<?= LAYOUT_CARD_CLASS ?>">
+        <h1 class="mb-4 text-2xl font-semibold">Brak dostępu</h1>
+        <p>Nie masz uprawnień do wyświetlenia tej strony.</p>
+        <p class="mt-4 text-sm">
+            <a href="<?= $homeHref ?>" class="text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">Wróć do panelu</a>
+        </p>
+    </main>
+    <?php
+    layout_foot();
 
     exit;
 }

@@ -1,1 +1,36 @@
 @import "tailwindcss";
+
+/*
+    Klatki kluczowe powiadomień (toastów). Czasy i taktowanie nadaje JavaScript
+    (style inline), tutaj trzymamy same animacje.
+*/
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(0.5rem);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes toast-out {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(0.5rem);
+    }
+}
+
+@keyframes toast-progress {
+    from {
+        width: 100%;
+    }
+    to {
+        width: 0;
+    }
+}
