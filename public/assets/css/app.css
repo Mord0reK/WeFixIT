@@ -7,26 +7,16 @@
     sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
     monospace;
-    --color-red-50: oklch(97.1% 0.013 17.38);
-    --color-red-100: oklch(93.6% 0.032 17.717);
-    --color-red-200: oklch(88.5% 0.062 18.334);
     --color-red-400: oklch(70.4% 0.191 22.216);
     --color-red-500: oklch(63.7% 0.237 25.331);
     --color-red-600: oklch(57.7% 0.245 27.325);
-    --color-red-800: oklch(44.4% 0.177 26.899);
-    --color-red-900: oklch(39.6% 0.141 25.723);
     --color-orange-500: oklch(70.5% 0.213 47.604);
     --color-yellow-500: oklch(79.5% 0.184 86.047);
     --color-lime-500: oklch(76.8% 0.233 130.85);
-    --color-green-50: oklch(98.2% 0.018 155.826);
-    --color-green-100: oklch(96.2% 0.044 156.743);
-    --color-green-200: oklch(92.5% 0.084 155.995);
     --color-green-400: oklch(79.2% 0.209 151.711);
     --color-green-500: oklch(72.3% 0.219 149.579);
     --color-green-600: oklch(62.7% 0.194 149.214);
     --color-green-700: oklch(52.7% 0.154 150.069);
-    --color-green-800: oklch(44.8% 0.119 151.328);
-    --color-green-900: oklch(39.3% 0.095 152.535);
     --color-emerald-400: oklch(76.5% 0.177 163.223);
     --color-emerald-500: oklch(69.6% 0.17 162.48);
     --color-emerald-700: oklch(50.8% 0.118 165.612);
@@ -399,12 +389,6 @@
   .h-0\.5 {
     height: calc(var(--spacing) * 0.5);
   }
-  .h-1 {
-    height: var(--spacing);
-  }
-  .h-2 {
-    height: calc(var(--spacing) * 2);
-  }
   .h-5 {
     height: calc(var(--spacing) * 5);
   }
@@ -570,10 +554,6 @@
     border-style: var(--tw-border-style);
     border-width: 1px;
   }
-  .border-1 {
-    border-style: var(--tw-border-style);
-    border-width: 1px;
-  }
   .border-2 {
     border-style: var(--tw-border-style);
     border-width: 2px;
@@ -606,14 +586,8 @@
   .border-gray-400 {
     border-color: var(--color-gray-400);
   }
-  .border-green-200 {
-    border-color: var(--color-green-200);
-  }
   .border-green-500 {
     border-color: var(--color-green-500);
-  }
-  .border-red-200 {
-    border-color: var(--color-red-200);
   }
   .border-red-500 {
     border-color: var(--color-red-500);
@@ -636,14 +610,8 @@
   .bg-gray-100 {
     background-color: var(--color-gray-100);
   }
-  .bg-green-50 {
-    background-color: var(--color-green-50);
-  }
   .bg-green-500 {
     background-color: var(--color-green-500);
-  }
-  .bg-red-50 {
-    background-color: var(--color-red-50);
   }
   .bg-red-500 {
     background-color: var(--color-red-500);
@@ -785,9 +753,6 @@
   .text-green-600 {
     color: var(--color-green-600);
   }
-  .text-green-800 {
-    color: var(--color-green-800);
-  }
   .text-lime-500 {
     color: var(--color-lime-500);
   }
@@ -796,9 +761,6 @@
   }
   .text-red-600 {
     color: var(--color-red-600);
-  }
-  .text-red-800 {
-    color: var(--color-red-800);
   }
   .text-sky-500 {
     color: var(--color-sky-500);
@@ -817,9 +779,6 @@
   }
   .underline {
     text-decoration-line: underline;
-  }
-  .opacity-70 {
-    opacity: 70%;
   }
   .shadow-lg {
     --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 4px 6px -4px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
@@ -898,9 +857,6 @@
     .hover\:text-red-600:hover {
       color: var(--color-red-600);
     }
-    .hover\:opacity-100:hover {
-      opacity: 100%;
-    }
   }
   .focus\:border-blue-600:focus {
     border-color: var(--color-blue-600);
@@ -958,12 +914,6 @@
     .dark\:border-gray-700 {
       border-color: var(--color-gray-700);
     }
-    .dark\:border-green-800 {
-      border-color: var(--color-green-800);
-    }
-    .dark\:border-red-800 {
-      border-color: var(--color-red-800);
-    }
     .dark\:bg-gray-700 {
       background-color: var(--color-gray-700);
     }
@@ -981,12 +931,6 @@
     .dark\:bg-gray-900 {
       background-color: var(--color-gray-900);
     }
-    .dark\:bg-green-900 {
-      background-color: var(--color-green-900);
-    }
-    .dark\:bg-red-900 {
-      background-color: var(--color-red-900);
-    }
     .dark\:text-blue-400 {
       color: var(--color-blue-400);
     }
@@ -1002,14 +946,8 @@
     .dark\:text-gray-400 {
       color: var(--color-gray-400);
     }
-    .dark\:text-green-100 {
-      color: var(--color-green-100);
-    }
     .dark\:text-green-400 {
       color: var(--color-green-400);
-    }
-    .dark\:text-red-100 {
-      color: var(--color-red-100);
     }
     .dark\:text-red-400 {
       color: var(--color-red-400);
