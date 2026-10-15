@@ -4,78 +4,14 @@ declare(strict_types=1);
 /*
     Zalążek panelu administratora. Dostęp wyłącznie dla roli admin.
 */
-require_once dirname(__DIR__) . '/app/auth.php';
+require_once dirname(__DIR__) . '/app/panel_layout.php';
 
 $user = require_role(['admin']);
-$csrfToken = csrf_token();
+
+panel_layout_head($user, 'Panel administratora — WeFixIT', 'home');
 ?>
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel administratora — WeFixIT</title>
-    <link rel="stylesheet" href="assets/css/app.css">
-</head>
-<body class="flex min-h-screen items-center justify-center bg-gray-100 p-4 text-gray-900">
-    <main class="w-full max-w-sm rounded-lg bg-white p-6 shadow-sm">
+    <section class="<?= PANEL_CARD_CLASS ?>">
         <h1 class="mb-4 text-2xl font-semibold">Panel administratora</h1>
         <p>Ta strona jest dostępna tylko dla administratorów.</p>
-        <p class="mt-4 text-sm">Imię i nazwisko: <?= htmlspecialchars($user['imie'] . ' ' . $user['nazwisko'], ENT_QUOTES, 'UTF-8') ?></p>
-        <p class="mt-4 text-sm text-gray-600">Rola: <?= htmlspecialchars($user['rola'], ENT_QUOTES, 'UTF-8') ?></p>
-
-        <p class="mt-4 text-sm">
-            <a href="profil" class="text-blue-600 underline hover:text-blue-700">Mój profil</a>
-        </p>
-
-        <form id="logout-form" action="api/auth/logout" method="post" class="mt-4">
-            <p id="logout-error" role="alert" class="mb-4 hidden text-sm text-red-600"></p>
-            <button type="submit"
-                class="w-full rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
-                Wyloguj się
-            </button>
-        </form>
-    </main>
-
-    <script>
-        const form = document.getElementById('logout-form');
-        const error = document.getElementById('logout-error');
-        const button = form.querySelector('button[type="submit"]');
-        const csrfToken = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault();
-
-            if (button.disabled) return;
-
-            error.textContent = '';
-            error.classList.add('hidden');
-            button.disabled = true;
-            button.textContent = 'Wylogowywanie…';
-
-            try {
-                const response = await fetch(form.action, {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: { 'X-CSRF-Token': csrfToken }
-                });
-                const data = await response.json();
-
-                if (!response.ok || data.success !== true) {
-                    error.textContent = data.error || 'Nie udało się wylogować.';
-                    error.classList.remove('hidden');
-                    return;
-                }
-
-                window.location.href = 'login';
-            } catch {
-                error.textContent = 'Nie udało się połączyć z serwerem. Spróbuj ponownie.';
-                error.classList.remove('hidden');
-            } finally {
-                button.disabled = false;
-                button.textContent = 'Wyloguj się';
-            }
-        });
-    </script>
-</body>
-</html>
+    </section>
+<?php panel_layout_foot(); ?>

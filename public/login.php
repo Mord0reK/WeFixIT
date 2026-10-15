@@ -5,7 +5,7 @@ declare(strict_types=1);
     Formularz logowania. Renderuje token CSRF i wysyła go w nagłówku X-CSRF-Token.
     Zalogowanego użytkownika przekierowuje na panel właściwy dla jego roli.
 */
-require_once dirname(__DIR__) . '/app/auth.php';
+require_once dirname(__DIR__) . '/app/layout.php';
 
 $user = current_user();
 
@@ -15,47 +15,40 @@ if ($user !== null) {
 }
 
 $csrfToken = csrf_token();
+
+layout_head('Logowanie — WeFixIT');
 ?>
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logowanie — WeFixIT</title>
-    <link rel="stylesheet" href="assets/css/app.css">
-</head>
-<body class="flex min-h-screen items-center justify-center bg-gray-100 p-4 text-gray-900">
-    <main class="w-full max-w-sm rounded-lg bg-white p-6 shadow-sm">
+    <main class="<?= LAYOUT_CARD_CLASS ?>">
         <h1 class="mb-6 text-center text-2xl font-semibold">Logowanie do WeFixIT</h1>
 
         <form id="login-form" action="api/auth/login" method="post" class="space-y-4">
             <div>
                 <label for="email" class="mb-1 block text-sm font-medium">E-mail</label>
                 <input id="email" name="email" type="email" autocomplete="username" maxlength="254" required
-                    class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600">
+                    class="<?= LAYOUT_INPUT_CLASS ?>">
             </div>
 
             <div>
                 <label for="password" class="mb-1 block text-sm font-medium">Hasło</label>
                 <input id="password" name="password" type="password" autocomplete="current-password" required
-                    class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600">
+                    class="<?= LAYOUT_INPUT_CLASS ?>">
             </div>
 
-            <p id="login-error" role="alert" class="hidden text-sm text-red-600"></p>
+            <p id="login-error" role="alert" class="hidden text-sm text-red-600 dark:text-red-400"></p>
 
             <button type="submit"
-                class="w-full rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
+                class="w-full rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60 dark:focus:ring-offset-gray-800">
                 Zaloguj się
             </button>
         </form>
 
-        <p class="mt-4 text-center text-sm text-gray-600">
+        <p class="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
             Nie masz konta?
-            <a href="register" class="text-blue-600 underline hover:text-blue-700">Załóż konto</a>
+            <a href="register" class="text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">Załóż konto</a>
         </p>
 
         <noscript>
-            <p class="mt-4 text-sm text-red-600">Włącz JavaScript, aby się zalogować.</p>
+            <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby się zalogować.</p>
         </noscript>
     </main>
 
@@ -116,5 +109,4 @@ $csrfToken = csrf_token();
             }
         });
     </script>
-</body>
-</html>
+<?php layout_foot(); ?>

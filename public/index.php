@@ -1,10 +1,11 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <title>Strona główna</title>
-</head>
-<body>
+<?php
+declare(strict_types=1);
 
-</body>
-</html>
+/*
+    Punkt wejścia dla katalogu głównego. Przekierowuje na formularz logowania.
+    Zalogowanego użytkownika login.php odeśle dalej na stronę właściwą dla jego roli.
+*/
+require_once dirname(__DIR__) . '/app/auth.php';
+
+header('Location: ' . auth_base_path() . '/login');
+exit;

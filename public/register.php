@@ -5,7 +5,7 @@ declare(strict_types=1);
     Formularz rejestracji. Renderuje token CSRF i wysyła go w nagłówku X-CSRF-Token.
     Zalogowanego użytkownika przekierowuje na panel właściwy dla jego roli.
 */
-require_once dirname(__DIR__) . '/app/auth.php';
+require_once dirname(__DIR__) . '/app/layout.php';
 
 $user = current_user();
 
@@ -15,79 +15,72 @@ if ($user !== null) {
 }
 
 $csrfToken = csrf_token();
+
+layout_head('Rejestracja — WeFixIT');
 ?>
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rejestracja — WeFixIT</title>
-    <link rel="stylesheet" href="assets/css/app.css">
-</head>
-<body class="flex min-h-screen items-center justify-center bg-gray-100 p-4 text-gray-900">
-    <main class="w-full max-w-sm rounded-lg bg-white p-6 shadow-sm">
+    <main class="<?= LAYOUT_CARD_CLASS ?>">
         <h1 class="mb-6 text-center text-2xl font-semibold">Rejestracja w WeFixIT</h1>
 
         <form id="register-form" action="api/auth/register" method="post" class="space-y-4">
             <div>
                 <label for="imie" class="mb-1 block text-sm font-medium">Imię</label>
                 <input id="imie" name="imie" type="text" autocomplete="given-name" maxlength="100" required
-                    class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600">
-                <p id="register-error-imie" class="mt-1 hidden text-sm text-red-600"></p>
+                    class="<?= LAYOUT_INPUT_CLASS ?>">
+                <p id="register-error-imie" class="mt-1 hidden text-sm text-red-600 dark:text-red-400"></p>
             </div>
 
             <div>
                 <label for="nazwisko" class="mb-1 block text-sm font-medium">Nazwisko</label>
                 <input id="nazwisko" name="nazwisko" type="text" autocomplete="family-name" maxlength="100" required
-                    class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600">
-                <p id="register-error-nazwisko" class="mt-1 hidden text-sm text-red-600"></p>
+                    class="<?= LAYOUT_INPUT_CLASS ?>">
+                <p id="register-error-nazwisko" class="mt-1 hidden text-sm text-red-600 dark:text-red-400"></p>
             </div>
 
             <div>
                 <label for="email" class="mb-1 block text-sm font-medium">E-mail</label>
                 <input id="email" name="email" type="email" autocomplete="username" maxlength="254" required
-                    class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600">
-                <p id="register-error-email" class="mt-1 hidden text-sm text-red-600"></p>
+                    class="<?= LAYOUT_INPUT_CLASS ?>">
+                <p id="register-error-email" class="mt-1 hidden text-sm text-red-600 dark:text-red-400"></p>
             </div>
 
             <div>
                 <label for="telefon" class="mb-1 block text-sm font-medium">Telefon</label>
                 <input id="telefon" name="telefon" type="tel" autocomplete="tel" maxlength="20" required
-                    class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600">
-                <p id="register-error-telefon" class="mt-1 hidden text-sm text-red-600"></p>
+                    class="<?= LAYOUT_INPUT_CLASS ?>">
+                <p id="register-error-telefon" class="mt-1 hidden text-sm text-red-600 dark:text-red-400"></p>
             </div>
 
             <div>
                 <label for="password" class="mb-1 block text-sm font-medium">Hasło</label>
                 <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required
-                    class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600">
-                <p class="mt-1 text-sm text-gray-600">Minimum 8 znaków.</p>
-                <p id="register-error-password" class="mt-1 hidden text-sm text-red-600"></p>
+                    class="<?= LAYOUT_INPUT_CLASS ?>">
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Minimum 8 znaków.</p>
+                <p id="register-error-password" class="mt-1 hidden text-sm text-red-600 dark:text-red-400"></p>
             </div>
 
             <div>
                 <label for="password_powtorzenie" class="mb-1 block text-sm font-medium">Powtórz hasło</label>
                 <input id="password_powtorzenie" name="password_powtorzenie" type="password"
                     autocomplete="new-password" minlength="8" required
-                    class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600">
-                <p id="register-error-password_powtorzenie" class="mt-1 hidden text-sm text-red-600"></p>
+                    class="<?= LAYOUT_INPUT_CLASS ?>">
+                <p id="register-error-password_powtorzenie" class="mt-1 hidden text-sm text-red-600 dark:text-red-400"></p>
             </div>
 
-            <p id="register-error" role="alert" class="hidden text-sm text-red-600"></p>
+            <p id="register-error" role="alert" class="hidden text-sm text-red-600 dark:text-red-400"></p>
 
             <button type="submit"
-                class="w-full rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
+                class="w-full rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60 dark:focus:ring-offset-gray-800">
                 Załóż konto
             </button>
         </form>
 
-        <p class="mt-4 text-center text-sm text-gray-600">
+        <p class="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
             Masz już konto?
-            <a href="login" class="text-blue-600 underline hover:text-blue-700">Zaloguj się</a>
+            <a href="login" class="text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">Zaloguj się</a>
         </p>
 
         <noscript>
-            <p class="mt-4 text-sm text-red-600">Włącz JavaScript, aby założyć konto.</p>
+            <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby założyć konto.</p>
         </noscript>
     </main>
 
@@ -169,5 +162,4 @@ $csrfToken = csrf_token();
             }
         });
     </script>
-</body>
-</html>
+<?php layout_foot(); ?>
