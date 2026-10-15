@@ -234,6 +234,51 @@ jobs:
 
           exit 1
 
+  http_tests:
+    name: Testy integracyjne HTTP
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    services:
+      mariadb:
+        image: mariadb:11.4@sha256:65ad406b90f2d23a0d75d8cdadb075f9c421f70d8c93f020b9513e9ab9b29a78 # mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: ci-root-password
+          MARIADB_DATABASE: wefixit_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+          --health-start-period 15s
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: curl, mbstring, pdo_mysql
+          coverage: none
+
+      - name: Show PHP version
+        run: php --version
+
+      - name: Run integration tests
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: "3306"
+          DB_NAME: wefixit_test
+          DB_USER: root
+          DB_PASSWORD: ci-root-password
+        run: php tests/run.php
+
   ci_result:
     name: CI result
     if: always()
@@ -241,6 +286,7 @@ jobs:
       - php_lint
       - sql_import
       - tailwind
+      - http_tests
     runs-on: ubuntu-24.04
     timeout-minutes: 2
 
@@ -253,10 +299,12 @@ jobs:
           php_result="${{ needs.php_lint.result }}"
           sql_result="${{ needs.sql_import.result }}"
           tailwind_result="${{ needs.tailwind.result }}"
+          tests_result="${{ needs.http_tests.result }}"
 
-          echo "PHP lint:     $php_result"
-          echo "SQL import:   $sql_result"
-          echo "Tailwind CSS: $tailwind_result"
+          echo "PHP lint:          $php_result"
+          echo "SQL import:        $sql_result"
+          echo "Tailwind CSS:      $tailwind_result"
+          echo "Testy HTTP:        $tests_result"
 
           if [[ "$php_result" != "success" ]]; then
             echo "::error::PHP lint nie zakończył się sukcesem."
@@ -270,6 +318,11 @@ jobs:
 
           if [[ "$tailwind_result" != "success" ]]; then
             echo "::error::Walidacja Tailwind CSS nie zakończyła się sukcesem."
+            exit 1
+          fi
+
+          if [[ "$tests_result" != "success" ]]; then
+            echo "::error::Testy integracyjne HTTP nie zakończyły się sukcesem."
             exit 1
           fi
 
