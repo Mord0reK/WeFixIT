@@ -2,6 +2,8 @@
 
 System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników i administratorów.
 
+**Wersja online:** <https://wefixit.dziaslo.dev>
+
 ## Spis treści
 
 - [Technologie](#Technologie)
