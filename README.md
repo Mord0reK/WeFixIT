@@ -10,6 +10,7 @@ System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników 
 - [Wymagania](#wymagania)
 - [Uruchomienie przez Docker](#uruchomienie-przez-docker)
 - [Uruchomienie przez XAMPP](#uruchomienie-przez-xampp)
+- [Testy integracyjne](#testy-integracyjne)
 - [Autorzy](#Autorzy)
 
 ## Technologie
@@ -172,13 +173,50 @@ WeFixIT to system rezerwacji dla serwisu komputerowego z trzema rolami: klient, 
 - Dane testowe: 1 administrator, 2 pracowników, 3 klientów, usługi, grafik i rezerwacje.
 - Środowisko uruchomieniowe: Docker Compose dev + prod oraz instrukcja pod XAMPP.
 
-### Planowane w Etapie 2 - Użytkownicy i logowanie
+### Zrealizowano w Etapie 2 - Użytkownicy i logowanie
 
-- Rejestracja konta klienta z walidacją po stronie serwera.
-- Logowanie i wylogowanie z obsługą sesji.
+- Rejestracja konta klienta z walidacją po stronie serwera i rolą ustawianą przez serwer.
+- Logowanie i wylogowanie z obsługą sesji PHP, ochroną CSRF i odświeżaniem identyfikatora sesji.
 - Podział na role: klient, pracownik, administrator.
-- Ochrona stron i endpointów przed dostępem bez roli / sesji.
-- Profil użytkownika: podgląd i edycja podstawowych danych.
+- Ochrona stron i endpointów przed dostępem bez sesji lub bez wymaganej roli.
+- Profil użytkownika: podgląd i edycja imienia, nazwiska, e-maila i telefonu.
+- Ciemny motyw zależny od preferencji systemu, wspólny layout oraz powiadomienia toast.
+
+#### Role i dostęp
+
+| Rola | Dostęp |
+|------|--------|
+| Klient (`klient`) | `/panel`, `/profil`, `GET /api/me`, `PATCH /api/profile` |
+| Pracownik (`pracownik`) | jak klient oraz `/pracownik` |
+| Administrator (`admin`) | jak pracownik oraz `/admin` |
+
+Konto klienta powstaje wyłącznie przez rejestrację. Rolę zawsze ustala serwer,
+więc pola `rola` i `aktywny` przesłane w formularzu są ignorowane. Strona
+`/register` tworzy konto z rolą `klient`, a `/pracownik` i `/admin` wymagają
+odpowiednio roli pracownika i administratora.
+
+#### Endpointy JSON
+
+| Metoda i adres | CSRF | Najważniejsze kody odpowiedzi |
+|----------------|------|-------------------------------|
+| `POST /api/auth/register` | tak | 201 sukces, 409 zajęty e-mail, 422 błędy walidacji, 415 zły `Content-Type` |
+| `POST /api/auth/login` | tak | 200 sukces z rolą, 401 błędne dane logowania, 422 błędy walidacji, 415 zły `Content-Type` |
+| `POST /api/auth/logout` | tak | 200 sukces, 403 brak CSRF, 405 zła metoda |
+| `GET /api/me` | nie | 200 dane zalogowanego użytkownika, 401 brak sesji |
+| `PATCH /api/profile` | tak | 200 sukces, 401 brak sesji, 403 brak CSRF, 409 zajęty e-mail, 422 błędy walidacji |
+
+Token CSRF przesyłany jest w nagłówku `X-CSRF-Token`. Body żądań i odpowiedzi
+są w formacie JSON (`Content-Type: application/json`). `GET /api/me` nigdy nie
+zwraca `haslo_hash` ani `aktywny`.
+
+#### Sesja i CSRF
+
+Sesja korzysta z cookie `PHPSESSID` ustawionego jako `HttpOnly` i `SameSite=Lax`;
+flaga `Secure` jest dodawana, gdy aplikacja działa po HTTPS. Po zalogowaniu
+identyfikator sesji jest odświeżany (`session_regenerate_id`), a token CSRF
+rotowany. Operacje zmieniające stan wymagają nagłówka `X-CSRF-Token` zgodnego
+z tokenem zapisanym w sesji. Formularze korzystają z `fetch()` i wymagają
+włączonego JavaScriptu.
 
 ## Wymagania
 
@@ -258,6 +296,62 @@ Uruchomienie przez XAMPP:
 5. Otworzyć aplikację pod adresem [http://localhost/WeFixIT/public/](http://localhost/WeFixIT/public/). Alternatywnie można skonfigurować VirtualHost z `DocumentRoot` wskazującym na katalog `public/` i używać adresu ustawionego dla tego VirtualHosta.
 
 W środowisku Docker wartość `DB_HOST` musi wynosić `mariadb`; w środowisku XAMPP — `localhost`.
+
+## Testy integracyjne
+
+Testy Etapu 2 znajdują się w katalogu [`tests/`](tests/) i sprawdzają aplikację
+przez HTTP na izolowanej bazie testowej (domyślnie `wefixit_test`). Nie korzystają
+z bazy deweloperskiej ani z wolumenu Dockera.
+
+### Wymagania
+
+- PHP 8.2 z rozszerzeniami `curl`, `mbstring`, `pdo_mysql` i `session`.
+- Działający serwer MariaDB 11.4 lub MySQL.
+
+### Konfiguracja
+
+Testy czytają połączenie ze zmiennych środowiskowych:
+
+```dotenv
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=wefixit_test
+DB_USER=root
+DB_PASSWORD=twoje-haslo
+```
+
+Baza o nazwie z `DB_NAME` jest importowana od zera z
+[database.sql](database/database.sql) lub
+[database-czysta.sql](database/database-czysta.sql) przed każdą grupą testów,
+więc każde uruchomienie startuje z czystego stanu.
+
+### Uruchomienie
+
+Z katalogu głównego projektu:
+
+```bash
+DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=wefixit_test DB_USER=root DB_PASSWORD=haslo \
+  php tests/run.php
+```
+
+Testy same uruchamiają wbudowany serwer PHP (`php -S`) na czas trwania zestawu
+i uderzają w ścieżki z rozszerzeniem `.php`, ponieważ `php -S` nie obsługuje
+`.htaccess`. Po zakończeniu wypisują liczbę testów poprawnych i niepoprawnych
+oraz sprawdzają, czy log serwera nie zawiera błędów PHP.
+
+Tymczasowy serwer MariaDB do testów można uruchomić w Dockerze:
+
+```bash
+docker run --rm -d --name wefixit-test-db \
+  -e MARIADB_ROOT_PASSWORD=test-root -e MARIADB_DATABASE=wefixit_test \
+  -p 127.0.0.1:13306:3306 mariadb:11.4
+
+DB_HOST=127.0.0.1 DB_PORT=13306 DB_NAME=wefixit_test DB_USER=root DB_PASSWORD=test-root \
+  php tests/run.php
+```
+
+Analogiczne testy uruchamia CI w zadaniu `http_tests`
+([.github/workflows/check.yml](.github/workflows/check.yml)) na MariaDB 11.4.
 
 ## Autorzy
 
