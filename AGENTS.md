@@ -102,6 +102,7 @@ Nie opisuj każdej instrukcji ani oczywistych operacji.
 
 Dla endpointów przyjmujących JSON:
 
+- Sukces: 200, a przy utworzeniu nowego zasobu 201.
 - Sprawdź metodę HTTP i Content-Type.
 - Niepoprawna metoda: 405 i właściwy nagłówek Allow.
 - Nieobsługiwany Content-Type: 415.
@@ -165,6 +166,9 @@ Błędy walidacji mogą dodatkowo zawierać mapę pól:
 - Nie ufaj user_id, roli ani uprawnieniom przekazanym przez klienta.
 - Stosuj CSRF dla operacji zmieniających stan, również logowania,
   wylogowania i JSON POST/PATCH/DELETE.
+- Token CSRF przesyłaj w nagłówku X-CSRF-Token, nie w query stringu
+  ani w polu body.
+- Po udanym logowaniu rotuj token CSRF razem z odświeżeniem sesji.
 - Escapuj dynamiczne dane w kontekście, w którym są wyświetlane.
 - Do tekstowych komunikatów w JS używaj textContent, nie innerHTML.
 - Nie zapisuj haseł, tokenów ani innych sekretów w logach.
@@ -192,7 +196,8 @@ existing.start_at < requested.end_at
 AND existing.end_at > requested.start_at
 ```
 
-Nazwy w warunku są schematyczne — używaj rzeczywistych kolumn DB.
+Nazwy w warunku są schematyczne. Rzeczywiste kolumny w tabeli rezerwacje
+to czas_rozpoczecia i czas_zakonczenia.
 Przedziały stykające się granicami nie kolidują.
 
 Bezpośrednio przed zapisem sprawdź ponownie uprawnienia, aktywność usługi
@@ -210,6 +215,31 @@ i pracownika, przypisanie usługi, godziny pracy, nieobecności oraz konflikty.
 - Nie zakładaj, że aplikacja zawsze działa w root domeny.
 - Kod, .env i pliki SQL poza public/ nie mogą być dostępne przez HTTP.
 - Zmiana database.sql nie aktualizuje istniejącego volume MariaDB.
+
+## Testy
+
+- Testy HTTP znajdują się w tests/ i uruchamia się je przez
+  php tests/run.php.
+- Nowe testy dokładaj do istniejącego mechanizmu, w tym samym stylu.
+  Nie dodawaj frameworka testowego bez uzasadnienia.
+- Testy nie mogą działać na bazie deweloperskiej. Importuj i resetuj
+  wyłącznie izolowaną bazę wskazaną przez DB_NAME, domyślnie wefixit_test.
+- Testy uruchamiają wbudowany serwer php -S, który nie obsługuje
+  .htaccess. Dlatego uderzają w ścieżki z rozszerzeniem .php, mimo że
+  publiczne URL-e go nie mają.
+- Zmiana zachowania endpointu bez aktualizacji testów jest niekompletna;
+  CI wymaga zielonego zadania http_tests.
+- Nowe zachowania pokrywaj testem sprawdzającym przypadek poprawny oraz
+  odrzucenie danych niepoprawnych.
+
+## Git
+
+- Commity zapisuj z prefiksem: feat:, fix:, docs:, test:, ci:.
+  Nie mieszaj obu konwencji w jednym pull requeście.
+- Opis commitu mówi, co się zmieniło i dlaczego. Commity w rodzaju
+  "cos tam" są niedopuszczalne.
+- Pracuj na feature branchu i zgłaszaj zmiany pull requestem do main.
+- Każdy PR musi przejść CI oraz code review przed mergem.
 
 ## Granice działania agenta
 
