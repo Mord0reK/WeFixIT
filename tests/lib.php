@@ -412,6 +412,8 @@ function start_test_server(): array
         throw new RuntimeException('Nie udało się przygotować katalogu testów.');
     }
 
+    $GLOBALS['__test_server_log'] = $logFile;
+
     $descriptors = [
         0 => ['pipe', 'r'],
         1 => ['file', $logFile, 'a'],
