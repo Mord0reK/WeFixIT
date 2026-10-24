@@ -145,11 +145,18 @@ erDiagram
     }
 ```
 
+### Opis tabel nieobecnosci i log_zdarzen
+
+- `nieobecnosci` przechowuje urlopy, choroby i inne nieobecności pracowników w zakresie dat. Status `oczekujaca` oznacza wniosek przed decyzją, a `zatwierdzona`, `odrzucona` lub `anulowana` — jego rozstrzygnięcie. Przy zatwierdzeniu lub odrzuceniu zapisywane są `rozpatrzyl_id` i `rozpatrzono`.
+- `log_zdarzen` jest dziennikiem audytowym istotnych operacji. Zapisuje aktora, akcję, typ i identyfikator obiektu, poziom (`info`, `warning`, `critical`), opis oraz opcjonalne szczegóły w formacie JSON. Nie zastępuje danych biznesowych, tylko dokumentuje zmiany.
+
 ### Wersja pusta
 Pusta edycja bazy danych jak sama nazwa wskazuje nie zawiera żadnych danych w sobie. Zalecane użycie w środowisku produkcyjnym.
 
 ### Wersja testowa
 Testowa edycja bazy danych zawiera wszystko co wersja pusta plus dane testowe. Zalecana ona jest do użycia w celach testowych.
+
+Daty rezerwacji w wersji testowej są liczone względem `CURDATE()` i dopasowane do grafiku pracowników. Rezerwacja na dziś powstaje tylko w dni robocze; w weekend odpowiednik statusu `w_trakcie` trafia na najbliższy poniedziałek.
 
 #### Konta testowe
 
@@ -161,6 +168,8 @@ Testowa edycja bazy danych zawiera wszystko co wersja pusta plus dane testowe. Z
 | Klient | Jan Kowalski | `jan.kowalski@example.com` | `haslo123` |
 | Klient | Anna Nowak | `anna.nowak@example.com` | `haslo123` |
 | Klient | Piotr Wiśniewski | `piotr.wisniewski@example.com` | `haslo123` |
+
+Wszystkie konta testowe mają identyczny `haslo_hash`, ponieważ korzystają ze wspólnego hasła testowego `haslo123`. To zamierzone ułatwienie środowiska testowego — hashy nie należy zmieniać pojedynczo ani używać tego hasła poza testami.
 
 ## Zakres projektu
 
