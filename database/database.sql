@@ -420,12 +420,72 @@ INSERT INTO godziny_pracy (pracownik_id, dzien_tygodnia, czas_rozpoczecia, czas_
 (2, 4, '10:00:00', '18:00:00', TRUE),
 (2, 5, '09:00:00', '15:00:00', TRUE);
 
+-- Daty rezerwacji są liczone od CURDATE(), żeby import zawsze dawał aktualne
+-- dane i nie kolidował z grafikiem pracowników. Gdy dziś jest weekend,
+-- rezerwacja "w trakcie" trafia na najbliższy poniedziałek.
+SET @base_data = CASE
+    WHEN WEEKDAY(CURDATE()) >= 5
+        THEN DATE_ADD(CURDATE(), INTERVAL (7 - WEEKDAY(CURDATE())) DAY)
+    ELSE CURDATE()
+END;
+
 INSERT INTO rezerwacje (
     id, uzytkownik_id, pracownik_id, usluga_id, czas_rozpoczecia, czas_zakonczenia,
     cena_historyczna, status_rezerwacji, komentarz_klienta, anulowano
-) VALUES
-(1, 4, 1, 1, '2026-05-10 09:00:00', '2026-05-10 10:00:00', 150.00, 'zrealizowana', 'Laptop grzał się przy renderingu, po czyszczeniu temperatury w normie.', NULL),
-(2, 5, 2, 4, '2026-05-15 11:00:00', '2026-05-15 13:00:00', 350.00, 'w_trakcie', 'Płyta nie reaguje na włącznik po zalaniu herbatą.', NULL),
-(3, 6, 1, 5, '2026-05-20 10:00:00', '2026-05-20 11:00:00', 120.00, 'potwierdzona', 'Proszę o zachowanie plików z pulpitu przed formatem.', NULL),
-(4, 4, 2, 3, '2026-05-21 14:30:00', '2026-05-21 16:00:00', 180.00, 'oczekujaca', 'Pęknięta matryca 15.6 cala IPS 144Hz.', NULL),
-(5, 5, 1, 2, '2026-05-12 13:00:00', '2026-05-12 13:45:00', 80.00, 'anulowana', 'Klientka zrezygnowała z diagnostyki, zakupiła nowy sprzęt.', '2026-05-11 18:20:00');
+)
+SELECT 1, 4, 1, 1,
+    TIMESTAMP(DATE_SUB(@base_data, INTERVAL 7 DAY), '09:00:00'),
+    TIMESTAMP(DATE_SUB(@base_data, INTERVAL 7 DAY), '10:00:00'),
+    150.00, 'zrealizowana', 'Laptop grzał się przy renderingu, po czyszczeniu temperatury w normie.', NULL;
+
+-- Rezerwacja "na dziś" powstaje wyłącznie w dzień roboczy.
+INSERT INTO rezerwacje (
+    id, uzytkownik_id, pracownik_id, usluga_id, czas_rozpoczecia, czas_zakonczenia,
+    cena_historyczna, status_rezerwacji, komentarz_klienta, anulowano
+)
+SELECT 2, 5, 2, 4,
+    TIMESTAMP(CURDATE(), '11:00:00'),
+    TIMESTAMP(CURDATE(), '13:00:00'),
+    350.00, 'w_trakcie', 'Płyta nie reaguje na włącznik po zalaniu herbatą.', NULL
+FROM DUAL
+WHERE WEEKDAY(CURDATE()) BETWEEN 0 AND 4;
+
+-- W weekend ten sam status trafia na najbliższy poniedziałek.
+INSERT INTO rezerwacje (
+    id, uzytkownik_id, pracownik_id, usluga_id, czas_rozpoczecia, czas_zakonczenia,
+    cena_historyczna, status_rezerwacji, komentarz_klienta, anulowano
+)
+SELECT 2, 5, 2, 4,
+    TIMESTAMP(@base_data, '11:00:00'),
+    TIMESTAMP(@base_data, '13:00:00'),
+    350.00, 'w_trakcie', 'Płyta nie reaguje na włącznik po zalaniu herbatą.', NULL
+FROM DUAL
+WHERE WEEKDAY(CURDATE()) >= 5;
+
+INSERT INTO rezerwacje (
+    id, uzytkownik_id, pracownik_id, usluga_id, czas_rozpoczecia, czas_zakonczenia,
+    cena_historyczna, status_rezerwacji, komentarz_klienta, anulowano
+)
+SELECT 3, 6, 1, 5,
+    TIMESTAMP(DATE_ADD(@base_data, INTERVAL 7 DAY), '10:00:00'),
+    TIMESTAMP(DATE_ADD(@base_data, INTERVAL 7 DAY), '11:00:00'),
+    120.00, 'potwierdzona', 'Proszę o zachowanie plików z pulpitu przed formatem.', NULL;
+
+INSERT INTO rezerwacje (
+    id, uzytkownik_id, pracownik_id, usluga_id, czas_rozpoczecia, czas_zakonczenia,
+    cena_historyczna, status_rezerwacji, komentarz_klienta, anulowano
+)
+SELECT 4, 4, 2, 3,
+    TIMESTAMP(DATE_ADD(@base_data, INTERVAL 14 DAY), '14:30:00'),
+    TIMESTAMP(DATE_ADD(@base_data, INTERVAL 14 DAY), '16:00:00'),
+    180.00, 'oczekujaca', 'Pęknięta matryca 15.6 cala IPS 144Hz.', NULL;
+
+INSERT INTO rezerwacje (
+    id, uzytkownik_id, pracownik_id, usluga_id, czas_rozpoczecia, czas_zakonczenia,
+    cena_historyczna, status_rezerwacji, komentarz_klienta, anulowano
+)
+SELECT 5, 5, 1, 2,
+    TIMESTAMP(DATE_SUB(@base_data, INTERVAL 14 DAY), '13:00:00'),
+    TIMESTAMP(DATE_SUB(@base_data, INTERVAL 14 DAY), '13:45:00'),
+    80.00, 'anulowana', 'Klientka zrezygnowała z diagnostyki, zakupiła nowy sprzęt.',
+    TIMESTAMP(DATE_SUB(@base_data, INTERVAL 15 DAY), '18:20:00');

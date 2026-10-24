@@ -18,7 +18,7 @@ $profileApi = $basePath . '/api/profile';
 panel_layout_head($user, 'Profil — WeFixIT', 'profil');
 ?>
     <section class="<?= PANEL_CARD_CLASS ?>">
-        <h1 class="mb-6 text-center text-2xl font-semibold">Mój profil</h1>
+        <?php panel_section_header('Mój profil', 'Edytuj dane kontaktowe swojego konta.'); ?>
 
         <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
             Rola: <?= htmlspecialchars(auth_role_label($user['rola']), ENT_QUOTES, 'UTF-8') ?>

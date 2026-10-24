@@ -12,6 +12,85 @@ require_once __DIR__ . '/layout.php';
 // Klasy tła i karty panelu wspólne dla wszystkich stron zalogowanych.
 const PANEL_BODY_CLASS = 'min-h-screen bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-gray-100 lg:flex';
 const PANEL_CARD_CLASS = 'mx-auto w-full max-w-2xl rounded-lg bg-white p-6 shadow-sm dark:bg-gray-800';
+const PANEL_CARD_WIDE_CLASS = 'mx-auto w-full max-w-6xl rounded-lg bg-white p-6 shadow-sm dark:bg-gray-800';
+
+// Menu panelu jest jednym źródłem nawigacji; role decydują, które pozycje są widoczne.
+function panel_menu_items(string $role): array
+{
+    $items = [
+        [
+            'key' => 'home',
+            'label' => 'Panel',
+            'path' => '/' . auth_role_home_path($role),
+            'roles' => ['klient', 'pracownik'],
+        ],
+        [
+            'key' => 'dashboard',
+            'label' => 'Dashboard',
+            'path' => '/admin',
+            'roles' => ['admin'],
+        ],
+        [
+            'key' => 'profil',
+            'label' => 'Mój profil',
+            'path' => '/profil',
+            'roles' => ['klient', 'pracownik', 'admin'],
+        ],
+    ];
+
+    $basePath = auth_base_path();
+    $menu = [];
+
+    foreach ($items as $item) {
+        if (!in_array($role, $item['roles'], true)) {
+            continue;
+        }
+
+        $item['href'] = $basePath . $item['path'];
+        $menu[] = $item;
+    }
+
+    return $menu;
+}
+
+// Spójny nagłówek sekcji modułu; akcje są linkami przygotowanymi przez widok.
+function panel_section_header(string $title, string $description = '', array $actions = []): void
+{
+    $titleSafe = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+    $descriptionSafe = htmlspecialchars($description, ENT_QUOTES, 'UTF-8');
+    ?>
+    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h1 class="text-2xl font-semibold"><?= $titleSafe ?></h1>
+            <?php if ($descriptionSafe !== ''): ?>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400"><?= $descriptionSafe ?></p>
+            <?php endif; ?>
+        </div>
+        <?php if ($actions !== []): ?>
+            <div class="flex shrink-0 flex-wrap items-center gap-2">
+                <?php foreach ($actions as $action): ?>
+                    <?php
+                    if (!is_array($action)) {
+                        continue;
+                    }
+
+                    $label = $action['label'] ?? '';
+                    $href = $action['href'] ?? '';
+
+                    if (!is_string($label) || !is_string($href) || $label === '' || $href === '') {
+                        continue;
+                    }
+                    ?>
+                    <a href="<?= htmlspecialchars($href, ENT_QUOTES, 'UTF-8') ?>"
+                        class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 dark:focus:ring-offset-gray-800">
+                        <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+    <?php
+}
 
 function panel_layout_head(array $user, string $title, string $active): void
 {
@@ -20,19 +99,7 @@ function panel_layout_head(array $user, string $title, string $active): void
 
     $fullName = htmlspecialchars($user['imie'] . ' ' . $user['nazwisko'], ENT_QUOTES, 'UTF-8');
     $roleLabel = htmlspecialchars(auth_role_label($user['rola']), ENT_QUOTES, 'UTF-8');
-
-    $menu = [
-        [
-            'key' => 'home',
-            'label' => 'Panel',
-            'href' => htmlspecialchars($basePath . '/' . auth_role_home_path($user['rola']), ENT_QUOTES, 'UTF-8'),
-        ],
-        [
-            'key' => 'profil',
-            'label' => 'Mój profil',
-            'href' => htmlspecialchars($basePath . '/profil', ENT_QUOTES, 'UTF-8'),
-        ],
-    ];
+    $menu = panel_menu_items((string) $user['rola']);
 
     layout_head($title, PANEL_BODY_CLASS);
     ?>
@@ -54,7 +121,7 @@ function panel_layout_head(array $user, string $title, string $active): void
         <nav class="flex-1 space-y-1 overflow-y-auto p-3">
             <?php foreach ($menu as $item): ?>
                 <?php $isActive = $item['key'] === $active; ?>
-                <a href="<?= $item['href'] ?>"
+                <a href="<?= htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') ?>"
                     class="block rounded px-3 py-2 text-sm font-medium <?= $isActive
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700' ?>"

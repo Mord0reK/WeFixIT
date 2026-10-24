@@ -49,3 +49,33 @@ test('15. administrator ma dostęp do /admin.php', function (): void {
     $admin = http_request($session['cookies'], 'GET', '/admin.php');
     assert_status(200, $admin, 'Administrator powinien mieć dostęp do /admin.php');
 });
+
+test('Dodatkowo: menu klienta i pracownika zawiera link do właściwego panelu', function (): void {
+    $client = login_as('jan.kowalski@example.com');
+    assert_status(200, $client['response'], 'Logowanie klienta powinno się udać');
+
+    $clientProfile = http_request($client['cookies'], 'GET', '/profil.php');
+    assert_status(200, $clientProfile, 'Klient powinien mieć dostęp do profilu');
+    assert_true(
+        strpos($clientProfile['body'], 'href="/panel"') !== false,
+        'Menu klienta powinno zawierać link do /panel'
+    );
+    assert_true(
+        strpos($clientProfile['body'], 'href="/admin"') === false,
+        'Menu klienta nie powinno zawierać linku do /admin'
+    );
+
+    $employee = login_as('tomasz.serwisant@wefixit.pl');
+    assert_status(200, $employee['response'], 'Logowanie pracownika powinno się udać');
+
+    $employeeProfile = http_request($employee['cookies'], 'GET', '/profil.php');
+    assert_status(200, $employeeProfile, 'Pracownik powinien mieć dostęp do profilu');
+    assert_true(
+        strpos($employeeProfile['body'], 'href="/pracownik"') !== false,
+        'Menu pracownika powinno zawierać link do /pracownik'
+    );
+    assert_true(
+        strpos($employeeProfile['body'], 'href="/admin"') === false,
+        'Menu pracownika nie powinno zawierać linku do /admin'
+    );
+});
