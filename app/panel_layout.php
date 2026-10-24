@@ -19,6 +19,12 @@ function panel_menu_items(string $role): array
 {
     $items = [
         [
+            'key' => 'home',
+            'label' => 'Panel',
+            'path' => '/' . auth_role_home_path($role),
+            'roles' => ['klient', 'pracownik'],
+        ],
+        [
             'key' => 'dashboard',
             'label' => 'Dashboard',
             'path' => '/admin',
