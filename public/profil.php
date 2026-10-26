@@ -20,47 +20,58 @@ panel_layout_head($user, 'Profil — WeFixIT', 'profil');
     <section class="<?= PANEL_CARD_CLASS ?>">
         <?php panel_section_header('Mój profil', 'Edytuj dane kontaktowe swojego konta.'); ?>
 
-        <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            Rola: <?= htmlspecialchars(auth_role_label($user['rola']), ENT_QUOTES, 'UTF-8') ?>
-        </p>
+        <div class="mb-6 flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-950/50">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-sm font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                <?= htmlspecialchars(panel_user_initials($user), ENT_QUOTES, 'UTF-8') ?>
+            </span>
+            <div class="min-w-0">
+                <p class="truncate text-sm font-medium">
+                    <?= htmlspecialchars(trim($user['imie'] . ' ' . $user['nazwisko']), ENT_QUOTES, 'UTF-8') ?>
+                </p>
+                <p class="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                    Rola: <?= htmlspecialchars(auth_role_label($user['rola']), ENT_QUOTES, 'UTF-8') ?>
+                </p>
+            </div>
+        </div>
 
         <form id="profile-form" action="<?= htmlspecialchars($profileApi, ENT_QUOTES, 'UTF-8') ?>" method="post" class="space-y-4">
-            <div>
-                <label for="imie" class="mb-1 block text-sm font-medium">Imię</label>
-                <input id="imie" name="imie" type="text" autocomplete="given-name" maxlength="100" required
-                    value="<?= htmlspecialchars($user['imie'], ENT_QUOTES, 'UTF-8') ?>"
-                    class="<?= LAYOUT_INPUT_CLASS ?>">
-                <p id="profile-error-imie" class="mt-1 hidden text-sm text-red-600 dark:text-red-400"></p>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label for="imie" class="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Imię</label>
+                    <input id="imie" name="imie" type="text" autocomplete="given-name" maxlength="100" required
+                        value="<?= htmlspecialchars($user['imie'], ENT_QUOTES, 'UTF-8') ?>"
+                        class="<?= LAYOUT_INPUT_CLASS ?>">
+                    <p id="profile-error-imie" class="mt-1.5 hidden text-sm text-red-600 dark:text-red-400"></p>
+                </div>
+
+                <div>
+                    <label for="nazwisko" class="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Nazwisko</label>
+                    <input id="nazwisko" name="nazwisko" type="text" autocomplete="family-name" maxlength="100" required
+                        value="<?= htmlspecialchars($user['nazwisko'], ENT_QUOTES, 'UTF-8') ?>"
+                        class="<?= LAYOUT_INPUT_CLASS ?>">
+                    <p id="profile-error-nazwisko" class="mt-1.5 hidden text-sm text-red-600 dark:text-red-400"></p>
+                </div>
             </div>
 
             <div>
-                <label for="nazwisko" class="mb-1 block text-sm font-medium">Nazwisko</label>
-                <input id="nazwisko" name="nazwisko" type="text" autocomplete="family-name" maxlength="100" required
-                    value="<?= htmlspecialchars($user['nazwisko'], ENT_QUOTES, 'UTF-8') ?>"
-                    class="<?= LAYOUT_INPUT_CLASS ?>">
-                <p id="profile-error-nazwisko" class="mt-1 hidden text-sm text-red-600 dark:text-red-400"></p>
-            </div>
-
-            <div>
-                <label for="email" class="mb-1 block text-sm font-medium">E-mail</label>
+                <label for="email" class="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">E-mail</label>
                 <input id="email" name="email" type="email" autocomplete="username" maxlength="254" required
                     value="<?= htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8') ?>"
                     class="<?= LAYOUT_INPUT_CLASS ?>">
-                <p id="profile-error-email" class="mt-1 hidden text-sm text-red-600 dark:text-red-400"></p>
+                <p id="profile-error-email" class="mt-1.5 hidden text-sm text-red-600 dark:text-red-400"></p>
             </div>
 
             <div>
-                <label for="telefon" class="mb-1 block text-sm font-medium">Telefon</label>
+                <label for="telefon" class="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Telefon</label>
                 <input id="telefon" name="telefon" type="tel" autocomplete="tel" maxlength="20" required
                     value="<?= htmlspecialchars($user['telefon'], ENT_QUOTES, 'UTF-8') ?>"
                     class="<?= LAYOUT_INPUT_CLASS ?>">
-                <p id="profile-error-telefon" class="mt-1 hidden text-sm text-red-600 dark:text-red-400"></p>
+                <p id="profile-error-telefon" class="mt-1.5 hidden text-sm text-red-600 dark:text-red-400"></p>
             </div>
 
             <p id="profile-error" role="alert" class="hidden text-sm text-red-600 dark:text-red-400"></p>
 
-            <button type="submit"
-                class="w-full rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60 dark:focus:ring-offset-gray-800">
+            <button type="submit" class="<?= LAYOUT_BUTTON_CLASS ?>">
                 Zapisz zmiany
             </button>
         </form>

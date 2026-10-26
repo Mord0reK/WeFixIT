@@ -19,32 +19,38 @@ $csrfToken = csrf_token();
 layout_head('Logowanie — WeFixIT');
 ?>
     <main class="<?= LAYOUT_CARD_CLASS ?>">
-        <h1 class="mb-6 text-center text-2xl font-semibold">Logowanie do WeFixIT</h1>
+        <div class="mb-6 flex flex-col items-center text-center">
+            <span class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-900 text-white shadow-sm dark:bg-zinc-50 dark:text-zinc-900">
+                <?= layout_logo('h-6 w-6') ?>
+            </span>
+            <p class="text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">WeFixIT</p>
+            <h1 class="mt-1 text-2xl font-semibold tracking-tight">Witaj ponownie</h1>
+            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Zaloguj się, aby przejść do panelu.</p>
+        </div>
 
         <form id="login-form" action="api/auth/login" method="post" class="space-y-4">
             <div>
-                <label for="email" class="mb-1 block text-sm font-medium">E-mail</label>
+                <label for="email" class="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">E-mail</label>
                 <input id="email" name="email" type="email" autocomplete="username" maxlength="254" required
                     class="<?= LAYOUT_INPUT_CLASS ?>">
             </div>
 
             <div>
-                <label for="password" class="mb-1 block text-sm font-medium">Hasło</label>
+                <label for="password" class="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Hasło</label>
                 <input id="password" name="password" type="password" autocomplete="current-password" required
                     class="<?= LAYOUT_INPUT_CLASS ?>">
             </div>
 
             <p id="login-error" role="alert" class="hidden text-sm text-red-600 dark:text-red-400"></p>
 
-            <button type="submit"
-                class="w-full rounded bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60 dark:focus:ring-offset-gray-800">
+            <button type="submit" class="<?= LAYOUT_BUTTON_CLASS ?>">
                 Zaloguj się
             </button>
         </form>
 
-        <p class="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
+        <p class="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
             Nie masz konta?
-            <a href="register" class="text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">Załóż konto</a>
+            <a href="register" class="font-medium text-zinc-900 underline-offset-4 hover:underline dark:text-zinc-100">Załóż konto</a>
         </p>
 
         <noscript>

@@ -79,3 +79,18 @@ test('Dodatkowo: menu klienta i pracownika zawiera link do właściwego panelu',
         'Menu pracownika nie powinno zawierać linku do /admin'
     );
 });
+
+test('Dodatkowo: administrator widzi w menu oba panele i profil', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $dashboard = http_request($session['cookies'], 'GET', '/admin.php');
+    assert_status(200, $dashboard, 'Administrator powinien zobaczyć dashboard');
+
+    foreach (['/panel', '/pracownik', '/profil'] as $path) {
+        assert_true(
+            strpos($dashboard['body'], 'href="' . $path . '"') !== false,
+            'Menu administratora powinno zawierać link do ' . $path
+        );
+    }
+});
