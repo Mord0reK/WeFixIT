@@ -272,3 +272,20 @@ test('39. PATCH z nazwą innej kategorii daje 409 z błędem nazwy', function ()
         'Odpowiedź 409 powinna zawierać errors.nazwa'
     );
 });
+
+test('49. PATCH z tymi samymi wartościami kategorii daje 200', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $row = test_db()->query('SELECT nazwa, opis FROM kategorie_uslug WHERE id = 1')->fetch();
+    assert_true(is_array($row), 'Kategoria testowa powinna istnieć w bazie');
+
+    $csrf = csrf_from_page($session['cookies'], '/kategorie.php');
+    $response = patch_json($session['cookies'], '/api/admin/categories.php', [
+        'id' => 1,
+        'nazwa' => $row['nazwa'],
+        'opis' => $row['opis'] ?? '',
+    ], $csrf);
+
+    assert_status(200, $response, 'Zapis bez zmiany wartości powinien dać 200, a nie 404');
+});

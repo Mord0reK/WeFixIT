@@ -235,7 +235,7 @@ if (!$hasName && !$hasDescription && !$hasCategory && !$hasPrice && !$hasDuratio
     }
 
     if (!$updated) {
-        json_response(404, ['error' => 'Nie znaleziono usługi.']);
+        json_response(500, ['error' => 'Nie udało się zapisać usługi. Wystąpił problem z serwerem.']);
     }
 }
 

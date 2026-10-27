@@ -325,3 +325,67 @@ test('48. odpowiedzi JSON i HTML nie ujawniają danych technicznych', function (
     assert_true(is_string($logFile) && $logFile !== '', 'Brak ścieżki logu serwera testowego');
     assert_same([], server_log_errors($logFile), 'Log serwera nie powinien zawierać błędów PHP');
 });
+
+test('50. PATCH z tymi samymi wartościami usługi daje 200', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $row = test_db()->query(
+        'SELECT kategoria_id, nazwa, opis, czas_trwania_minuty, cena, aktywna
+         FROM uslugi WHERE id = 1'
+    )->fetch();
+    assert_true(is_array($row), 'Usługa testowa powinna istnieć w bazie');
+
+    $csrf = csrf_from_page($session['cookies'], '/uslugi.php');
+    $response = patch_json($session['cookies'], '/api/admin/services.php', [
+        'id' => 1,
+        'kategoria_id' => (int) $row['kategoria_id'],
+        'nazwa' => $row['nazwa'],
+        'opis' => $row['opis'] ?? '',
+        'czas_trwania_minuty' => (int) $row['czas_trwania_minuty'],
+        'cena' => $row['cena'],
+        'aktywna' => (int) $row['aktywna'] === 1,
+    ], $csrf);
+
+    assert_status(200, $response, 'Zapis bez zmiany wartości powinien dać 200, a nie 404');
+});
+
+test('51. GET endpointu usług daje 405 z nagłówkiem Allow', function (): void {
+    $cookies = [];
+    $response = http_request($cookies, 'GET', '/api/admin/services.php');
+
+    assert_status(405, $response, 'GET na endpoint usług powinien dać 405');
+
+    $allow = header_value($response, 'allow');
+    assert_true(is_string($allow) && $allow !== '', 'Odpowiedź 405 powinna zawierać nagłówek Allow');
+
+    foreach (['POST', 'PATCH', 'DELETE'] as $method) {
+        assert_true(
+            strpos($allow, $method) !== false,
+            'Nagłówek Allow powinien zawierać metodę ' . $method
+        );
+    }
+});
+
+test('52. POST bez Content-Type application/json daje 415 i nie tworzy rekordu', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $csrf = csrf_from_page($session['cookies'], '/uslugi.php');
+    $response = http_request($session['cookies'], 'POST', '/api/admin/services.php', [
+        'body' => json_encode([
+            'nazwa' => 'Usługa bez content type 52',
+            'opis' => '',
+            'kategoria_id' => 1,
+            'cena' => '10,00',
+            'czas_trwania_minuty' => 30,
+        ], JSON_UNESCAPED_UNICODE),
+        'headers' => ['X-CSRF-Token' => $csrf],
+    ]);
+
+    assert_status(415, $response, 'Brak Content-Type application/json powinien dać 415');
+
+    $statement = test_db()->prepare('SELECT COUNT(*) FROM uslugi WHERE nazwa = :nazwa');
+    $statement->execute(['nazwa' => 'Usługa bez content type 52']);
+    assert_same(0, (int) $statement->fetchColumn(), 'Usługa bez poprawnego Content-Type nie może powstać');
+});

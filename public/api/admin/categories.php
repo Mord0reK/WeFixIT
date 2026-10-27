@@ -198,7 +198,7 @@ if ($hasName || $hasDescription) {
     }
 
     if (!$updated) {
-        json_response(404, ['error' => 'Nie znaleziono kategorii.']);
+        json_response(500, ['error' => 'Nie udało się zapisać kategorii. Wystąpił problem z serwerem.']);
     }
 } else {
     $updated = kategoria_set_active($categoryId, $activeAfter);

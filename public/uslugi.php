@@ -199,9 +199,11 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
                 <select id="service-kategoria" name="kategoria_id" class="<?= LAYOUT_INPUT_CLASS ?>" required>
                     <option value="">Wybierz kategorię</option>
                     <?php foreach ($categories ?? [] as $category): ?>
+                        <?php if (!$category['aktywna']) {
+                            continue;
+                        } ?>
                         <option value="<?= $category['id'] ?>">
                             <?= htmlspecialchars($category['nazwa'], ENT_QUOTES, 'UTF-8') ?>
-                            <?= $category['aktywna'] ? '' : '(nieaktywna)' ?>
                         </option>
                     <?php endforeach; ?>
                 </select>

@@ -491,7 +491,8 @@ function usluga_update(int $id, array $data): bool
         'aktywna' => $active ? 1 : 0,
     ]);
 
-    return $statement->rowCount() > 0;
+    // Sukces oznacza wykonany UPDATE; MySQL zwraca 0 wierszy, gdy wartości się nie zmieniły.
+    return true;
 }
 
 function usluga_set_active(int $id, bool $active): bool
