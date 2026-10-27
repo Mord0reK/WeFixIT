@@ -16,6 +16,7 @@ $basePath = auth_base_path();
 $profileUrl = $basePath . '/profil';
 $categoriesUrl = $basePath . '/kategorie';
 $servicesUrl = $basePath . '/uslugi';
+$employeesUrl = $basePath . '/pracownicy';
 
 panel_layout_head($user, 'Dashboard — WeFixIT', 'home');
 ?>
@@ -27,6 +28,7 @@ panel_layout_head($user, 'Dashboard — WeFixIT', 'home');
         [
             ['label' => 'Kategorie', 'href' => $categoriesUrl],
             ['label' => 'Usługi', 'href' => $servicesUrl],
+            ['label' => 'Pracownicy', 'href' => $employeesUrl],
             ['label' => 'Mój profil', 'href' => $profileUrl],
         ]
     );

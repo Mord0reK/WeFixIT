@@ -206,6 +206,11 @@ więc pola `rola` i `aktywny` przesłane w formularzu są ignorowane. Strona
 `/register` tworzy konto z rolą `klient`, a `/pracownik` i `/admin` wymagają
 odpowiednio roli pracownika i administratora.
 
+Panel `/pracownicy` nie tworzy nowych kont użytkowników. Tworzy wyłącznie
+profil pracownika powiązany z istniejącym, aktywnym kontem o roli `pracownik`.
+Rejestracja kont ma własną ścieżkę, a nadanie roli pracownika wymaga świadomej
+decyzji administratora.
+
 #### Endpointy JSON
 
 | Metoda i adres | CSRF | Najważniejsze kody odpowiedzi |
