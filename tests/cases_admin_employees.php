@@ -412,3 +412,31 @@ test('65. PATCH z tymi samymi wartościami pracownika daje 200', function (): vo
     assert_same($row['opis'] ?? null, $after['opis'] ?? null, 'Opis po zapisie powinien być identyczny');
     assert_same((int) $row['aktywny'], (int) $after['aktywny'], 'Flaga aktywności po zapisie powinna być identyczna');
 });
+
+test('Dodatkowo: DELETE pracownika wymaga Content-Type application/json', function (): void {
+    $userId = create_test_employee_user('pracownik66@example.com', 'Pracownik66', '+48123456066');
+
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $csrf = csrf_from_page($session['cookies'], '/pracownicy.php');
+    $created = post_json($session['cookies'], '/api/admin/employees.php', [
+        'uzytkownik_id' => $userId,
+        'opis' => '',
+        'aktywny' => true,
+    ], $csrf);
+    assert_status(201, $created, 'Utworzenie profilu do testu Content-Type powinno dać 201');
+    $id = json_body($created)['id'] ?? 0;
+
+    $response = http_request($session['cookies'], 'DELETE', '/api/admin/employees.php', [
+        'body' => json_encode(['id' => $id], JSON_UNESCAPED_UNICODE),
+        'content_type' => 'text/plain',
+        'headers' => ['X-CSRF-Token' => $csrf],
+    ]);
+
+    assert_status(415, $response, 'DELETE z text/plain powinien dać 415');
+
+    $statement = test_db()->prepare('SELECT COUNT(*) FROM pracownicy WHERE id = :id');
+    $statement->execute(['id' => $id]);
+    assert_same(1, (int) $statement->fetchColumn(), 'Profil nie może zostać usunięty bez JSON Content-Type');
+});

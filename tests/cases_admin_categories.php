@@ -90,7 +90,6 @@ test('32. walidacja nazwy zwraca 422 z błędem przy polu nazwa', function (): v
     $cases = [
         ['payload' => ['opis' => 'Brak nazwy.'], 'label' => 'brak nazwy'],
         ['payload' => ['nazwa' => str_repeat('a', 101), 'opis' => ''], 'label' => 'nazwa dłuższa niż 100 znaków'],
-        ['payload' => ['nazwa' => 'Diagnostyka i Konserwacja', 'opis' => ''], 'label' => 'duplikat nazwy'],
     ];
 
     foreach ($cases as $case) {
@@ -174,7 +173,12 @@ test('35. odpowiedzi JSON nie ujawniają hashy, SQL ani ścieżek', function ():
         'nazwa' => 'Diagnostyka i Konserwacja',
         'opis' => '',
     ], $csrf);
-    assert_status(422, $duplicate, 'Duplikat nazwy powinien dać 422');
+    assert_status(409, $duplicate, 'Duplikat nazwy powinien dać 409');
+    $duplicateData = json_body($duplicate);
+    assert_true(
+        isset($duplicateData['errors']['nazwa']) && is_string($duplicateData['errors']['nazwa']),
+        'Odpowiedź 409 powinna zawierać errors.nazwa'
+    );
     $responses[] = $duplicate;
 
     $deleted = delete_json($session['cookies'], '/api/admin/categories.php', ['id' => $id], $csrf);
@@ -288,4 +292,29 @@ test('49. PATCH z tymi samymi wartościami kategorii daje 200', function (): voi
     ], $csrf);
 
     assert_status(200, $response, 'Zapis bez zmiany wartości powinien dać 200, a nie 404');
+});
+
+test('Dodatkowo: DELETE kategorii wymaga Content-Type application/json', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $csrf = csrf_from_page($session['cookies'], '/kategorie.php');
+    $created = post_json($session['cookies'], '/api/admin/categories.php', [
+        'nazwa' => 'Kategoria content type DELETE',
+        'opis' => '',
+    ], $csrf);
+    assert_status(201, $created, 'Utworzenie kategorii do testu Content-Type powinno dać 201');
+    $id = json_body($created)['id'] ?? 0;
+
+    $response = http_request($session['cookies'], 'DELETE', '/api/admin/categories.php', [
+        'body' => json_encode(['id' => $id], JSON_UNESCAPED_UNICODE),
+        'content_type' => 'text/plain',
+        'headers' => ['X-CSRF-Token' => $csrf],
+    ]);
+
+    assert_status(415, $response, 'DELETE z text/plain powinien dać 415');
+
+    $statement = test_db()->prepare('SELECT COUNT(*) FROM kategorie_uslug WHERE id = :id');
+    $statement->execute(['id' => $id]);
+    assert_same(1, (int) $statement->fetchColumn(), 'Kategoria nie może zostać usunięta bez JSON Content-Type');
 });

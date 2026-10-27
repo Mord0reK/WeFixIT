@@ -389,3 +389,82 @@ test('52. POST bez Content-Type application/json daje 415 i nie tworzy rekordu',
     $statement->execute(['nazwa' => 'Usługa bez content type 52']);
     assert_same(0, (int) $statement->fetchColumn(), 'Usługa bez poprawnego Content-Type nie może powstać');
 });
+
+test('Dodatkowo: edycja usługi w nieaktywnej kategorii nie wymaga zmiany kategorii', function (): void {
+    $pdo = test_db();
+    $statement = $pdo->prepare(
+        'INSERT INTO uslugi (kategoria_id, nazwa, opis, czas_trwania_minuty, cena, aktywna)
+         VALUES (4, :nazwa, :opis, 30, 50.00, TRUE)'
+    );
+    $statement->execute([
+        'nazwa' => 'Usługa archiwalna test',
+        'opis' => 'Usługa w nieaktywnej kategorii.',
+    ]);
+    $serviceId = (int) $pdo->lastInsertId();
+
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $csrf = csrf_from_page($session['cookies'], '/uslugi.php');
+    $priceUpdate = patch_json($session['cookies'], '/api/admin/services.php', [
+        'id' => $serviceId,
+        'cena' => '60,00',
+    ], $csrf);
+    assert_status(200, $priceUpdate, 'Edycja ceny bez zmiany kategorii powinna dać 200');
+
+    $statement = $pdo->prepare('SELECT kategoria_id, cena FROM uslugi WHERE id = :id');
+    $statement->execute(['id' => $serviceId]);
+    $row = $statement->fetch();
+    assert_same(4, (int) ($row['kategoria_id'] ?? 0), 'Usługa powinna pozostać w nieaktywnej kategorii');
+    assert_same('60.00', (string) ($row['cena'] ?? ''), 'Nowa cena powinna zostać zapisana');
+
+    $sameCategoryUpdate = patch_json($session['cookies'], '/api/admin/services.php', [
+        'id' => $serviceId,
+        'kategoria_id' => 4,
+        'opis' => 'Zaktualizowany opis archiwalnej usługi.',
+    ], $csrf);
+    assert_status(200, $sameCategoryUpdate, 'Zapis z tą samą nieaktywną kategorią powinien dać 200');
+
+    $page = http_request($session['cookies'], 'GET', '/uslugi.php');
+    assert_status(200, $page, 'Strona usług powinna zwrócić 200');
+    assert_true(
+        preg_match('/<select id="service-kategoria".*?<\/select>/s', $page['body'], $matches) === 1,
+        'Formularz powinien zawierać select kategorii'
+    );
+    assert_true(
+        strpos($matches[0], 'data-inactive="1"') !== false,
+        'Select powinien zawierać nieaktywną kategorię oznaczoną dla JS'
+    );
+    assert_true(
+        strpos($matches[0], '(nieaktywna)') !== false,
+        'Nieaktywna kategoria powinna mieć czytelne oznaczenie'
+    );
+});
+
+test('Dodatkowo: DELETE usługi wymaga Content-Type application/json', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $csrf = csrf_from_page($session['cookies'], '/uslugi.php');
+    $created = post_json($session['cookies'], '/api/admin/services.php', [
+        'nazwa' => 'Usługa content type DELETE',
+        'opis' => '',
+        'kategoria_id' => 1,
+        'cena' => '10,00',
+        'czas_trwania_minuty' => 30,
+    ], $csrf);
+    assert_status(201, $created, 'Utworzenie usługi do testu Content-Type powinno dać 201');
+    $id = json_body($created)['id'] ?? 0;
+
+    $response = http_request($session['cookies'], 'DELETE', '/api/admin/services.php', [
+        'body' => json_encode(['id' => $id], JSON_UNESCAPED_UNICODE),
+        'content_type' => 'text/plain',
+        'headers' => ['X-CSRF-Token' => $csrf],
+    ]);
+
+    assert_status(415, $response, 'DELETE z text/plain powinien dać 415');
+
+    $statement = test_db()->prepare('SELECT COUNT(*) FROM uslugi WHERE id = :id');
+    $statement->execute(['id' => $id]);
+    assert_same(1, (int) $statement->fetchColumn(), 'Usługa nie może zostać usunięta bez JSON Content-Type');
+});

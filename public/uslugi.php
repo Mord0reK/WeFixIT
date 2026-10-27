@@ -199,11 +199,11 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
                 <select id="service-kategoria" name="kategoria_id" class="<?= LAYOUT_INPUT_CLASS ?>" required>
                     <option value="">Wybierz kategorię</option>
                     <?php foreach ($categories ?? [] as $category): ?>
-                        <?php if (!$category['aktywna']) {
-                            continue;
-                        } ?>
-                        <option value="<?= $category['id'] ?>">
+                        <option value="<?= $category['id'] ?>"
+                            data-inactive="<?= $category['aktywna'] ? '0' : '1' ?>"
+                            <?= $category['aktywna'] ? '' : 'disabled' ?>>
                             <?= htmlspecialchars($category['nazwa'], ENT_QUOTES, 'UTF-8') ?>
+                            <?= $category['aktywna'] ? '' : '(nieaktywna)' ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -298,9 +298,18 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
         serviceFormError.classList.remove('hidden');
     }
 
+    function setInactiveCategoryOptionsDisabled() {
+        for (const option of serviceCategory.options) {
+            if (option.dataset.inactive === '1') {
+                option.disabled = true;
+            }
+        }
+    }
+
     function resetServiceForm() {
         editingServiceId = null;
         serviceForm.reset();
+        setInactiveCategoryOptionsDisabled();
         serviceId.value = '';
         serviceFormTitle.textContent = 'Dodaj usługę';
         serviceSubmit.textContent = 'Dodaj usługę';
@@ -395,7 +404,16 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
             serviceId.value = String(editingServiceId);
             serviceName.value = button.dataset.name || '';
             serviceDescription.value = button.dataset.description || '';
-            serviceCategory.value = button.dataset.category || '';
+            setInactiveCategoryOptionsDisabled();
+            const selectedCategoryId = button.dataset.category || '';
+
+            for (const option of serviceCategory.options) {
+                if (option.value === selectedCategoryId && option.dataset.inactive === '1') {
+                    option.disabled = false;
+                }
+            }
+
+            serviceCategory.value = selectedCategoryId;
             servicePrice.value = button.dataset.price || '';
             serviceDuration.value = button.dataset.duration || '';
             serviceFormTitle.textContent = 'Edytuj usługę';

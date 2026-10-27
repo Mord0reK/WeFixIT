@@ -16,7 +16,7 @@ require_once __DIR__ . '/../../../app/log.php';
 $method = $_SERVER['REQUEST_METHOD'] ?? '';
 json_require_method(['POST', 'PATCH', 'DELETE']);
 
-if ($method === 'POST' || $method === 'PATCH') {
+if ($method === 'POST' || $method === 'PATCH' || $method === 'DELETE') {
     json_require_content_type();
 }
 
@@ -165,7 +165,7 @@ if ($hasDescription) {
 }
 
 if ($hasCategory) {
-    $partialErrors += usluga_category_errors($data['kategoria_id']);
+    $partialErrors += usluga_category_errors($data['kategoria_id'], false);
 }
 
 if ($hasPrice) {
@@ -241,7 +241,8 @@ if (!$hasName && !$hasDescription && !$hasCategory && !$hasPrice && !$hasDuratio
         'aktywna' => $activeAfter,
     ];
 
-    $errors = usluga_errors($payload, $serviceId);
+    $categoryChanged = usluga_category_id_value($payload['kategoria_id']) !== $current['kategoria_id'];
+    $errors = usluga_errors($payload, $serviceId, $categoryChanged);
 
     if ($errors !== []) {
         if (($errors['nazwa'] ?? '') === USLUGA_NAME_TAKEN_ERROR) {

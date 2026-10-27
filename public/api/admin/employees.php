@@ -17,7 +17,7 @@ require_once __DIR__ . '/../../../app/log.php';
 $method = $_SERVER['REQUEST_METHOD'] ?? '';
 json_require_method(['POST', 'PATCH', 'DELETE']);
 
-if ($method === 'POST' || $method === 'PATCH') {
+if ($method === 'POST' || $method === 'PATCH' || $method === 'DELETE') {
     json_require_content_type();
 }
 

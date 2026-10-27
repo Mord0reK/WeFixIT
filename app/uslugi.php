@@ -232,8 +232,8 @@ function usluga_description_errors(mixed $description): array
     return [];
 }
 
-// Kategoria musi istnieć i być aktywna; wartości z formularza nie są zaufane.
-function usluga_category_errors(mixed $value): array
+// Kategoria musi istnieć; aktywność jest wymagana, gdy kategoria się zmienia.
+function usluga_category_errors(mixed $value, bool $requireActive = true): array
 {
     $categoryId = usluga_category_id_value($value);
 
@@ -260,7 +260,7 @@ function usluga_category_errors(mixed $value): array
         return ['kategoria_id' => 'Wybrana kategoria nie istnieje.'];
     }
 
-    if ((int) $row['aktywna'] !== 1) {
+    if ($requireActive && (int) $row['aktywna'] !== 1) {
         return ['kategoria_id' => 'Wybrana kategoria jest nieaktywna.'];
     }
 
@@ -277,11 +277,15 @@ function usluga_duration_errors(mixed $value): array
 }
 
 // Wspólna walidacja kompletnego zestawu pól usługi.
-function usluga_errors(array $data, ?int $ignoreId = null): array
+function usluga_errors(
+    array $data,
+    ?int $ignoreId = null,
+    bool $requireActiveCategory = true
+): array
 {
     $errors = usluga_name_basic_errors($data['nazwa'] ?? null)
         + usluga_description_errors($data['opis'] ?? null)
-        + usluga_category_errors($data['kategoria_id'] ?? null)
+        + usluga_category_errors($data['kategoria_id'] ?? null, $requireActiveCategory)
         + usluga_price_errors($data['cena'] ?? null)
         + usluga_duration_errors($data['czas_trwania_minuty'] ?? null);
 
