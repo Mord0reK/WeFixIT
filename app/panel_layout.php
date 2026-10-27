@@ -87,6 +87,14 @@ function panel_menu_items(string $role): array
             'group' => 'Konto',
             'icon' => 'user',
         ],
+        [
+            'key' => 'categories',
+            'label' => 'Kategorie',
+            'path' => '/kategorie',
+            'roles' => ['admin'],
+            'group' => 'Zarządzanie',
+            'icon' => 'folder',
+        ],
     ];
 
     $basePath = auth_base_path();

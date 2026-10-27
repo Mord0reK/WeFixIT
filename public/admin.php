@@ -14,6 +14,7 @@ $user = require_role(['admin']);
 $stats = admin_dashboard_stats();
 $basePath = auth_base_path();
 $profileUrl = $basePath . '/profil';
+$categoriesUrl = $basePath . '/kategorie';
 
 panel_layout_head($user, 'Dashboard — WeFixIT', 'home');
 ?>
@@ -23,6 +24,7 @@ panel_layout_head($user, 'Dashboard — WeFixIT', 'home');
         'Dashboard',
         'Przegląd najważniejszych danych serwisu.',
         [
+            ['label' => 'Kategorie', 'href' => $categoriesUrl],
             ['label' => 'Mój profil', 'href' => $profileUrl],
         ]
     );
@@ -40,10 +42,15 @@ panel_layout_head($user, 'Dashboard — WeFixIT', 'home');
         ?>
 
         <?php if (!$hasBusinessData): ?>
-            <div role="status" class="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
-                Baza nie zawiera jeszcze danych o usługach, pracownikach ani rezerwacjach.
-                Świeży import <code class="font-mono">database-czysta.sql</code> jest pusty;
-                aby zobaczyć przykładowe dane, zaimportuj <code class="font-mono">database.sql</code>.
+            <div class="mb-6">
+                <?php
+                panel_empty_state(
+                    'Brak danych w bazie',
+                    'Baza nie zawiera jeszcze danych o usługach, pracownikach ani rezerwacjach. '
+                    . 'Świeży import database-czysta.sql jest pusty; aby zobaczyć przykładowe dane, '
+                    . 'zaimportuj database.sql.'
+                );
+                ?>
             </div>
         <?php endif; ?>
 
