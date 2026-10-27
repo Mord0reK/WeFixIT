@@ -8,7 +8,7 @@ require_once dirname(__DIR__) . '/app/panel_layout.php';
 
 $user = require_login();
 
-panel_layout_head($user, 'Panel — WeFixIT', 'home');
+panel_layout_head($user, 'Panel — WeFixIT', $user['rola'] === 'admin' ? 'client_panel' : 'home');
 ?>
     <section class="<?= PANEL_CARD_CLASS ?>">
         <?php panel_section_header('Panel klienta', 'Twoje konto w serwisie WeFixIT.'); ?>

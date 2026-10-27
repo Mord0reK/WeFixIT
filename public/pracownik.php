@@ -8,7 +8,7 @@ require_once dirname(__DIR__) . '/app/panel_layout.php';
 
 $user = require_role(['pracownik', 'admin']);
 
-panel_layout_head($user, 'Panel pracownika — WeFixIT', 'home');
+panel_layout_head($user, 'Panel pracownika — WeFixIT', $user['rola'] === 'admin' ? 'employee_panel' : 'home');
 ?>
     <section class="<?= PANEL_CARD_CLASS ?>">
         <?php panel_section_header('Panel pracownika', 'Widok roboczy dla pracowników serwisu.'); ?>

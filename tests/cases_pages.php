@@ -94,3 +94,30 @@ test('Dodatkowo: administrator widzi w menu oba panele i profil', function (): v
         );
     }
 });
+
+test('Dodatkowo: administrator widzi właściwą aktywną pozycję menu na podglądach', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $panel = http_request($session['cookies'], 'GET', '/panel.php');
+    assert_status(200, $panel, 'Administrator powinien zobaczyć podgląd panelu klienta');
+    assert_true(
+        preg_match('/<a href="\/panel"[^>]*aria-current="page"/s', $panel['body']) === 1,
+        'Na /panel.php aktywna powinna być pozycja Panel klienta'
+    );
+    assert_true(
+        preg_match('/<a href="\/admin"[^>]*aria-current="page"/s', $panel['body']) !== 1,
+        'Na /panel.php Dashboard nie powinien być aktywny'
+    );
+
+    $employee = http_request($session['cookies'], 'GET', '/pracownik.php');
+    assert_status(200, $employee, 'Administrator powinien zobaczyć podgląd panelu pracownika');
+    assert_true(
+        preg_match('/<a href="\/pracownik"[^>]*aria-current="page"/s', $employee['body']) === 1,
+        'Na /pracownik.php aktywna powinna być pozycja Panel pracownika'
+    );
+    assert_true(
+        preg_match('/<a href="\/admin"[^>]*aria-current="page"/s', $employee['body']) !== 1,
+        'Na /pracownik.php Dashboard nie powinien być aktywny'
+    );
+});
