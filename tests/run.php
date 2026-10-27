@@ -29,6 +29,7 @@ require_once __DIR__ . '/cases_profile.php';
 require_once __DIR__ . '/cases_admin.php';
 require_once __DIR__ . '/cases_admin_categories.php';
 require_once __DIR__ . '/cases_admin_services.php';
+require_once __DIR__ . '/cases_admin_employees.php';
 
 // Najpierw przygotowujemy bazę, żeby pierwsze żądanie nie logowało błędu połączenia.
 reset_database('database/database.sql');
