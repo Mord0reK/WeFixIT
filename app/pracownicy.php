@@ -356,8 +356,12 @@ function pracownik_update(int $id, array $data): bool
         return false;
     }
 
+    if (!array_key_exists('aktywny', $data)) {
+        return false;
+    }
+
     $description = pracownik_field($data, 'opis');
-    $active = (bool) ($data['aktywny'] ?? true);
+    $active = (bool) $data['aktywny'];
 
     $statement = $pdo->prepare(
         'UPDATE pracownicy

@@ -464,6 +464,10 @@ function usluga_update(int $id, array $data): bool
         return false;
     }
 
+    if (!array_key_exists('aktywna', $data)) {
+        return false;
+    }
+
     $price = usluga_price_value($data['cena'] ?? null);
     $duration = usluga_duration_value($data['czas_trwania_minuty'] ?? null);
     $categoryId = usluga_category_id_value($data['kategoria_id'] ?? null);
@@ -473,7 +477,7 @@ function usluga_update(int $id, array $data): bool
     }
 
     $description = usluga_field($data, 'opis');
-    $active = (bool) ($data['aktywna'] ?? true);
+    $active = (bool) $data['aktywna'];
 
     $statement = $pdo->prepare(
         'UPDATE uslugi

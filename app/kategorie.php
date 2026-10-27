@@ -222,8 +222,12 @@ function kategoria_update(int $id, array $data): bool
         return false;
     }
 
+    if (!array_key_exists('aktywna', $data)) {
+        return false;
+    }
+
     $opis = kategoria_field($data, 'opis');
-    $active = (bool) ($data['aktywna'] ?? true);
+    $active = (bool) $data['aktywna'];
 
     $statement = $pdo->prepare(
         'UPDATE kategorie_uslug
