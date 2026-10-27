@@ -10,6 +10,7 @@ declare(strict_types=1);
     a wylogowanie obsługuje fetch() z tokenem CSRF.
 */
 require_once __DIR__ . '/layout.php';
+require_once __DIR__ . '/panel_ui.php';
 
 // Klasy tła i karty panelu wspólne dla wszystkich stron zalogowanych.
 const PANEL_BODY_CLASS = 'min-h-screen bg-zinc-50 text-zinc-950 antialiased dark:bg-zinc-950 dark:text-zinc-50';
@@ -32,6 +33,8 @@ function panel_icon(string $name, string $classes = 'h-4 w-4 shrink-0'): string
         'menu' => '<path d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>',
         'chevron-left' => '<path d="m15 18-6-6 6-6"/>',
         'pin' => '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+        'folder' => '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+        'inbox' => '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
         default => '<circle cx="12" cy="12" r="9"/>',
     };
 
@@ -139,7 +142,7 @@ function panel_section_header(string $title, string $description = '', array $ac
                     }
                     ?>
                     <a href="<?= htmlspecialchars($href, ENT_QUOTES, 'UTF-8') ?>"
-                        class="inline-flex h-9 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200 dark:focus-visible:ring-offset-zinc-900">
+                        class="<?= panel_button_classes('primary') ?>">
                         <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
                     </a>
                 <?php endforeach; ?>
@@ -285,11 +288,32 @@ function panel_layout_foot(): void
         JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
     );
     $loginUrl = htmlspecialchars(auth_base_path() . '/login', ENT_QUOTES, 'UTF-8');
+    $confirmCancelClass = panel_button_classes('secondary');
+    $confirmDangerClass = panel_button_classes('danger');
+    $confirmDangerClassJson = json_encode(
+        panel_button_classes('danger'),
+        JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+    );
+    $confirmPrimaryClassJson = json_encode(
+        panel_button_classes('primary'),
+        JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+    );
 
     echo <<<HTML
             </main>
         </div>
     </div>
+    <dialog id="app-confirm" aria-labelledby="app-confirm-title" aria-describedby="app-confirm-message"
+        class="w-[calc(100%-2rem)] max-w-md rounded-xl border border-zinc-200 bg-white p-0 text-zinc-950 shadow-xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50">
+        <form method="dialog" class="p-6">
+            <h2 id="app-confirm-title" class="text-lg font-semibold tracking-tight">Potwierdź operację</h2>
+            <p id="app-confirm-message" class="mt-2 text-sm text-zinc-600 dark:text-zinc-400"></p>
+            <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button type="button" id="app-confirm-cancel" class="{$confirmCancelClass}">Anuluj</button>
+                <button type="submit" id="app-confirm-ok" value="confirm" class="{$confirmDangerClass}">Potwierdź</button>
+            </div>
+        </form>
+    </dialog>
     <script>
         (function () {
             const shell = document.getElementById('panel-shell');
@@ -376,6 +400,56 @@ function panel_layout_foot(): void
             } catch {
                 setCollapsed(false);
             }
+
+            const confirmDialog = document.getElementById('app-confirm');
+            const confirmTitle = document.getElementById('app-confirm-title');
+            const confirmMessage = document.getElementById('app-confirm-message');
+            const confirmCancel = document.getElementById('app-confirm-cancel');
+            const confirmOk = document.getElementById('app-confirm-ok');
+            const confirmDangerClasses = {$confirmDangerClassJson};
+            const confirmPrimaryClasses = {$confirmPrimaryClassJson};
+            let confirmResolve = null;
+
+            function setConfirmVariant(danger) {
+                confirmOk.className = danger ? confirmDangerClasses : confirmPrimaryClasses;
+            }
+
+            window.panelConfirm = function (options) {
+                // Drugie wywołanie w trakcie otwartego dialogu nie tworzy kolejnego okna.
+                if (confirmResolve !== null || confirmDialog.open) {
+                    return Promise.resolve(false);
+                }
+
+                const settings = options || {};
+
+                confirmTitle.textContent = typeof settings.title === 'string' && settings.title !== ''
+                    ? settings.title
+                    : 'Potwierdź operację';
+                confirmMessage.textContent = typeof settings.message === 'string' ? settings.message : '';
+                confirmOk.textContent = typeof settings.confirmLabel === 'string' && settings.confirmLabel !== ''
+                    ? settings.confirmLabel
+                    : 'Potwierdź';
+                setConfirmVariant(settings.danger === true);
+                confirmDialog.returnValue = '';
+
+                return new Promise(function (resolve) {
+                    confirmResolve = resolve;
+                    confirmDialog.showModal();
+                    confirmCancel.focus();
+                });
+            };
+
+            confirmCancel.addEventListener('click', function () {
+                confirmDialog.close('cancel');
+            });
+
+            confirmDialog.addEventListener('close', function () {
+                if (confirmResolve === null) return;
+
+                const resolve = confirmResolve;
+                confirmResolve = null;
+                resolve(confirmDialog.returnValue === 'confirm');
+            });
 
             const form = document.getElementById('logout-form');
             const error = document.getElementById('logout-error');

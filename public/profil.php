@@ -37,41 +37,41 @@ panel_layout_head($user, 'Profil — WeFixIT', 'profil');
         <form id="profile-form" action="<?= htmlspecialchars($profileApi, ENT_QUOTES, 'UTF-8') ?>" method="post" class="space-y-4">
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                    <label for="imie" class="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Imię</label>
+                    <label for="imie" class="<?= LAYOUT_LABEL_CLASS ?>">Imię</label>
                     <input id="imie" name="imie" type="text" autocomplete="given-name" maxlength="100" required
                         value="<?= htmlspecialchars($user['imie'], ENT_QUOTES, 'UTF-8') ?>"
                         class="<?= LAYOUT_INPUT_CLASS ?>">
-                    <p id="profile-error-imie" class="mt-1.5 hidden text-sm text-red-600 dark:text-red-400"></p>
+                    <?= panel_field_error('profile-error-imie') ?>
                 </div>
 
                 <div>
-                    <label for="nazwisko" class="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Nazwisko</label>
+                    <label for="nazwisko" class="<?= LAYOUT_LABEL_CLASS ?>">Nazwisko</label>
                     <input id="nazwisko" name="nazwisko" type="text" autocomplete="family-name" maxlength="100" required
                         value="<?= htmlspecialchars($user['nazwisko'], ENT_QUOTES, 'UTF-8') ?>"
                         class="<?= LAYOUT_INPUT_CLASS ?>">
-                    <p id="profile-error-nazwisko" class="mt-1.5 hidden text-sm text-red-600 dark:text-red-400"></p>
+                    <?= panel_field_error('profile-error-nazwisko') ?>
                 </div>
             </div>
 
             <div>
-                <label for="email" class="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">E-mail</label>
+                <label for="email" class="<?= LAYOUT_LABEL_CLASS ?>">E-mail</label>
                 <input id="email" name="email" type="email" autocomplete="username" maxlength="254" required
                     value="<?= htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8') ?>"
                     class="<?= LAYOUT_INPUT_CLASS ?>">
-                <p id="profile-error-email" class="mt-1.5 hidden text-sm text-red-600 dark:text-red-400"></p>
+                <?= panel_field_error('profile-error-email') ?>
             </div>
 
             <div>
-                <label for="telefon" class="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Telefon</label>
+                <label for="telefon" class="<?= LAYOUT_LABEL_CLASS ?>">Telefon</label>
                 <input id="telefon" name="telefon" type="tel" autocomplete="tel" maxlength="20" required
                     value="<?= htmlspecialchars($user['telefon'], ENT_QUOTES, 'UTF-8') ?>"
                     class="<?= LAYOUT_INPUT_CLASS ?>">
-                <p id="profile-error-telefon" class="mt-1.5 hidden text-sm text-red-600 dark:text-red-400"></p>
+                <?= panel_field_error('profile-error-telefon') ?>
             </div>
 
             <p id="profile-error" role="alert" class="hidden text-sm text-red-600 dark:text-red-400"></p>
 
-            <button type="submit" class="<?= LAYOUT_BUTTON_CLASS ?>">
+            <button type="submit" class="<?= panel_button_classes('primary') ?>">
                 Zapisz zmiany
             </button>
         </form>
