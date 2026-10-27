@@ -188,6 +188,43 @@ if ($current === null) {
 
 $activeAfter = $hasActive ? $data['aktywna'] : $current['aktywna'];
 
+$changedFields = [];
+
+if ($hasName && usluga_field($data, 'nazwa') !== $current['nazwa']) {
+    $changedFields[] = 'nazwa';
+}
+
+if ($hasDescription) {
+    $newDescription = usluga_field($data, 'opis');
+    $currentDescription = $current['opis'] ?? '';
+
+    if ($newDescription !== $currentDescription) {
+        $changedFields[] = 'opis';
+    }
+}
+
+if ($hasCategory && usluga_category_id_value($data['kategoria_id']) !== $current['kategoria_id']) {
+    $changedFields[] = 'kategoria_id';
+}
+
+if ($hasPrice) {
+    $newPrice = usluga_price_value($data['cena']);
+    $currentPrice = number_format((float) $current['cena'], 2, '.', '');
+    $normalizedPrice = $newPrice !== null ? number_format((float) $newPrice, 2, '.', '') : null;
+
+    if ($normalizedPrice !== $currentPrice) {
+        $changedFields[] = 'cena';
+    }
+}
+
+if ($hasDuration && usluga_duration_value($data['czas_trwania_minuty']) !== $current['czas_trwania_minuty']) {
+    $changedFields[] = 'czas_trwania_minuty';
+}
+
+if ($hasActive && $activeAfter !== $current['aktywna']) {
+    $changedFields[] = 'aktywna';
+}
+
 if (!$hasName && !$hasDescription && !$hasCategory && !$hasPrice && !$hasDuration) {
     $updated = usluga_set_active($serviceId, $activeAfter);
 
@@ -254,7 +291,7 @@ log_event(
     'info',
     'usluga',
     $serviceId,
-    ['aktywna' => $activeAfter]
+    ['zmienione_pola' => $changedFields, 'aktywna' => $activeAfter]
 );
 
 json_response(200, ['success' => true, 'id' => $serviceId]);

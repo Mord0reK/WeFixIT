@@ -40,10 +40,18 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
         </div>
     <?php elseif ($employees === []): ?>
         <?php
-        panel_empty_state(
-            'Brak pracowników',
-            'Utwórz profil pracownika powiązany z istniejącym kontem o roli pracownik.'
-        );
+        if ($availableAccounts === []) {
+            panel_empty_state(
+                'Brak pracowników i kont do powiązania',
+                'Aby dodać pierwszego pracownika, najpierw utwórz konto z rolą pracownik. '
+                . 'Panel pracowników nie tworzy kont użytkowników.'
+            );
+        } else {
+            panel_empty_state(
+                'Brak pracowników',
+                'Utwórz profil pracownika powiązany z istniejącym kontem o roli pracownik.'
+            );
+        }
         ?>
     <?php else: ?>
         <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">
@@ -134,7 +142,7 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
             Nie udało się pobrać kont dostępnych do powiązania z pracownikiem.
         </div>
     </section>
-<?php elseif ($availableAccounts === []): ?>
+<?php elseif ($availableAccounts === [] && $hasEmployees): ?>
     <section class="<?= PANEL_CARD_WIDE_CLASS ?> mt-6">
         <?php
         panel_empty_state(

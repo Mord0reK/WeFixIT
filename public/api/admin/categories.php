@@ -173,6 +173,25 @@ if ($current === null) {
 
 $activeAfter = $hasActive ? $data['aktywna'] : $current['aktywna'];
 
+$changedFields = [];
+
+if ($hasName && kategoria_field($data, 'nazwa') !== $current['nazwa']) {
+    $changedFields[] = 'nazwa';
+}
+
+if ($hasDescription) {
+    $newDescription = kategoria_field($data, 'opis');
+    $currentDescription = $current['opis'] ?? '';
+
+    if ($newDescription !== $currentDescription) {
+        $changedFields[] = 'opis';
+    }
+}
+
+if ($hasActive && $activeAfter !== $current['aktywna']) {
+    $changedFields[] = 'aktywna';
+}
+
 if ($hasName || $hasDescription) {
     $payload = [
         'nazwa' => $hasName ? $data['nazwa'] : $current['nazwa'],
@@ -223,7 +242,7 @@ log_event(
     'info',
     'kategoria_uslug',
     $categoryId,
-    ['aktywna' => $activeAfter]
+    ['zmienione_pola' => $changedFields, 'aktywna' => $activeAfter]
 );
 
 json_response(200, ['success' => true, 'id' => $categoryId]);

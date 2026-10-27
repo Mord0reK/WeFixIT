@@ -205,6 +205,21 @@ if ($hasDescription) {
     }
 }
 
+$changedFields = [];
+
+if ($hasDescription) {
+    $newDescription = pracownik_field($data, 'opis');
+    $currentDescription = $current['opis'] ?? '';
+
+    if ($newDescription !== $currentDescription) {
+        $changedFields[] = 'opis';
+    }
+}
+
+if ($hasActive && $activeAfter !== $current['aktywny']) {
+    $changedFields[] = 'aktywny';
+}
+
 $action = 'pracownik_zaktualizowany';
 $description = 'Zaktualizowano profil pracownika.';
 
@@ -220,7 +235,7 @@ log_event(
     'info',
     'pracownik',
     $employeeId,
-    ['aktywny' => $activeAfter]
+    ['zmienione_pola' => $changedFields, 'aktywny' => $activeAfter]
 );
 
 json_response(200, ['success' => true, 'id' => $employeeId]);
