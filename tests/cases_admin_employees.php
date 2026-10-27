@@ -311,3 +311,104 @@ test('61. dashboard administratora zawiera link do pracowników', function (): v
         'Dashboard powinien zawierać link do pracowników'
     );
 });
+
+test('62. konto testowe bez profilu jest widoczne w select i znika po utworzeniu profilu', function (): void {
+    $statement = test_db()->prepare('SELECT id FROM uzytkownicy WHERE email = :email');
+    $statement->execute(['email' => 'kamil.testowy@wefixit.pl']);
+    $userId = (int) $statement->fetchColumn();
+    assert_true($userId > 0, 'Konto testowe bez profilu powinno istnieć w database.sql');
+
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $page = http_request($session['cookies'], 'GET', '/pracownicy.php');
+    assert_status(200, $page, 'Strona pracowników powinna zwrócić 200');
+    assert_true(
+        preg_match('/<select id="employee-uzytkownik".*?<\/select>/s', $page['body'], $matches) === 1,
+        'Formularz powinien zawierać select konta'
+    );
+    assert_true(
+        strpos($matches[0], 'kamil.testowy@wefixit.pl') !== false,
+        'Select powinien zawierać konto testowe bez profilu'
+    );
+
+    $csrf = csrf_from_page($session['cookies'], '/pracownicy.php');
+    $created = post_json($session['cookies'], '/api/admin/employees.php', [
+        'uzytkownik_id' => $userId,
+        'opis' => 'Profil utworzony w teście 62.',
+        'aktywny' => true,
+    ], $csrf);
+    assert_status(201, $created, 'Utworzenie profilu dla konta testowego powinno dać 201');
+
+    $after = http_request($session['cookies'], 'GET', '/pracownicy.php');
+    assert_status(200, $after, 'Strona pracowników po utworzeniu profilu powinna zwrócić 200');
+    assert_true(
+        preg_match('/<select id="employee-uzytkownik".*?<\/select>/s', $after['body'], $matchesAfter) === 1,
+        'Formularz nadal powinien zawierać select konta'
+    );
+    assert_true(
+        strpos($matchesAfter[0], 'kamil.testowy@wefixit.pl') === false,
+        'Konto z utworzonym profilem nie może być proponowane w select'
+    );
+});
+
+test('63. GET endpointu pracowników daje 405 z nagłówkiem Allow', function (): void {
+    $cookies = [];
+    $response = http_request($cookies, 'GET', '/api/admin/employees.php');
+
+    assert_status(405, $response, 'GET na endpoint pracowników powinien dać 405');
+
+    $allow = header_value($response, 'allow');
+    assert_true(is_string($allow) && $allow !== '', 'Odpowiedź 405 powinna zawierać nagłówek Allow');
+
+    foreach (['POST', 'PATCH', 'DELETE'] as $method) {
+        assert_true(
+            strpos($allow, $method) !== false,
+            'Nagłówek Allow powinien zawierać metodę ' . $method
+        );
+    }
+});
+
+test('64. POST bez Content-Type application/json daje 415 i nie tworzy profilu', function (): void {
+    $userId = create_test_employee_user('pracownik64@example.com', 'Pracownik64', '+48123456064');
+
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $csrf = csrf_from_page($session['cookies'], '/pracownicy.php');
+    $response = http_request($session['cookies'], 'POST', '/api/admin/employees.php', [
+        'body' => json_encode([
+            'uzytkownik_id' => $userId,
+            'opis' => '',
+            'aktywny' => true,
+        ], JSON_UNESCAPED_UNICODE),
+        'headers' => ['X-CSRF-Token' => $csrf],
+    ]);
+
+    assert_status(415, $response, 'Brak Content-Type application/json powinien dać 415');
+
+    $statement = test_db()->prepare('SELECT COUNT(*) FROM pracownicy WHERE uzytkownik_id = :id');
+    $statement->execute(['id' => $userId]);
+    assert_same(0, (int) $statement->fetchColumn(), 'Profil bez poprawnego Content-Type nie może powstać');
+});
+
+test('65. PATCH z tymi samymi wartościami pracownika daje 200', function (): void {
+    $row = test_db()->query('SELECT opis, aktywny FROM pracownicy WHERE id = 1')->fetch();
+    assert_true(is_array($row), 'Profil testowy powinien istnieć w bazie');
+
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $csrf = csrf_from_page($session['cookies'], '/pracownicy.php');
+    $response = patch_json($session['cookies'], '/api/admin/employees.php', [
+        'id' => 1,
+        'opis' => $row['opis'] ?? '',
+        'aktywny' => (int) $row['aktywny'] === 1,
+    ], $csrf);
+
+    assert_status(200, $response, 'Zapis bez zmiany wartości powinien dać 200, a nie 404 ani 500');
+
+    $after = test_db()->query('SELECT opis, aktywny FROM pracownicy WHERE id = 1')->fetch();
+    assert_same($row['opis'] ?? null, $after['opis'] ?? null, 'Opis po zapisie powinien być identyczny');
+    assert_same((int) $row['aktywny'], (int) $after['aktywny'], 'Flaga aktywności po zapisie powinna być identyczna');
+});
