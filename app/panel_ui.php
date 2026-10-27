@@ -2,13 +2,36 @@
 declare(strict_types=1);
 
 /*
-    Komponenty widoków panelu: przyciski, plakietki, tabele, pusty stan
+    Komponenty widoków panelu: ikony, przyciski, plakietki, tabele, pusty stan
     i komunikaty błędów pól.
 
     Plik zawiera wyłącznie funkcje i stałe renderujące HTML. Nie wykonuje
-    zapytań SQL ani operacji zapisu. Korzysta z ikon zdefiniowanych
-    w panel_layout.php.
+    zapytań SQL ani operacji zapisu.
 */
+
+// Ikony panelu to stałe, zaufane fragmenty SVG — żadnych danych użytkownika.
+function panel_icon(string $name, string $classes = 'h-4 w-4 shrink-0'): string
+{
+    $paths = match ($name) {
+        'home' => '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+        'dashboard' => '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
+        'briefcase' => '<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/>',
+        'user' => '<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/>',
+        'logout' => '<path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>',
+        'menu' => '<path d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>',
+        'chevron-left' => '<path d="m15 18-6-6 6-6"/>',
+        'pin' => '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+        'folder' => '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+        'inbox' => '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+        default => '<circle cx="12" cy="12" r="9"/>',
+    };
+
+    $classesSafe = htmlspecialchars($classes, ENT_QUOTES, 'UTF-8');
+
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+        . ' stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="' . $classesSafe . '" aria-hidden="true">'
+        . $paths . '</svg>';
+}
 
 // Kompletne warianty klas przycisków są literałami, żeby Tailwind je wykrył.
 function panel_button_classes(string $variant): string

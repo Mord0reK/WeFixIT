@@ -237,7 +237,7 @@ function kategoria_update(int $id, array $data): bool
         'aktywna' => $active ? 1 : 0,
     ]);
 
-    return true;
+    return $statement->rowCount() > 0;
 }
 
 function kategoria_set_active(int $id, bool $active): bool

@@ -219,3 +219,56 @@ test('36. strona kategorii zawiera tabelę i akcję, a dashboard link do kategor
         'Dashboard powinien zawierać link do kategorii'
     );
 });
+
+test('37. GET endpointu kategorii daje 405 z nagłówkiem Allow', function (): void {
+    $cookies = [];
+    $response = http_request($cookies, 'GET', '/api/admin/categories.php');
+
+    assert_status(405, $response, 'GET na endpoint kategorii powinien dać 405');
+
+    $allow = header_value($response, 'allow');
+    assert_true(is_string($allow) && $allow !== '', 'Odpowiedź 405 powinna zawierać nagłówek Allow');
+
+    foreach (['POST', 'PATCH', 'DELETE'] as $method) {
+        assert_true(
+            strpos($allow, $method) !== false,
+            'Nagłówek Allow powinien zawierać metodę ' . $method
+        );
+    }
+});
+
+test('38. POST bez Content-Type application/json daje 415 i nie tworzy rekordu', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $csrf = csrf_from_page($session['cookies'], '/kategorie.php');
+    $response = http_request($session['cookies'], 'POST', '/api/admin/categories.php', [
+        'body' => json_encode(['nazwa' => 'Kategoria bez content type 38', 'opis' => ''], JSON_UNESCAPED_UNICODE),
+        'headers' => ['X-CSRF-Token' => $csrf],
+    ]);
+
+    assert_status(415, $response, 'Brak Content-Type application/json powinien dać 415');
+
+    $statement = test_db()->prepare('SELECT COUNT(*) FROM kategorie_uslug WHERE nazwa = :nazwa');
+    $statement->execute(['nazwa' => 'Kategoria bez content type 38']);
+    assert_same(0, (int) $statement->fetchColumn(), 'Kategoria bez poprawnego Content-Type nie może powstać');
+});
+
+test('39. PATCH z nazwą innej kategorii daje 409 z błędem nazwy', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $csrf = csrf_from_page($session['cookies'], '/kategorie.php');
+    $response = patch_json($session['cookies'], '/api/admin/categories.php', [
+        'id' => 2,
+        'nazwa' => 'Diagnostyka i Konserwacja',
+    ], $csrf);
+
+    assert_status(409, $response, 'Konflikt unikalności nazwy przy PATCH powinien dać 409');
+
+    $data = json_body($response);
+    assert_true(
+        isset($data['errors']['nazwa']) && is_string($data['errors']['nazwa']),
+        'Odpowiedź 409 powinna zawierać errors.nazwa'
+    );
+});

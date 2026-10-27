@@ -33,6 +33,7 @@ function json_require_method(array $methods): void
 }
 
 // Endpointy przyjmujące JSON akceptują wyłącznie application/json (także z parametrem).
+// DELETE celowo nie przechodzi tej kontroli: operacja nie przyjmuje reprezentacji zasobu.
 function json_require_content_type(): void
 {
     $contentType = strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '', 2)[0]));

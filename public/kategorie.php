@@ -154,6 +154,7 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
 </section>
 
 <script>
+(function () {
     const categoryForm = document.getElementById('category-form');
     const categoryFormTitle = document.getElementById('category-form-title');
     const categoryFormError = document.getElementById('category-form-error');
@@ -395,5 +396,6 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
             }
         });
     }
+})();
 </script>
 <?php panel_layout_foot(); ?>

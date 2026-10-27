@@ -155,6 +155,13 @@ if ($hasDescription) {
 }
 
 if ($errors !== []) {
+    if (($errors['nazwa'] ?? '') === KATEGORIA_NAME_TAKEN_ERROR) {
+        json_response(409, [
+            'error' => KATEGORIA_NAME_TAKEN_ERROR,
+            'errors' => ['nazwa' => KATEGORIA_NAME_TAKEN_ERROR],
+        ]);
+    }
+
     json_response(422, ['error' => 'Nieprawidłowe dane kategorii.', 'errors' => $errors]);
 }
 
@@ -191,7 +198,7 @@ if ($hasName || $hasDescription) {
     }
 
     if (!$updated) {
-        json_response(500, ['error' => 'Nie udało się zapisać kategorii. Wystąpił problem z serwerem.']);
+        json_response(404, ['error' => 'Nie znaleziono kategorii.']);
     }
 } else {
     $updated = kategoria_set_active($categoryId, $activeAfter);
