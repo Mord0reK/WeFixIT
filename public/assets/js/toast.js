@@ -58,7 +58,7 @@
 
         const toast = document.createElement('div');
         toast.className = 'pointer-events-auto relative cursor-pointer overflow-hidden rounded-lg border-2 bg-white/95 shadow-lg backdrop-blur '
-            + style.border + ' dark:bg-gray-800/95';
+            + style.border + ' dark:bg-zinc-900/95';
         toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
 
         if (!reduceMotion) {
@@ -73,13 +73,13 @@
         iconWrap.innerHTML = icon;
 
         const text = document.createElement('span');
-        text.className = 'flex-1 break-words text-sm text-gray-800 dark:text-gray-100';
+        text.className = 'flex-1 break-words text-sm text-zinc-800 dark:text-zinc-100';
         text.textContent = message;
 
         const close = document.createElement('button');
         close.type = 'button';
         close.setAttribute('aria-label', 'Zamknij powiadomienie');
-        close.className = 'shrink-0 rounded leading-none text-gray-400 hover:text-gray-600 dark:hover:text-gray-200';
+        close.className = 'shrink-0 rounded leading-none text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200';
         close.textContent = '\u00d7';
 
         body.append(iconWrap, text, close);

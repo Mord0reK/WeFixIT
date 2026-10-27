@@ -165,6 +165,7 @@ Daty rezerwacji w wersji testowej są liczone względem `CURDATE()` i dopasowane
 | Administrator | Administrator Systemu | `admin@wefixit.pl` | `haslo123` |
 | Pracownik | Tomasz Serwisant | `tomasz.serwisant@wefixit.pl` | `haslo123` |
 | Pracownik | Marcin Elektronik | `marcin.elektronik@wefixit.pl` | `haslo123` |
+| Pracownik | Kamil Testowy | `kamil.testowy@wefixit.pl` | `haslo123` |
 | Klient | Jan Kowalski | `jan.kowalski@example.com` | `haslo123` |
 | Klient | Anna Nowak | `anna.nowak@example.com` | `haslo123` |
 | Klient | Piotr Wiśniewski | `piotr.wisniewski@example.com` | `haslo123` |
@@ -181,7 +182,7 @@ WeFixIT to system rezerwacji dla serwisu komputerowego z trzema rolami: klient, 
 - Relacje 1:N oraz relacja N:M pracownik–usługa przez `uslugi_pracownikow`.
 - Integralność: klucze obce, `UNIQUE` na e-mail, `CHECK` na ceny / czasy / statusy, `ON DELETE RESTRICT`.
 - Aktualny diagram ERD w Mermaid powyżej.
-- Dane testowe: 1 administrator, 2 pracowników, 3 klientów, usługi, grafik i rezerwacje.
+- Dane testowe: 1 administrator, 3 konta pracowników (w tym jedno bez profilu), 3 klientów, usługi, grafik i rezerwacje.
 - Środowisko uruchomieniowe: Docker Compose dev + prod oraz instrukcja pod XAMPP.
 
 ### Zrealizowano w Etapie 2 - Użytkownicy i logowanie
@@ -205,6 +206,11 @@ Konto klienta powstaje wyłącznie przez rejestrację. Rolę zawsze ustala serwe
 więc pola `rola` i `aktywny` przesłane w formularzu są ignorowane. Strona
 `/register` tworzy konto z rolą `klient`, a `/pracownik` i `/admin` wymagają
 odpowiednio roli pracownika i administratora.
+
+Panel `/pracownicy` nie tworzy nowych kont użytkowników. Tworzy wyłącznie
+profil pracownika powiązany z istniejącym, aktywnym kontem o roli `pracownik`.
+Rejestracja kont ma własną ścieżkę, a nadanie roli pracownika wymaga świadomej
+decyzji administratora.
 
 #### Endpointy JSON
 

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /*
-    Punkt wejścia testów integracyjnych Etapu 2.
+    Punkt wejścia testów integracyjnych WeFixIT.
 
     Wymaga działającego serwera MariaDB/MySQL wskazanego przez zmienne DB_HOST,
     DB_PORT, DB_NAME, DB_USER i DB_PASSWORD. Testy uruchamiają wbudowany serwer
@@ -27,6 +27,9 @@ require_once __DIR__ . '/cases_auth.php';
 require_once __DIR__ . '/cases_pages.php';
 require_once __DIR__ . '/cases_profile.php';
 require_once __DIR__ . '/cases_admin.php';
+require_once __DIR__ . '/cases_admin_categories.php';
+require_once __DIR__ . '/cases_admin_services.php';
+require_once __DIR__ . '/cases_admin_employees.php';
 
 // Najpierw przygotowujemy bazę, żeby pierwsze żądanie nie logowało błędu połączenia.
 reset_database('database/database.sql');

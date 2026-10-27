@@ -375,7 +375,8 @@ INSERT INTO uzytkownicy (id, imie, nazwisko, email, telefon, haslo_hash, rola, a
 (3, 'Marcin', 'Elektronik', 'marcin.elektronik@wefixit.pl', '+48123456782', '$2y$12$5WalVqOzwEO80XzP7g65ReJzpBkI4o.kBX2ZJHfXOjmv0ZDPuVR8a', 'pracownik', TRUE),
 (4, 'Jan', 'Kowalski', 'jan.kowalski@example.com', '+48987654321', '$2y$12$5WalVqOzwEO80XzP7g65ReJzpBkI4o.kBX2ZJHfXOjmv0ZDPuVR8a', 'klient', TRUE),
 (5, 'Anna', 'Nowak', 'anna.nowak@example.com', '+48987654322', '$2y$12$5WalVqOzwEO80XzP7g65ReJzpBkI4o.kBX2ZJHfXOjmv0ZDPuVR8a', 'klient', TRUE),
-(6, 'Piotr', 'Wisniewski', 'piotr.wisniewski@example.com', '+48987654323', '$2y$12$5WalVqOzwEO80XzP7g65ReJzpBkI4o.kBX2ZJHfXOjmv0ZDPuVR8a', 'klient', TRUE);
+(6, 'Piotr', 'Wisniewski', 'piotr.wisniewski@example.com', '+48987654323', '$2y$12$5WalVqOzwEO80XzP7g65ReJzpBkI4o.kBX2ZJHfXOjmv0ZDPuVR8a', 'klient', TRUE),
+(7, 'Kamil', 'Testowy', 'kamil.testowy@wefixit.pl', '+48123456783', '$2y$12$5WalVqOzwEO80XzP7g65ReJzpBkI4o.kBX2ZJHfXOjmv0ZDPuVR8a', 'pracownik', TRUE);
 
 INSERT INTO pracownicy (id, uzytkownik_id, opis, aktywny) VALUES
 (1, 2, 'Specjalista od diagnostyki PC, montażu zestawów komputerowych oraz instalacji systemów.', TRUE),

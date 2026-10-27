@@ -269,6 +269,13 @@ function patch_json(array &$cookies, string $path, array $payload, ?string $csrf
     return http_request($cookies, 'PATCH', $path, ['json' => $payload, 'headers' => $headers]);
 }
 
+function delete_json(array &$cookies, string $path, array $payload, ?string $csrf = null): array
+{
+    $headers = $csrf === null ? [] : ['X-CSRF-Token' => $csrf];
+
+    return http_request($cookies, 'DELETE', $path, ['json' => $payload, 'headers' => $headers]);
+}
+
 // Loguje użytkownika i zwraca cookies, token CSRF oraz odpowiedź endpointu.
 function login_as(string $email, string $password = 'haslo123'): array
 {

@@ -166,7 +166,7 @@ function require_role(array $roles): array
         <h1 class="mb-4 text-2xl font-semibold">Brak dostępu</h1>
         <p>Nie masz uprawnień do wyświetlenia tej strony.</p>
         <p class="mt-4 text-sm">
-            <a href="<?= $homeHref ?>" class="text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">Wróć do panelu</a>
+            <a href="<?= $homeHref ?>" class="font-medium text-zinc-900 underline-offset-4 hover:underline dark:text-zinc-100">Wróć do panelu</a>
         </p>
     </main>
     <?php
