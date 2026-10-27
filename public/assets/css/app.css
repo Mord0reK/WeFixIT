@@ -1204,6 +1204,9 @@
     .sm\:grid-cols-2 {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+    .sm\:grid-cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
     .sm\:flex-row {
       flex-direction: row;
     }
@@ -1257,6 +1260,12 @@
     }
     .lg\:grid-cols-\[18rem_1fr\] {
       grid-template-columns: 18rem 1fr;
+    }
+    .lg\:grid-cols-\[minmax\(0\,1fr\)_minmax\(0\,1fr\)_auto\] {
+      grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto;
+    }
+    .lg\:items-end {
+      align-items: flex-end;
     }
     .lg\:p-8 {
       padding: calc(var(--spacing) * 8);

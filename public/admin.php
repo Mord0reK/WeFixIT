@@ -15,6 +15,7 @@ $stats = admin_dashboard_stats();
 $basePath = auth_base_path();
 $profileUrl = $basePath . '/profil';
 $categoriesUrl = $basePath . '/kategorie';
+$servicesUrl = $basePath . '/uslugi';
 
 panel_layout_head($user, 'Dashboard — WeFixIT', 'home');
 ?>
@@ -25,6 +26,7 @@ panel_layout_head($user, 'Dashboard — WeFixIT', 'home');
         'Przegląd najważniejszych danych serwisu.',
         [
             ['label' => 'Kategorie', 'href' => $categoriesUrl],
+            ['label' => 'Usługi', 'href' => $servicesUrl],
             ['label' => 'Mój profil', 'href' => $profileUrl],
         ]
     );
