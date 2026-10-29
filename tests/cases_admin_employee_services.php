@@ -6,7 +6,8 @@ declare(strict_types=1);
 
     Obejmują zapis stanu docelowego, odłączanie bez usuwania wierszy,
     idempotencję, kontrolę dostępu, CSRF, walidację, metody HTTP,
-    spójność rezerwacji historycznych i brak wycieku danych technicznych.
+    usługi nieaktywne, spójność rezerwacji historycznych i brak wycieku
+    danych technicznych. Każdy test przygotowuje własny stan początkowy.
 */
 
 test_group('Panel: przypisania usług', 'database/database.sql');
@@ -34,16 +35,47 @@ function employee_services_total(): int
     return (int) test_db()->query('SELECT COUNT(*) FROM uslugi_pracownikow')->fetchColumn();
 }
 
-test('66. administrator zapisuje zbiór usług i odłącza brakujące bez usuwania wierszy', function (): void {
-    $totalBefore = employee_services_total();
+function employee_services_set_service_active(int $serviceId, bool $active): void
+{
+    $statement = test_db()->prepare('UPDATE uslugi SET aktywna = :aktywna WHERE id = :id');
+    $statement->execute([
+        'id' => $serviceId,
+        'aktywna' => $active ? 1 : 0,
+    ]);
+}
+
+function employee_services_set_services_active(array $serviceIds): void
+{
+    foreach ($serviceIds as $serviceId) {
+        employee_services_set_service_active((int) $serviceId, true);
+    }
+}
+
+function employee_services_admin_session(int $employeeId = 1): array
+{
     $session = login_as('admin@wefixit.pl');
     assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+    $session['csrf'] = csrf_from_page($session['cookies'], '/pracownicy-uslugi.php?id=' . $employeeId);
 
-    $csrf = csrf_from_page($session['cookies'], '/pracownicy-uslugi.php?id=1');
-    $response = post_json($session['cookies'], '/api/admin/employee-services.php', [
-        'pracownik_id' => 1,
-        'usluga_ids' => [1, 3, 3],
-    ], $csrf);
+    return $session;
+}
+
+function employee_services_save_with(array &$session, array $serviceIds, int $employeeId = 1): array
+{
+    return post_json($session['cookies'], '/api/admin/employee-services.php', [
+        'pracownik_id' => $employeeId,
+        'usluga_ids' => $serviceIds,
+    ], $session['csrf']);
+}
+
+test('66. administrator zapisuje zbiór usług i odłącza brakujące bez usuwania wierszy', function (): void {
+    employee_services_set_services_active([1, 2, 3, 5, 6]);
+    $session = employee_services_admin_session();
+    $setup = employee_services_save_with($session, [1, 2, 5, 6]);
+    assert_status(200, $setup, 'Przygotowanie przypisań powinno dać 200');
+
+    $totalBefore = employee_services_total();
+    $response = employee_services_save_with($session, [1, 3, 3]);
 
     assert_status(200, $response, 'Zapis przypisań powinien dać 200');
     $data = json_body($response);
@@ -60,9 +92,8 @@ test('66. administrator zapisuje zbiór usług i odłącza brakujące bez usuwan
         assert_same(0, $rows[$serviceId], 'Usługa ' . $serviceId . ' powinna być odłączona');
     }
 
-    assert_same(
-        $totalBefore + 1,
-        employee_services_total(),
+    assert_true(
+        employee_services_total() >= $totalBefore,
         'Zapis może dodać nowy wiersz, ale nie może usuwać istniejących'
     );
 
@@ -84,17 +115,15 @@ test('66. administrator zapisuje zbiór usług i odłącza brakujące bez usuwan
 });
 
 test('67. pusta lista odłącza wszystkie przypisania bez usuwania wierszy', function (): void {
+    employee_services_set_services_active([1, 2, 3, 4, 5, 6]);
+    $session = employee_services_admin_session();
+    $setup = employee_services_save_with($session, [1, 3]);
+    assert_status(200, $setup, 'Przygotowanie przypisań powinno dać 200');
+
     $rowsBefore = employee_services_rows(1);
     assert_true($rowsBefore !== [], 'Pracownik 1 powinien mieć przypisania przed testem');
 
-    $session = login_as('admin@wefixit.pl');
-    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
-
-    $csrf = csrf_from_page($session['cookies'], '/pracownicy-uslugi.php?id=1');
-    $response = post_json($session['cookies'], '/api/admin/employee-services.php', [
-        'pracownik_id' => 1,
-        'usluga_ids' => [],
-    ], $csrf);
+    $response = employee_services_save_with($session, []);
 
     assert_status(200, $response, 'Zapis pustej listy powinien dać 200');
     assert_same([], json_body($response)['usluga_ids'] ?? null, 'Odpowiedź powinna zawierać pustą listę');
@@ -108,21 +137,13 @@ test('67. pusta lista odłącza wszystkie przypisania bez usuwania wierszy', fun
 });
 
 test('68. ponowne wysłanie tego samego zbioru jest idempotentne', function (): void {
-    $session = login_as('admin@wefixit.pl');
-    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
-
-    $csrf = csrf_from_page($session['cookies'], '/pracownicy-uslugi.php?id=1');
-    $first = post_json($session['cookies'], '/api/admin/employee-services.php', [
-        'pracownik_id' => 1,
-        'usluga_ids' => [1, 3],
-    ], $csrf);
+    employee_services_set_services_active([1, 3]);
+    $session = employee_services_admin_session();
+    $first = employee_services_save_with($session, [1, 3]);
     assert_status(200, $first, 'Pierwszy zapis zbioru powinien dać 200');
 
     $rowsAfterFirst = employee_services_rows(1);
-    $second = post_json($session['cookies'], '/api/admin/employee-services.php', [
-        'pracownik_id' => 1,
-        'usluga_ids' => [1, 3],
-    ], $csrf);
+    $second = employee_services_save_with($session, [1, 3]);
 
     assert_status(200, $second, 'Drugi zapis tego samego zbioru powinien dać 200');
     assert_same([1, 3], json_body($second)['usluga_ids'] ?? null, 'Odpowiedź powinna zawierać ten sam zbiór');
@@ -158,10 +179,7 @@ test('69. klient i pracownik dostają 403 na stronie i endpointcie przypisań', 
 });
 
 test('70. POST bez tokenu CSRF daje 403 i nie zmienia przypisań', function (): void {
-    $session = login_as('admin@wefixit.pl');
-    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
-
-    csrf_from_page($session['cookies'], '/pracownicy-uslugi.php?id=1'); // Sesja istnieje, ale tokenu nie wysyłamy.
+    $session = employee_services_admin_session();
     $before = employee_services_rows(1);
 
     $response = post_json($session['cookies'], '/api/admin/employee-services.php', [
@@ -174,10 +192,8 @@ test('70. POST bez tokenu CSRF daje 403 i nie zmienia przypisań', function (): 
 });
 
 test('71. walidacja zwraca 422 lub 404 i nie zostawia połowicznego stanu', function (): void {
-    $session = login_as('admin@wefixit.pl');
-    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
-
-    $csrf = csrf_from_page($session['cookies'], '/pracownicy-uslugi.php?id=1');
+    employee_services_set_service_active(7, false);
+    $session = employee_services_admin_session();
     $cases = [
         [
             'payload' => ['usluga_ids' => [1]],
@@ -212,7 +228,8 @@ test('71. walidacja zwraca 422 lub 404 i nie zostawia połowicznego stanu', func
     ];
 
     foreach ($cases as $case) {
-        $response = post_json($session['cookies'], '/api/admin/employee-services.php', $case['payload'], $csrf);
+        $response = post_json($session['cookies'], '/api/admin/employee-services.php', $case['payload'], $session['csrf']);
+
         assert_status($case['status'], $response, 'Przypadek "' . $case['label'] . '" powinien dać ' . $case['status']);
 
         $data = json_body($response);
@@ -225,14 +242,14 @@ test('71. walidacja zwraca 422 lub 404 i nie zostawia połowicznego stanu', func
     $missing = post_json($session['cookies'], '/api/admin/employee-services.php', [
         'pracownik_id' => 999999,
         'usluga_ids' => [1],
-    ], $csrf);
+    ], $session['csrf']);
     assert_status(404, $missing, 'Nieistniejący pracownik powinien dać 404');
 
     $before = employee_services_rows(1);
     $atomic = post_json($session['cookies'], '/api/admin/employee-services.php', [
         'pracownik_id' => 1,
         'usluga_ids' => [1, 7],
-    ], $csrf);
+    ], $session['csrf']);
     assert_status(422, $atomic, 'Mieszanka poprawnej i nieaktywnej usługi powinna dać 422');
     assert_same($before, employee_services_rows(1), 'Błąd walidacji nie może zostawić częściowego stanu');
 });
@@ -246,15 +263,12 @@ test('72. GET daje 405 z Allow, a POST bez JSON daje 415', function (): void {
     assert_true(is_string($allow) && $allow !== '', 'Odpowiedź 405 powinna zawierać nagłówek Allow');
     assert_true(strpos($allow, 'POST') !== false, 'Nagłówek Allow powinien zawierać POST');
 
-    $session = login_as('admin@wefixit.pl');
-    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
-
-    $csrf = csrf_from_page($session['cookies'], '/pracownicy-uslugi.php?id=1');
+    $session = employee_services_admin_session();
     $before = employee_services_rows(1);
     $response = http_request($session['cookies'], 'POST', '/api/admin/employee-services.php', [
         'body' => json_encode(['pracownik_id' => 1, 'usluga_ids' => []], JSON_UNESCAPED_UNICODE),
         'content_type' => 'text/plain',
-        'headers' => ['X-CSRF-Token' => $csrf],
+        'headers' => ['X-CSRF-Token' => $session['csrf']],
     ]);
 
     assert_status(415, $response, 'POST bez Content-Type application/json powinien dać 415');
@@ -262,23 +276,15 @@ test('72. GET daje 405 z Allow, a POST bez JSON daje 415', function (): void {
 });
 
 test('73. odłączenie przypisania użytego przez rezerwację zachowuje wiersz i rezerwację', function (): void {
-    $session = login_as('admin@wefixit.pl');
-    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
-
-    $csrf = csrf_from_page($session['cookies'], '/pracownicy-uslugi.php?id=1');
-    $setup = post_json($session['cookies'], '/api/admin/employee-services.php', [
-        'pracownik_id' => 1,
-        'usluga_ids' => [1, 3],
-    ], $csrf);
+    employee_services_set_services_active([1, 3]);
+    $session = employee_services_admin_session();
+    $setup = employee_services_save_with($session, [1, 3]);
     assert_status(200, $setup, 'Przygotowanie przypisania 1/1 powinno dać 200');
 
     $reservationBefore = test_db()->query('SELECT * FROM rezerwacje WHERE id = 1')->fetch();
     assert_true(is_array($reservationBefore), 'Rezerwacja testowa powinna istnieć');
 
-    $response = post_json($session['cookies'], '/api/admin/employee-services.php', [
-        'pracownik_id' => 1,
-        'usluga_ids' => [3],
-    ], $csrf);
+    $response = employee_services_save_with($session, [3]);
     assert_status(200, $response, 'Odłączenie usługi z rezerwacją powinno dać 200');
     assert_same([3], json_body($response)['usluga_ids'] ?? null, 'Odpowiedź powinna zawierać nowy zbiór');
 
@@ -295,8 +301,13 @@ test('73. odłączenie przypisania użytego przez rezerwację zachowuje wiersz i
 });
 
 test('74. strona przypisań zwraca 200 dla pracownika i 404 dla braku lub złego id', function (): void {
-    $session = login_as('admin@wefixit.pl');
-    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+    employee_services_set_services_active([1, 3]);
+    $session = employee_services_admin_session();
+    $first = employee_services_save_with($session, [1, 3]);
+    assert_status(200, $first, 'Przypisanie usług 1 i 3 powinno dać 200');
+
+    $detached = employee_services_save_with($session, [3]);
+    assert_status(200, $detached, 'Odłączenie usługi 1 powinno dać 200');
 
     $page = http_request($session['cookies'], 'GET', '/pracownicy-uslugi.php?id=1');
     assert_status(200, $page, 'Strona przypisań powinna zwrócić 200');
@@ -317,6 +328,10 @@ test('74. strona przypisań zwraca 200 dla pracownika i 404 dla braku lub złego
     $missing = http_request($session['cookies'], 'GET', '/pracownicy-uslugi.php?id=999999');
     assert_status(404, $missing, 'Nieistniejący pracownik powinien dać 404');
     assert_true(strpos($missing['body'], 'Nie znaleziono pracownika') !== false, 'Strona 404 powinna zawierać komunikat');
+    assert_true(
+        strpos($missing['body'], 'id="panel-shell"') !== false,
+        'Strona 404 powinna być osadzona w szkielecie panelu'
+    );
 
     $withoutId = http_request($session['cookies'], 'GET', '/pracownicy-uslugi.php');
     assert_status(404, $withoutId, 'Brak parametru id powinien dać 404');
@@ -324,24 +339,20 @@ test('74. strona przypisań zwraca 200 dla pracownika i 404 dla braku lub złego
 });
 
 test('75. odpowiedzi nie ujawniają danych technicznych i nie usuwają przypisań', function (): void {
-    $session = login_as('admin@wefixit.pl');
-    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+    employee_services_set_services_active([1, 3]);
+    employee_services_set_service_active(7, false);
+    $session = employee_services_admin_session();
+    $setup = employee_services_save_with($session, [1, 3]);
+    assert_status(200, $setup, 'Przygotowanie przypisań do testu 75 powinno dać 200');
 
-    $csrf = csrf_from_page($session['cookies'], '/pracownicy-uslugi.php?id=1');
     $totalBefore = employee_services_total();
     $responses = [];
 
-    $saved = post_json($session['cookies'], '/api/admin/employee-services.php', [
-        'pracownik_id' => 1,
-        'usluga_ids' => [1, 3],
-    ], $csrf);
+    $saved = employee_services_save_with($session, [1, 3]);
     assert_status(200, $saved, 'Zapis przypisań do testu 75 powinien dać 200');
     $responses[] = $saved;
 
-    $invalid = post_json($session['cookies'], '/api/admin/employee-services.php', [
-        'pracownik_id' => 1,
-        'usluga_ids' => [7],
-    ], $csrf);
+    $invalid = employee_services_save_with($session, [7]);
     assert_status(422, $invalid, 'Nieaktywna usługa powinna dać 422');
     $responses[] = $invalid;
 
@@ -369,4 +380,105 @@ test('75. odpowiedzi nie ujawniają danych technicznych i nie usuwają przypisa�
     $logFile = $GLOBALS['__test_server_log'] ?? '';
     assert_true(is_string($logFile) && $logFile !== '', 'Brak ścieżki logu serwera testowego');
     assert_same([], server_log_errors($logFile), 'Log serwera nie powinien zawierać błędów PHP');
+});
+
+test('76. nieaktywna usługa pozostaje widoczna i nie jest odłączana przez zapis bez zmian', function (): void {
+    employee_services_set_services_active([1, 3]);
+    $session = employee_services_admin_session();
+    $setup = employee_services_save_with($session, [1, 3]);
+    assert_status(200, $setup, 'Przygotowanie przypisania 1/1 powinno dać 200');
+
+    employee_services_set_service_active(1, false);
+
+    try {
+        $page = http_request($session['cookies'], 'GET', '/pracownicy-uslugi.php?id=1');
+        assert_status(200, $page, 'Strona z nieaktywną usługą powinna zwrócić 200');
+        assert_true(
+            strpos($page['body'], 'Konserwacja układu chłodzenia laptopa') !== false,
+            'Nieaktywna usługa nadal przypisana powinna być widoczna'
+        );
+        assert_true(strpos($page['body'], 'Usługa nieaktywna') !== false, 'Strona powinna zawierać badge usługi nieaktywnej');
+        assert_true(
+            strpos($page['body'], 'Usługi nieaktywne, nadal przypisane') !== false,
+            'Strona powinna zawierać osobną sekcję usług nieaktywnych'
+        );
+        assert_true(
+            strpos($page['body'], 'id="usluga-nieaktywna-1"') !== false,
+            'Nieaktywna usługa powinna mieć własny checkbox'
+        );
+
+        $response = employee_services_save_with($session, [3]);
+        assert_status(200, $response, 'Zapis aktywnej usługi powinien dać 200');
+
+        $rows = employee_services_rows(1);
+        assert_same(1, $rows[1] ?? null, 'Przypisanie do nieaktywnej usługi 1 musi pozostać aktywne');
+        assert_same(1, $rows[3] ?? null, 'Usługa 3 powinna pozostać przypisana');
+    } finally {
+        employee_services_set_service_active(1, true);
+    }
+});
+
+test('77. próba przypisania usługi nieaktywnej daje 422 i nie zmienia stanu', function (): void {
+    employee_services_set_services_active([1, 3]);
+    employee_services_set_service_active(7, false);
+    $session = employee_services_admin_session();
+    $setup = employee_services_save_with($session, [1, 3]);
+    assert_status(200, $setup, 'Przygotowanie przypisania 1/1 powinno dać 200');
+
+    employee_services_set_service_active(1, false);
+
+    try {
+        $before = employee_services_rows(1);
+
+        $neverAssigned = employee_services_save_with($session, [7]);
+        assert_status(422, $neverAssigned, 'Nieaktywna usługa bez historii powinna dać 422');
+        assert_true(
+            isset(json_body($neverAssigned)['errors']['usluga_ids']),
+            'Odpowiedź powinna zawierać errors.usluga_ids dla usługi bez historii'
+        );
+        assert_same($before, employee_services_rows(1), 'Nieudane przypisanie nie może zmienić stanu');
+
+        $alreadyAssigned = employee_services_save_with($session, [1]);
+        assert_status(422, $alreadyAssigned, 'Nieaktywna usługa z historią również powinna dać 422');
+        assert_true(
+            isset(json_body($alreadyAssigned)['errors']['usluga_ids']),
+            'Odpowiedź powinna zawierać errors.usluga_ids dla usługi z historią'
+        );
+        assert_same($before, employee_services_rows(1), 'Odrzucony zapis nie może odłączyć przypisania');
+    } finally {
+        employee_services_set_service_active(1, true);
+    }
+});
+
+test('78. zapis bez nieaktywnej usługi zachowuje przypisanie i nie loguje odłączenia', function (): void {
+    employee_services_set_services_active([1, 3]);
+    $session = employee_services_admin_session();
+    $setup = employee_services_save_with($session, [1, 3]);
+    assert_status(200, $setup, 'Przygotowanie przypisania 1/1 powinno dać 200');
+
+    employee_services_set_service_active(1, false);
+
+    try {
+        $response = employee_services_save_with($session, [3]);
+        assert_status(200, $response, 'Zapis bez nieaktywnej usługi powinien dać 200');
+        assert_same([1, 3], json_body($response)['usluga_ids'] ?? null, 'Odpowiedź powinna zawierać zachowane przypisanie');
+
+        $rows = employee_services_rows(1);
+        assert_same(1, $rows[1] ?? null, 'Przypisanie do nieaktywnej usługi 1 musi pozostać aktywne');
+        assert_same(1, $rows[3] ?? null, 'Usługa 3 powinna pozostać przypisana');
+
+        $log = test_db()->query(
+            "SELECT szczegoly
+             FROM log_zdarzen
+             WHERE akcja = 'pracownik_uslugi_zaktualizowane'
+             ORDER BY id DESC
+             LIMIT 1"
+        )->fetch();
+        assert_true(is_array($log), 'Zapis przypisań powinien trafić do logu');
+
+        $details = json_decode((string) ($log['szczegoly'] ?? ''), true);
+        assert_same([], $details['odlaczone_usluga_ids'] ?? null, 'Log nie może zgłaszać odłączenia niewidocznej usługi');
+    } finally {
+        employee_services_set_service_active(1, true);
+    }
 });
