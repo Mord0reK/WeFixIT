@@ -4,9 +4,10 @@ declare(strict_types=1);
 /*
     Strona przypisań usług do pracownika w panelu administratora.
 
-    Lista aktywnych usług pochodzi z app/pracownicy_uslugi.php, a formularz
+    Lista usług i stan przypisań pochodzą z app/pracownicy_uslugi.php, a formularz
     wysyła fetch() do /api/admin/employee-services. Zaznaczenie opisuje stan
     docelowy całego zbioru, a odłączanie nie usuwa historycznych wierszy.
+    Usługi nieaktywne z zachowanym przypisaniem są pokazane osobno.
     Widok nie wykonuje SQL ani operacji zapisu.
 */
 require_once dirname(__DIR__) . '/app/panel_layout.php';
@@ -32,18 +33,20 @@ $employee = $employeeId !== null ? pracownik_find_by_id($employeeId) : null;
 
 if ($employee === null) {
     http_response_code(404);
-    layout_head('Nie znaleziono pracownika — WeFixIT');
+    panel_layout_head($user, 'Nie znaleziono pracownika — WeFixIT', 'employees');
     $employeesUrlSafe = htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8');
     ?>
-    <main class="<?= LAYOUT_CARD_CLASS ?>">
-        <h1 class="text-2xl font-semibold tracking-tight">Nie znaleziono pracownika</h1>
-        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Wybrany profil pracownika nie istnieje lub identyfikator jest nieprawidłowy.
-        </p>
-        <a href="<?= $employeesUrlSafe ?>" class="<?= panel_button_classes('secondary') ?> mt-6">Wróć do pracowników</a>
-    </main>
+    <section class="<?= PANEL_CARD_WIDE_CLASS ?>">
+        <?php
+        panel_section_header(
+            'Nie znaleziono pracownika',
+            'Wybrany profil pracownika nie istnieje lub identyfikator jest nieprawidłowy.'
+        );
+        ?>
+        <a href="<?= $employeesUrlSafe ?>" class="<?= panel_button_classes('secondary') ?>">Wróć do pracowników</a>
+    </section>
     <?php
-    layout_foot();
+    panel_layout_foot();
     exit;
 }
 
@@ -52,8 +55,14 @@ $activeCount = pracownik_uslugi_active_count($employee['id']);
 $employeeName = $employee['imie'] . ' ' . $employee['nazwisko'];
 $csrfToken = csrf_token();
 $serviceGroups = [];
+$inactiveAssignedServices = [];
 
 foreach ($services ?? [] as $service) {
+    if (!$service['usluga_aktywna']) {
+        $inactiveAssignedServices[] = $service;
+        continue;
+    }
+
     if (!isset($serviceGroups[$service['kategoria_id']])) {
         $serviceGroups[$service['kategoria_id']] = [
             'nazwa' => $service['kategoria_nazwa'],
@@ -101,50 +110,99 @@ panel_layout_head($user, 'Usługi pracownika — WeFixIT', 'employees');
         ?>
     <?php else: ?>
         <p class="mb-5 text-sm text-zinc-600 dark:text-zinc-300">
-            Aktualnie przypisane aktywne usługi:
+            Aktualnie przypisane usługi:
             <span class="font-semibold text-zinc-900 dark:text-zinc-50"><?= $activeCount ?></span>
         </p>
 
         <form id="employee-services-form" method="post"
             action="<?= htmlspecialchars($servicesApi, ENT_QUOTES, 'UTF-8') ?>"
             class="space-y-6" novalidate>
-            <?php foreach ($serviceGroups as $group): ?>
-                <fieldset>
-                    <legend class="mb-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-                        <?= htmlspecialchars($group['nazwa'], ENT_QUOTES, 'UTF-8') ?>
-                    </legend>
-                    <div class="space-y-2">
-                        <?php foreach ($group['uslugi'] as $service): ?>
-                            <label for="usluga-<?= $service['id'] ?>"
-                                class="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/60">
-                                <input id="usluga-<?= $service['id'] ?>" type="checkbox"
+            <?php if ($serviceGroups === []): ?>
+                <?php
+                panel_empty_state(
+                    'Brak aktywnych usług',
+                    'Najpierw dodaj aktywne usługi w module Usługi, aby przypisać je do pracownika.',
+                    ['label' => 'Przejdź do usług', 'href' => $servicesUrl]
+                );
+                ?>
+            <?php else: ?>
+                <?php foreach ($serviceGroups as $group): ?>
+                    <fieldset>
+                        <legend class="mb-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                            <?= htmlspecialchars($group['nazwa'], ENT_QUOTES, 'UTF-8') ?>
+                        </legend>
+                        <div class="space-y-2">
+                            <?php foreach ($group['uslugi'] as $service): ?>
+                                <label for="usluga-<?= $service['id'] ?>"
+                                    class="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/60">
+                                    <input id="usluga-<?= $service['id'] ?>" type="checkbox"
+                                        name="usluga_ids[]" value="<?= $service['id'] ?>"
+                                        data-service-id="<?= $service['id'] ?>"
+                                        class="mt-1 h-4 w-4 shrink-0 rounded border-zinc-300 accent-zinc-900 dark:border-zinc-700 dark:accent-zinc-100"
+                                        <?= $service['przypisana'] ? 'checked' : '' ?>>
+                                    <span class="min-w-0 flex-1">
+                                        <span class="flex flex-wrap items-center gap-2">
+                                            <span class="font-medium text-zinc-900 dark:text-zinc-50">
+                                                <?= htmlspecialchars($service['nazwa'], ENT_QUOTES, 'UTF-8') ?>
+                                            </span>
+                                            <?php if ($service['przypisana']): ?>
+                                                <?= panel_badge('Przypisana', 'success') ?>
+                                            <?php elseif ($service['kiedykolwiek_przypisana']): ?>
+                                                <?= panel_badge('wcześniej odłączona', 'neutral') ?>
+                                            <?php else: ?>
+                                                <?= panel_badge('Nieprzypisana', 'neutral') ?>
+                                            <?php endif; ?>
+                                        </span>
+                                        <span class="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
+                                            <?= number_format((float) $service['cena'], 2, ',', ' ') ?> zł
+                                            · <?= $service['czas_trwania_minuty'] ?> min
+                                        </span>
+                                    </span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </fieldset>
+                <?php endforeach; ?>
+            <?php endif; ?>
+
+            <?php if ($inactiveAssignedServices !== []): ?>
+                <section class="rounded-xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+                    <h2 class="text-base font-semibold text-amber-900 dark:text-amber-200">
+                        Usługi nieaktywne, nadal przypisane
+                    </h2>
+                    <p class="mt-1 text-sm text-amber-800 dark:text-amber-200">
+                        Te usługi zostały wyłączone w module Usługi. Ich przypisania pozostają zachowane;
+                        aby je odłączyć, najpierw aktywuj usługę w module Usługi.
+                    </p>
+                    <div class="mt-3 space-y-2">
+                        <?php foreach ($inactiveAssignedServices as $service): ?>
+                            <label for="usluga-nieaktywna-<?= $service['id'] ?>"
+                                class="flex items-start gap-3 rounded-lg border border-amber-200 bg-white p-4 dark:border-amber-900/60 dark:bg-zinc-900">
+                                <input id="usluga-nieaktywna-<?= $service['id'] ?>" type="checkbox"
                                     name="usluga_ids[]" value="<?= $service['id'] ?>"
-                                    data-service-id="<?= $service['id'] ?>"
+                                    data-service-id="<?= $service['id'] ?>" data-service-inactive="1"
                                     class="mt-1 h-4 w-4 shrink-0 rounded border-zinc-300 accent-zinc-900 dark:border-zinc-700 dark:accent-zinc-100"
-                                    <?= $service['przypisana'] ? 'checked' : '' ?>>
+                                    checked disabled>
                                 <span class="min-w-0 flex-1">
                                     <span class="flex flex-wrap items-center gap-2">
                                         <span class="font-medium text-zinc-900 dark:text-zinc-50">
                                             <?= htmlspecialchars($service['nazwa'], ENT_QUOTES, 'UTF-8') ?>
                                         </span>
-                                        <?php if ($service['przypisana']): ?>
-                                            <?= panel_badge('Przypisana', 'success') ?>
-                                        <?php elseif ($service['kiedykolwiek_przypisana']): ?>
-                                            <?= panel_badge('wcześniej odłączona', 'neutral') ?>
-                                        <?php else: ?>
-                                            <?= panel_badge('Nieprzypisana', 'neutral') ?>
-                                        <?php endif; ?>
+                                        <?= panel_badge('Usługa nieaktywna', 'warning') ?>
                                     </span>
                                     <span class="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
                                         <?= number_format((float) $service['cena'], 2, ',', ' ') ?> zł
                                         · <?= $service['czas_trwania_minuty'] ?> min
                                     </span>
+                                    <span class="mt-1 block text-xs text-amber-700 dark:text-amber-300">
+                                        Przypisanie pozostaje zachowane. Po aktywowaniu usługi odznaczenie odłączy przypisanie.
+                                    </span>
                                 </span>
                             </label>
                         <?php endforeach; ?>
                     </div>
-                </fieldset>
-            <?php endforeach; ?>
+                </section>
+            <?php endif; ?>
 
             <?= panel_field_error('employee-services-error-usluga_ids') ?>
             <p id="employee-services-form-error" role="alert"
@@ -220,7 +278,8 @@ panel_layout_head($user, 'Usługi pracownika — WeFixIT', 'employees');
         reset.disabled = true;
 
         const submitLabel = submit.textContent;
-        const serviceIds = Array.from(form.querySelectorAll('input[name="usluga_ids[]"]:checked'))
+        // Nieaktywne usługi są tylko informacyjne; ich przypisań nie wysyłamy.
+        const serviceIds = Array.from(form.querySelectorAll('input[name="usluga_ids[]"]:checked:not(:disabled)'))
             .map(function (input) {
                 return Number(input.value);
             });
