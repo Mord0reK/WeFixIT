@@ -14,7 +14,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../public/config.php';
 
 const PRACOWNIK_USLUGI_IDS_ERROR = 'Lista usług musi być tablicą dodatnich liczb całkowitych.';
-const PRACOWNIK_USLUGI_UNAVAILABLE_ERROR = 'Wybór zawiera usługę niedostępną.';
+const PRACOWNIK_USLUGI_UNAVAILABLE_ERROR = 'Wybór zawiera usługę niedostępną. Przypisać można tylko aktywne usługi.';
 
 function pracownicy_uslugi_db(): ?PDO
 {
@@ -51,7 +51,7 @@ function pracownik_uslugi_ids_value(mixed $value): ?array
     return $ids;
 }
 
-// Wszystkie aktywne usługi z informacją o bieżącym i historycznym przypisaniu.
+// Aktywne usługi oraz nieaktywne, które nadal mają aktywne przypisanie.
 function pracownik_uslugi_state(int $employeeId): ?array
 {
     $pdo = pracownicy_uslugi_db();
@@ -69,14 +69,15 @@ function pracownik_uslugi_state(int $employeeId): ?array
                 u.nazwa,
                 u.cena,
                 u.czas_trwania_minuty,
+                u.aktywna AS usluga_aktywna,
                 COALESCE(up.aktywne, FALSE) AS przypisana,
                 (up.pracownik_id IS NOT NULL) AS kiedykolwiek_przypisana
              FROM uslugi u
              JOIN kategorie_uslug k ON k.id = u.kategoria_id
              LEFT JOIN uslugi_pracownikow up
                 ON up.usluga_id = u.id AND up.pracownik_id = :pracownik_id
-             WHERE u.aktywna = TRUE
-             ORDER BY k.nazwa ASC, u.nazwa ASC'
+             WHERE u.aktywna = TRUE OR COALESCE(up.aktywne, FALSE) = TRUE
+             ORDER BY u.aktywna DESC, k.nazwa ASC, u.nazwa ASC'
         );
         $statement->execute(['pracownik_id' => $employeeId]);
         $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
@@ -95,6 +96,7 @@ function pracownik_uslugi_state(int $employeeId): ?array
             'nazwa' => (string) $row['nazwa'],
             'cena' => (string) $row['cena'],
             'czas_trwania_minuty' => (int) $row['czas_trwania_minuty'],
+            'usluga_aktywna' => (int) $row['usluga_aktywna'] === 1,
             'przypisana' => (int) $row['przypisana'] === 1,
             'kiedykolwiek_przypisana' => (int) $row['kiedykolwiek_przypisana'] === 1,
         ];
@@ -132,6 +134,7 @@ function pracownik_uslugi_active_count(int $employeeId): ?int
     Zapisuje stan docelowy przypisań w jednej transakcji. Zwraca status:
     ok, not_found, invalid albo error. Wiersze są tylko dodawane lub
     aktualizowane — moduł nigdy nie wykonuje DELETE na uslugi_pracownikow.
+    Usługi nieaktywne można zachować, ale nie można ich przypisać ponownie.
 */
 function pracownik_uslugi_save(int $employeeId, array $serviceIds): array
 {
@@ -155,11 +158,14 @@ function pracownik_uslugi_save(int $employeeId, array $serviceIds): array
         }
 
         $activeIds = [];
+        $statement = $pdo->prepare('SELECT id FROM uslugi WHERE aktywna = TRUE FOR UPDATE');
+        $statement->execute();
 
-        foreach ($pdo->query('SELECT id FROM uslugi WHERE aktywna = TRUE')->fetchAll(PDO::FETCH_COLUMN) as $activeId) {
+        foreach ($statement->fetchAll(PDO::FETCH_COLUMN) as $activeId) {
             $activeIds[] = (int) $activeId;
         }
 
+        // Nie przypisujemy usług nieaktywnych, także gdy mają już historię przypisania.
         $invalidIds = array_values(array_diff($ids, $activeIds));
 
         if ($invalidIds !== []) {
@@ -189,18 +195,37 @@ function pracownik_uslugi_save(int $employeeId, array $serviceIds): array
             $params[$key] = $serviceId;
         }
 
-        $sql = 'UPDATE uslugi_pracownikow SET aktywne = FALSE WHERE pracownik_id = :pracownik_id';
+        // Odłączamy wyłącznie przypisania do aktywnych usług, których nie ma w żądaniu.
+        $sql = 'UPDATE uslugi_pracownikow up
+                JOIN uslugi u ON u.id = up.usluga_id
+                SET up.aktywne = FALSE
+                WHERE up.pracownik_id = :pracownik_id
+                  AND u.aktywna = TRUE';
 
         if ($placeholders !== []) {
-            $sql .= ' AND usluga_id NOT IN (' . implode(', ', $placeholders) . ')';
+            $sql .= ' AND up.usluga_id NOT IN (' . implode(', ', $placeholders) . ')';
         }
 
         $statement = $pdo->prepare($sql);
         $statement->execute($params);
 
+        // Stan po zapisie obejmuje także zachowane przypisania do usług nieaktywnych.
+        $statement = $pdo->prepare(
+            'SELECT usluga_id
+             FROM uslugi_pracownikow
+             WHERE pracownik_id = :pracownik_id AND aktywne = TRUE
+             ORDER BY usluga_id ASC'
+        );
+        $statement->execute(['pracownik_id' => $employeeId]);
+        $assignedIds = [];
+
+        foreach ($statement->fetchAll(PDO::FETCH_COLUMN) as $assignedId) {
+            $assignedIds[] = (int) $assignedId;
+        }
+
         $pdo->commit();
 
-        return ['status' => 'ok', 'usluga_ids' => $ids];
+        return ['status' => 'ok', 'usluga_ids' => $assignedIds];
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();

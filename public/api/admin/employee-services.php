@@ -6,8 +6,9 @@ declare(strict_types=1);
 
     Obsługuje wyłącznie POST, który zastępuje cały zbiór przypisań wskazanego
     pracownika. Operacja jest idempotentna: podana lista jest stanem docelowym,
-    a brakujące przypisania są odłączane przez aktywne = FALSE. Uprawnienia
-    sprawdzamy wyłącznie po stronie serwera.
+    a brakujące przypisania do aktywnych usług są odłączane przez aktywne = FALSE.
+    Przypisania do usług nieaktywnych pozostają zachowane, ale nie można ich
+    przypisać ponownie. Uprawnienia sprawdzamy wyłącznie po stronie serwera.
 */
 require_once __DIR__ . '/../../../app/json.php';
 require_once __DIR__ . '/../../../app/auth.php';
