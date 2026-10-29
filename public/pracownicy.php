@@ -104,6 +104,10 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                             </td>
                             <td class="<?= PANEL_TD_CLASS ?>">
                                 <div class="flex flex-wrap justify-end gap-2">
+                                    <a href="<?= htmlspecialchars($basePath . '/pracownicy-uslugi?id=' . $employee['id'], ENT_QUOTES, 'UTF-8') ?>"
+                                        class="<?= panel_button_classes('ghost') ?>">
+                                        Usługi
+                                    </a>
                                     <button type="button" class="<?= panel_button_classes('ghost') ?>"
                                         data-employee-edit
                                         data-id="<?= $employee['id'] ?>"

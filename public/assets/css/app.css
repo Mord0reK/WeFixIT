@@ -400,6 +400,9 @@
   .mb-1\.5 {
     margin-bottom: calc(var(--spacing) * 1.5);
   }
+  .mb-2 {
+    margin-bottom: calc(var(--spacing) * 2);
+  }
   .mb-4 {
     margin-bottom: calc(var(--spacing) * 4);
   }
@@ -631,10 +634,20 @@
     margin-block-start: calc(calc(var(--spacing) * 0.5) * var(--tw-space-y-reverse));
     margin-block-end: calc(calc(var(--spacing) * 0.5) * calc(1 - var(--tw-space-y-reverse)));
   }
+  :where(.space-y-2 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 2) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 2) * calc(1 - var(--tw-space-y-reverse)));
+  }
   :where(.space-y-4 > :not(:last-child)) {
     --tw-space-y-reverse: 0;
     margin-block-start: calc(calc(var(--spacing) * 4) * var(--tw-space-y-reverse));
     margin-block-end: calc(calc(var(--spacing) * 4) * calc(1 - var(--tw-space-y-reverse)));
+  }
+  :where(.space-y-6 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 6) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 6) * calc(1 - var(--tw-space-y-reverse)));
   }
   .truncate {
     overflow: hidden;
@@ -1125,6 +1138,9 @@
     .hover\:bg-red-700:hover {
       background-color: var(--color-red-700);
     }
+    .hover\:bg-zinc-50:hover {
+      background-color: var(--color-zinc-50);
+    }
     .hover\:bg-zinc-50\/70:hover {
       background-color: color-mix(in srgb, oklch(98.5% 0 none) 70%, transparent);
     }
@@ -1526,6 +1542,14 @@
       @supports (color: color-mix(in lab, red, red)) {
         .dark\:hover\:bg-zinc-800\/40:hover {
           background-color: color-mix(in oklab, var(--color-zinc-800) 40%, transparent);
+        }
+      }
+      .dark\:hover\:bg-zinc-800\/60:hover {
+        background-color: color-mix(in srgb, oklch(27.4% 0.006 286.033) 60%, transparent);
+      }
+      @supports (color: color-mix(in lab, red, red)) {
+        .dark\:hover\:bg-zinc-800\/60:hover {
+          background-color: color-mix(in oklab, var(--color-zinc-800) 60%, transparent);
         }
       }
       .dark\:hover\:bg-zinc-900:hover {
