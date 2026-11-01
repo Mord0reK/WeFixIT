@@ -303,9 +303,12 @@ test('113. nielegalne przejścia dają 422 i nie zmieniają rekordu', function (
 
 test('114. endpoint przyjmuje GET i PATCH, a POST i DELETE dają 405', function (): void {
     $cookies = [];
+    $responses = [
+        'POST' => post_json($cookies, '/api/admin/reservations.php', ['id' => 4]),
+        'DELETE' => delete_json($cookies, '/api/admin/reservations.php', ['id' => 4]),
+    ];
 
-    foreach (['POST', 'DELETE'] as $method) {
-        $response = http_request($cookies, $method, '/api/admin/reservations.php');
+    foreach ($responses as $method => $response) {
         assert_status(405, $response, $method . ' na endpoint rezerwacji powinien dać 405');
 
         $allow = header_value($response, 'allow');
