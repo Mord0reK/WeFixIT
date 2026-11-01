@@ -95,6 +95,14 @@ function panel_menu_items(string $role): array
             'group' => 'Zarządzanie',
             'icon' => 'user',
         ],
+        [
+            'key' => 'reservations',
+            'label' => 'Rezerwacje',
+            'path' => '/rezerwacje',
+            'roles' => ['admin'],
+            'group' => 'Zarządzanie',
+            'icon' => 'calendar',
+        ],
     ];
 
     $basePath = auth_base_path();
