@@ -19,7 +19,7 @@ require_once __DIR__ . '/../../../app/log.php';
 $method = $_SERVER['REQUEST_METHOD'] ?? '';
 json_require_method(['POST']);
 
-if ($method === 'POST' || $method === 'PATCH') {
+if ($method === 'POST') {
     json_require_content_type();
 }
 
