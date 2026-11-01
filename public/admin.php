@@ -19,6 +19,7 @@ $servicesUrl = $basePath . '/uslugi';
 $employeesUrl = $basePath . '/pracownicy';
 $usersUrl = $basePath . '/uzytkownicy';
 $reservationsUrl = $basePath . '/rezerwacje';
+$logUrl = $basePath . '/log';
 
 panel_layout_head($user, 'Dashboard — WeFixIT', 'home');
 ?>
@@ -33,6 +34,7 @@ panel_layout_head($user, 'Dashboard — WeFixIT', 'home');
             ['label' => 'Pracownicy', 'href' => $employeesUrl],
             ['label' => 'Użytkownicy', 'href' => $usersUrl],
             ['label' => 'Rezerwacje', 'href' => $reservationsUrl],
+            ['label' => 'Dziennik zdarzeń', 'href' => $logUrl],
             ['label' => 'Mój profil', 'href' => $profileUrl],
         ]
     );

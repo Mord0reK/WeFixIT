@@ -103,6 +103,14 @@ function panel_menu_items(string $role): array
             'group' => 'Zarządzanie',
             'icon' => 'calendar',
         ],
+        [
+            'key' => 'log',
+            'label' => 'Dziennik zdarzeń',
+            'path' => '/log',
+            'roles' => ['admin'],
+            'group' => 'Zarządzanie',
+            'icon' => 'list',
+        ],
     ];
 
     $basePath = auth_base_path();
