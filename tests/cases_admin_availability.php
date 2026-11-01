@@ -48,6 +48,23 @@ function availability_schedule_count(int $employeeId, ?int $day = null): int
     return (int) $statement->fetchColumn();
 }
 
+function availability_active_schedule_count(int $employeeId, int $day): int
+{
+    $statement = test_db()->prepare(
+        'SELECT COUNT(*)
+         FROM godziny_pracy
+         WHERE pracownik_id = :pracownik_id
+           AND dzien_tygodnia = :dzien_tygodnia
+           AND aktywne = TRUE'
+    );
+    $statement->execute([
+        'pracownik_id' => $employeeId,
+        'dzien_tygodnia' => $day,
+    ]);
+
+    return (int) $statement->fetchColumn();
+}
+
 function availability_schedule_row(int $id): ?array
 {
     $statement = test_db()->prepare(
@@ -208,6 +225,8 @@ test('80. nakładanie jest blokowane, a stykające się granice są dozwolone', 
     ], $session['csrf']);
     assert_status(200, $disable, 'Dezaktywacja przedziału powinna dać 200');
 
+    // Ta reguła dotyczy wyłącznie tworzenia nowego wpisu. Reaktywacja
+    // nieaktywnego, kolidującego wpisu jest odrzucana — patrz test 94.
     $overInactive = availability_add_schedule($session, 1, 3, '09:00', '10:00');
     assert_status(201, $overInactive, 'Przedział nachodzący na nieaktywny wpis powinien być dozwolony');
 });
@@ -728,4 +747,121 @@ test('92. odpowiedzi nie ujawniają danych technicznych, a log nie ma błędów 
     $logFile = $GLOBALS['__test_server_log'] ?? '';
     assert_true(is_string($logFile) && $logFile !== '', 'Brak ścieżki logu serwera testowego');
     assert_same([], server_log_errors($logFile), 'Log serwera nie powinien zawierać błędów PHP');
+});
+
+test('93. kontrakt metod HTTP i Content-Type endpointów dostępności', function (): void {
+    availability_clean_schedule(1, 6);
+    availability_clean_absences(1);
+    $session = availability_admin_session();
+
+    $scheduleGet = http_request($session['cookies'], 'GET', '/api/admin/employee-schedule.php');
+    assert_status(405, $scheduleGet, 'GET grafiku powinien dać 405');
+    $scheduleAllow = header_value($scheduleGet, 'allow');
+    assert_true(is_string($scheduleAllow) && $scheduleAllow !== '', 'GET grafiku powinien zwrócić Allow');
+    $scheduleMethods = array_values(array_filter(array_map('trim', explode(',', $scheduleAllow))));
+    sort($scheduleMethods);
+    assert_same(
+        ['DELETE', 'PATCH', 'POST'],
+        $scheduleMethods,
+        'Allow grafiku powinno zawierać POST, PATCH i DELETE'
+    );
+
+    foreach (['GET', 'DELETE'] as $method) {
+        $response = http_request($session['cookies'], $method, '/api/admin/employee-absences.php');
+        assert_status(405, $response, $method . ' nieobecności powinien dać 405');
+        $allow = header_value($response, 'allow');
+        assert_true(is_string($allow) && $allow !== '', $method . ' nieobecności powinien zwrócić Allow');
+        $methods = array_values(array_filter(array_map('trim', explode(',', $allow))));
+        sort($methods);
+        assert_same(['PATCH', 'POST'], $methods, 'Allow nieobecności powinno zawierać wyłącznie POST i PATCH');
+    }
+
+    $postPayload = [
+        'pracownik_id' => 1,
+        'dzien_tygodnia' => 6,
+        'czas_rozpoczecia' => '08:00',
+        'czas_zakonczenia' => '09:00',
+    ];
+    $postWithoutType = http_request($session['cookies'], 'POST', '/api/admin/employee-schedule.php', [
+        'body' => json_encode($postPayload, JSON_UNESCAPED_UNICODE),
+        'headers' => ['X-CSRF-Token' => $session['csrf']],
+    ]);
+    assert_status(415, $postWithoutType, 'POST grafiku bez Content-Type powinien dać 415');
+    assert_same(0, availability_schedule_count(1, 6), 'POST bez Content-Type nie może utworzyć wpisu');
+
+    $created = availability_add_schedule($session, 1, 6, '10:00', '11:00');
+    assert_status(201, $created, 'Utworzenie wpisu do testu PATCH powinno dać 201');
+    $id = (int) (json_body($created)['id'] ?? 0);
+    $rowBefore = availability_schedule_row($id);
+    assert_true(is_array($rowBefore), 'Wpis do testu PATCH powinien istnieć');
+
+    $patchWithoutType = http_request($session['cookies'], 'PATCH', '/api/admin/employee-schedule.php', [
+        'body' => json_encode([
+            'id' => $id,
+            'pracownik_id' => 1,
+            'aktywne' => false,
+        ], JSON_UNESCAPED_UNICODE),
+        'headers' => ['X-CSRF-Token' => $session['csrf']],
+    ]);
+    assert_status(415, $patchWithoutType, 'PATCH grafiku bez Content-Type powinien dać 415');
+    assert_same($rowBefore, availability_schedule_row($id), 'PATCH bez Content-Type nie może zmienić wpisu');
+
+    availability_clean_schedule(1, 6);
+});
+
+test('94. reaktywacja wpisu grafiku odrzuca kolizję z aktywnym przedziałem', function (): void {
+    availability_clean_schedule(1, 3);
+    $session = availability_admin_session();
+
+    $first = availability_add_schedule($session, 1, 3, '08:00', '12:00');
+    assert_status(201, $first, 'Pierwszy przedział powinien dać 201');
+    $firstId = (int) (json_body($first)['id'] ?? 0);
+
+    $disableFirst = patch_json($session['cookies'], '/api/admin/employee-schedule.php', [
+        'id' => $firstId,
+        'pracownik_id' => 1,
+        'aktywne' => false,
+    ], $session['csrf']);
+    assert_status(200, $disableFirst, 'Dezaktywacja pierwszego przedziału powinna dać 200');
+
+    $second = availability_add_schedule($session, 1, 3, '09:00', '10:00');
+    assert_status(201, $second, 'Drugi, nachodzący przedział powinien dać 201 po dezaktywacji pierwszego');
+    $secondId = (int) (json_body($second)['id'] ?? 0);
+    assert_same(1, availability_active_schedule_count(1, 3), 'Aktywny powinien być tylko drugi wpis');
+
+    $reactivate = patch_json($session['cookies'], '/api/admin/employee-schedule.php', [
+        'id' => $firstId,
+        'pracownik_id' => 1,
+        'aktywne' => true,
+    ], $session['csrf']);
+    assert_status(422, $reactivate, 'Reaktywacja kolidującego wpisu powinna dać 422');
+    $reactivateData = json_body($reactivate);
+    assert_true(
+        isset($reactivateData['errors']['aktywne']) && is_string($reactivateData['errors']['aktywne']),
+        'Konflikt reaktywacji powinien być przypisany do pola aktywne'
+    );
+
+    $firstRow = availability_schedule_row($firstId);
+    assert_same(0, (int) $firstRow['aktywne'], 'Pierwszy wpis powinien pozostać nieaktywny');
+    assert_same(1, availability_active_schedule_count(1, 3), 'Nadal tylko drugi wpis powinien być aktywny');
+
+    $disableSecond = patch_json($session['cookies'], '/api/admin/employee-schedule.php', [
+        'id' => $secondId,
+        'pracownik_id' => 1,
+        'aktywne' => false,
+    ], $session['csrf']);
+    assert_status(200, $disableSecond, 'Dezaktywacja drugiego przedziału powinna dać 200');
+
+    $reactivateAgain = patch_json($session['cookies'], '/api/admin/employee-schedule.php', [
+        'id' => $firstId,
+        'pracownik_id' => 1,
+        'aktywne' => true,
+    ], $session['csrf']);
+    assert_status(200, $reactivateAgain, 'Reaktywacja bez kolizji powinna dać 200');
+
+    $firstRow = availability_schedule_row($firstId);
+    $secondRow = availability_schedule_row($secondId);
+    assert_same(1, (int) $firstRow['aktywne'], 'Pierwszy wpis powinien być ponownie aktywny');
+    assert_same(0, (int) $secondRow['aktywne'], 'Drugi wpis powinien pozostać nieaktywny');
+    assert_same(1, availability_active_schedule_count(1, 3), 'Dokładnie jeden wpis powinien być aktywny');
 });

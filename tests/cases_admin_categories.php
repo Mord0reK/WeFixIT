@@ -294,7 +294,7 @@ test('49. PATCH z tymi samymi wartościami kategorii daje 200', function (): voi
     assert_status(200, $response, 'Zapis bez zmiany wartości powinien dać 200, a nie 404');
 });
 
-test('Dodatkowo: DELETE kategorii wymaga Content-Type application/json', function (): void {
+test('Dodatkowo: DELETE kategorii nie wymaga Content-Type application/json', function (): void {
     $session = login_as('admin@wefixit.pl');
     assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
 
@@ -306,15 +306,16 @@ test('Dodatkowo: DELETE kategorii wymaga Content-Type application/json', functio
     assert_status(201, $created, 'Utworzenie kategorii do testu Content-Type powinno dać 201');
     $id = json_body($created)['id'] ?? 0;
 
+    // DELETE nie opisuje reprezentacji zasobu, więc wspólna reguła nie wymaga
+    // dla niego Content-Type. Body JSON z identyfikatorem jest nadal odczytywane.
     $response = http_request($session['cookies'], 'DELETE', '/api/admin/categories.php', [
         'body' => json_encode(['id' => $id], JSON_UNESCAPED_UNICODE),
-        'content_type' => 'text/plain',
         'headers' => ['X-CSRF-Token' => $csrf],
     ]);
 
-    assert_status(415, $response, 'DELETE z text/plain powinien dać 415');
+    assert_status(200, $response, 'DELETE bez Content-Type powinien usunąć kategorię');
 
     $statement = test_db()->prepare('SELECT COUNT(*) FROM kategorie_uslug WHERE id = :id');
     $statement->execute(['id' => $id]);
-    assert_same(1, (int) $statement->fetchColumn(), 'Kategoria nie może zostać usunięta bez JSON Content-Type');
+    assert_same(0, (int) $statement->fetchColumn(), 'Kategoria powinna zostać usunięta bez nagłówka Content-Type');
 });

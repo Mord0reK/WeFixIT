@@ -413,7 +413,7 @@ test('65. PATCH z tymi samymi wartościami pracownika daje 200', function (): vo
     assert_same((int) $row['aktywny'], (int) $after['aktywny'], 'Flaga aktywności po zapisie powinna być identyczna');
 });
 
-test('Dodatkowo: DELETE pracownika wymaga Content-Type application/json', function (): void {
+test('Dodatkowo: DELETE pracownika nie wymaga Content-Type application/json', function (): void {
     $userId = create_test_employee_user('pracownik66@example.com', 'Pracownik66', '+48123456066');
 
     $session = login_as('admin@wefixit.pl');
@@ -428,15 +428,16 @@ test('Dodatkowo: DELETE pracownika wymaga Content-Type application/json', functi
     assert_status(201, $created, 'Utworzenie profilu do testu Content-Type powinno dać 201');
     $id = json_body($created)['id'] ?? 0;
 
+    // DELETE nie opisuje reprezentacji zasobu, więc wspólna reguła nie wymaga
+    // dla niego Content-Type. Body JSON z identyfikatorem jest nadal odczytywane.
     $response = http_request($session['cookies'], 'DELETE', '/api/admin/employees.php', [
         'body' => json_encode(['id' => $id], JSON_UNESCAPED_UNICODE),
-        'content_type' => 'text/plain',
         'headers' => ['X-CSRF-Token' => $csrf],
     ]);
 
-    assert_status(415, $response, 'DELETE z text/plain powinien dać 415');
+    assert_status(200, $response, 'DELETE bez Content-Type powinien usunąć profil');
 
     $statement = test_db()->prepare('SELECT COUNT(*) FROM pracownicy WHERE id = :id');
     $statement->execute(['id' => $id]);
-    assert_same(1, (int) $statement->fetchColumn(), 'Profil nie może zostać usunięty bez JSON Content-Type');
+    assert_same(0, (int) $statement->fetchColumn(), 'Profil powinien zostać usunięty bez nagłówka Content-Type');
 });

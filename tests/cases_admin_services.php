@@ -441,7 +441,7 @@ test('Dodatkowo: edycja usługi w nieaktywnej kategorii nie wymaga zmiany katego
     );
 });
 
-test('Dodatkowo: DELETE usługi wymaga Content-Type application/json', function (): void {
+test('Dodatkowo: DELETE usługi nie wymaga Content-Type application/json', function (): void {
     $session = login_as('admin@wefixit.pl');
     assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
 
@@ -456,15 +456,16 @@ test('Dodatkowo: DELETE usługi wymaga Content-Type application/json', function 
     assert_status(201, $created, 'Utworzenie usługi do testu Content-Type powinno dać 201');
     $id = json_body($created)['id'] ?? 0;
 
+    // DELETE nie opisuje reprezentacji zasobu, więc wspólna reguła nie wymaga
+    // dla niego Content-Type. Body JSON z identyfikatorem jest nadal odczytywane.
     $response = http_request($session['cookies'], 'DELETE', '/api/admin/services.php', [
         'body' => json_encode(['id' => $id], JSON_UNESCAPED_UNICODE),
-        'content_type' => 'text/plain',
         'headers' => ['X-CSRF-Token' => $csrf],
     ]);
 
-    assert_status(415, $response, 'DELETE z text/plain powinien dać 415');
+    assert_status(200, $response, 'DELETE bez Content-Type powinien usunąć usługę');
 
     $statement = test_db()->prepare('SELECT COUNT(*) FROM uslugi WHERE id = :id');
     $statement->execute(['id' => $id]);
-    assert_same(1, (int) $statement->fetchColumn(), 'Usługa nie może zostać usunięta bez JSON Content-Type');
+    assert_same(0, (int) $statement->fetchColumn(), 'Usługa powinna zostać usunięta bez nagłówka Content-Type');
 });
