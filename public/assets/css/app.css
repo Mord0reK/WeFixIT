@@ -309,6 +309,17 @@
   .collapse {
     visibility: collapse;
   }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
   .absolute {
     position: absolute;
   }
@@ -606,6 +617,9 @@
   }
   .items-start {
     align-items: flex-start;
+  }
+  .items-stretch {
+    align-items: stretch;
   }
   .justify-between {
     justify-content: space-between;
@@ -1265,6 +1279,9 @@
     .sm\:inline {
       display: inline;
     }
+    .sm\:w-48 {
+      width: calc(var(--spacing) * 48);
+    }
     .sm\:grid-cols-2 {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -1279,6 +1296,9 @@
     }
     .sm\:items-center {
       align-items: center;
+    }
+    .sm\:items-end {
+      align-items: flex-end;
     }
     .sm\:items-start {
       align-items: flex-start;

@@ -87,6 +87,14 @@ function panel_menu_items(string $role): array
             'group' => 'Zarządzanie',
             'icon' => 'briefcase',
         ],
+        [
+            'key' => 'users',
+            'label' => 'Użytkownicy',
+            'path' => '/uzytkownicy',
+            'roles' => ['admin'],
+            'group' => 'Zarządzanie',
+            'icon' => 'user',
+        ],
     ];
 
     $basePath = auth_base_path();
