@@ -10,8 +10,8 @@ declare(strict_types=1);
 */
 
 /*
-    Rozmiary 1 i 2 obsługują precyzyjne widoki i testy paginacji. Nadal jest
-    to zamknięta allowlista, więc size z żądania nie trafia do SQL dowolnie.
+    Allowlista jest zamknięta i zawiera wyłącznie wartości dopuszczalne
+    w interfejsie. Wartość spoza listy wraca do rozmiaru domyślnego.
 */
 const PAGINATION_PAGE_SIZES = [1, 2, 10, 25, 50, 100];
 const PAGINATION_DEFAULT_SIZE = 25;
@@ -71,7 +71,10 @@ function pagination_total_pages(int $total, int $size): int
     return (int) ceil($total / $size);
 }
 
-// Wyszukiwanie ma jeden wspólny limit długości; zbyt długi tekst jest ucinany.
+/*
+    Fraza jest ucinana do 100 znaków zamiast odrzucana: formularze mają
+    maxlength=100, a API ma odpowiadać 200 na zbyt długi parametr, nie 422.
+*/
 function pagination_search_value(mixed $value): string
 {
     if (!is_string($value)) {
