@@ -4,24 +4,41 @@ declare(strict_types=1);
 /*
     Strona usług w panelu administratora.
 
-    Lista i filtry pochodzą z app/uslugi.php, a formularz dodawania i edycji
-    wysyła żądania fetch() do /api/admin/services. Widok nie wykonuje SQL ani
-    operacji zapisu.
+    Lista, filtry, wyszukiwanie i paginacja pochodzą z app/uslugi.php.
+    Formularz dodawania i edycji wysyła żądania fetch() do /api/admin/services.
+    Widok nie wykonuje SQL ani operacji zapisu.
 */
 require_once dirname(__DIR__) . '/app/panel_layout.php';
 require_once dirname(__DIR__) . '/app/uslugi.php';
 require_once dirname(__DIR__) . '/app/kategorie.php';
 
 $user = require_role(['admin']);
-$categoryFilter = usluga_filter_category_id($_GET['id_kategorii'] ?? null);
-$statusFilter = usluga_filter_status($_GET['status'] ?? null);
-$services = uslugi_list($categoryFilter, $statusFilter);
-$categories = kategorie_list();
 $basePath = auth_base_path();
 $servicesUrl = $basePath . '/uslugi';
 $servicesApi = $basePath . '/api/admin/services';
+$categoryFilter = usluga_filter_category_id($_GET['id_kategorii'] ?? null);
+$statusFilter = usluga_filter_status($_GET['status'] ?? null);
+$search = pagination_search_value($_GET['szukaj'] ?? null);
+$page = pagination_page($_GET['page'] ?? null);
+$size = pagination_size($_GET['size'] ?? null);
+$servicePage = uslugi_list_paginated($categoryFilter, $statusFilter, $search, $page, $size);
+$services = $servicePage['items'] ?? null;
+$categories = kategorie_list();
 $csrfToken = csrf_token();
-$filtersActive = $categoryFilter > 0 || $statusFilter !== 'all';
+$filtersActive = $categoryFilter > 0 || $statusFilter !== 'all' || $search !== '';
+$paginationParams = ['size' => $size];
+
+if ($categoryFilter > 0) {
+    $paginationParams['id_kategorii'] = $categoryFilter;
+}
+
+if ($statusFilter !== 'all') {
+    $paginationParams['status'] = $statusFilter;
+}
+
+if ($search !== '') {
+    $paginationParams['szukaj'] = $search;
+}
 
 panel_layout_head($user, 'Usługi — WeFixIT', 'services');
 ?>
@@ -36,8 +53,18 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
     );
     ?>
 
-    <form method="get" action="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>"
-        class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
+    <form id="services-filter-form" method="get"
+        action="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>"
+        class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2">
+        <input type="hidden" name="size" value="<?= $size ?>">
+
+        <div>
+            <label for="services-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
+            <input id="services-filter-search" name="szukaj" type="search" maxlength="100"
+                value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
+                placeholder="Nazwa usługi" class="<?= LAYOUT_INPUT_CLASS ?>">
+        </div>
+
         <div>
             <label for="filter-kategoria" class="<?= LAYOUT_LABEL_CLASS ?>">Kategoria</label>
             <select id="filter-kategoria" name="id_kategorii" class="<?= LAYOUT_INPUT_CLASS ?>">
@@ -78,7 +105,7 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
         if ($filtersActive) {
             panel_empty_state(
                 'Brak usług dla wybranych filtrów',
-                'Zmień kategorię lub status, aby zobaczyć inne usługi.',
+                'Zmień kategorię, status lub frazę wyszukiwania, aby zobaczyć inne usługi.',
                 ['label' => 'Wyczyść filtry', 'href' => $servicesUrl]
             );
         } else {
@@ -167,6 +194,7 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
                 </tbody>
             </table>
         </div>
+        <?php panel_pagination($basePath, '/uslugi', $paginationParams, $servicePage); ?>
     <?php endif; ?>
 </section>
 

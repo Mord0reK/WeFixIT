@@ -4,9 +4,10 @@ declare(strict_types=1);
 /*
     Strona administracji kontami użytkowników.
 
-    Wyświetla listę kont z filtrami roli i statusu, zmianą roli oraz aktywacją
-    lub dezaktywacją przez window.panelConfirm. Widok nie wykonuje SQL ani
-    operacji zapisu — korzysta z app/uzytkownicy.php i endpointu JSON.
+    Wyświetla listę kont z filtrami, wyszukiwaniem i paginacją, zmianą roli
+    oraz aktywacją lub dezaktywacją przez window.panelConfirm. Widok nie
+    wykonuje SQL ani operacji zapisu — korzysta z app/uzytkownicy.php
+    i endpointu JSON.
 */
 require_once dirname(__DIR__) . '/app/panel_layout.php';
 require_once dirname(__DIR__) . '/app/uzytkownicy.php';
@@ -17,8 +18,26 @@ $usersUrl = $basePath . '/uzytkownicy';
 $usersApi = $basePath . '/api/admin/users';
 $roleFilter = uzytkownik_role_filter($_GET['rola'] ?? null);
 $statusFilter = uzytkownik_status_filter($_GET['status'] ?? null);
-$users = uzytkownicy_list($roleFilter, $statusFilter);
-$hasFilters = $roleFilter !== '' || $statusFilter !== 'all';
+$search = pagination_search_value($_GET['szukaj'] ?? null);
+$page = pagination_page($_GET['page'] ?? null);
+$size = pagination_size($_GET['size'] ?? null);
+$userPage = uzytkownicy_list_paginated($roleFilter, $statusFilter, $search, $page, $size);
+$users = $userPage['items'] ?? null;
+$hasFilters = $roleFilter !== '' || $statusFilter !== 'all' || $search !== '';
+$paginationParams = ['size' => $size];
+
+if ($roleFilter !== '') {
+    $paginationParams['rola'] = $roleFilter;
+}
+
+if ($statusFilter !== 'all') {
+    $paginationParams['status'] = $statusFilter;
+}
+
+if ($search !== '') {
+    $paginationParams['szukaj'] = $search;
+}
+
 $csrfToken = csrf_token();
 $roleLabels = [
     'klient' => 'Klient',
@@ -43,7 +62,16 @@ panel_layout_head($user, 'Użytkownicy — WeFixIT', 'users');
 
     <form id="users-filter-form" method="get"
         action="<?= htmlspecialchars($usersUrl, ENT_QUOTES, 'UTF-8') ?>"
-        class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end">
+        class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2">
+        <input type="hidden" name="size" value="<?= $size ?>">
+
+        <div>
+            <label for="users-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
+            <input id="users-filter-search" name="szukaj" type="search" maxlength="100"
+                value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
+                placeholder="Imię, nazwisko lub e-mail" class="<?= LAYOUT_INPUT_CLASS ?>">
+        </div>
+
         <div class="w-full sm:w-48">
             <label for="users-filter-role" class="<?= LAYOUT_LABEL_CLASS ?>">Rola</label>
             <select id="users-filter-role" name="rola" class="<?= LAYOUT_INPUT_CLASS ?>">
@@ -87,7 +115,8 @@ panel_layout_head($user, 'Użytkownicy — WeFixIT', 'users');
         if ($hasFilters) {
             panel_empty_state(
                 'Brak wyników',
-                'Żadne konto nie spełnia wybranych filtrów. Zmień filtry i spróbuj ponownie.'
+                'Żadne konto nie spełnia wybranych filtrów ani frazy wyszukiwania. Zmień kryteria i spróbuj ponownie.',
+                ['label' => 'Wyczyść filtry', 'href' => $usersUrl]
             );
         } else {
             panel_empty_state(
@@ -211,6 +240,7 @@ panel_layout_head($user, 'Użytkownicy — WeFixIT', 'users');
                 </tbody>
             </table>
         </div>
+        <?php panel_pagination($basePath, '/uzytkownicy', $paginationParams, $userPage); ?>
 
         <p id="users-error" role="alert" class="mt-3 hidden text-sm text-red-600 dark:text-red-400"></p>
     <?php endif; ?>

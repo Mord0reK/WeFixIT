@@ -4,21 +4,34 @@ declare(strict_types=1);
 /*
     Strona pracowników w panelu administratora.
 
-    Lista i formularze korzystają z app/pracownicy.php. Panel tworzy wyłącznie
-    profile powiązane z istniejącymi kontami o roli pracownik — nie zakłada
-    nowych kont użytkowników. Widok nie wykonuje SQL ani operacji zapisu.
+    Lista, wyszukiwanie i paginacja oraz formularze korzystają z
+    app/pracownicy.php. Panel tworzy wyłącznie profile powiązane z istniejącymi
+    kontami o roli pracownik — nie zakłada nowych kont użytkowników.
+    Widok nie wykonuje SQL ani operacji zapisu.
 */
 require_once dirname(__DIR__) . '/app/panel_layout.php';
 require_once dirname(__DIR__) . '/app/pracownicy.php';
 
 $user = require_role(['admin']);
-$employees = pracownicy_list();
-$availableAccounts = pracownicy_available_accounts();
 $basePath = auth_base_path();
+$employeesUrl = $basePath . '/pracownicy';
 $employeesApi = $basePath . '/api/admin/employees';
+$search = pagination_search_value($_GET['szukaj'] ?? null);
+$page = pagination_page($_GET['page'] ?? null);
+$size = pagination_size($_GET['size'] ?? null);
+$employeePage = pracownicy_list_paginated($search, $page, $size);
+$employees = $employeePage['items'] ?? null;
+$availableAccounts = pracownicy_available_accounts();
 $csrfToken = csrf_token();
 $hasAvailableAccounts = $availableAccounts !== null && $availableAccounts !== [];
-$hasEmployees = $employees !== null && $employees !== [];
+$hasEmployees = $employeePage !== null && ($employeePage['total'] ?? 0) > 0;
+$hasFilters = $search !== '';
+$paginationParams = ['size' => $size];
+
+if ($search !== '') {
+    $paginationParams['szukaj'] = $search;
+}
+
 $headerActions = $hasAvailableAccounts
     ? [['label' => 'Dodaj pracownika', 'href' => '#employee-form']]
     : [];
@@ -34,13 +47,40 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
     );
     ?>
 
+    <form id="employees-filter-form" method="get"
+        action="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
+        class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2">
+        <input type="hidden" name="size" value="<?= $size ?>">
+
+        <div>
+            <label for="employees-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
+            <input id="employees-filter-search" name="szukaj" type="search" maxlength="100"
+                value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
+                placeholder="Imię lub nazwisko pracownika" class="<?= LAYOUT_INPUT_CLASS ?>">
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 sm:items-end">
+            <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
+            <?php if ($hasFilters): ?>
+                <a href="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
+                    class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
+            <?php endif; ?>
+        </div>
+    </form>
+
     <?php if ($employees === null): ?>
         <div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
             Nie udało się pobrać listy pracowników. Spróbuj ponownie później.
         </div>
     <?php elseif ($employees === []): ?>
         <?php
-        if ($availableAccounts === []) {
+        if ($hasFilters) {
+            panel_empty_state(
+                'Brak pracowników dla wybranej frazy',
+                'Zmień frazę wyszukiwania, aby zobaczyć inne profile.',
+                ['label' => 'Wyczyść wyszukiwanie', 'href' => $employeesUrl]
+            );
+        } elseif ($availableAccounts === []) {
             panel_empty_state(
                 'Brak pracowników i kont do powiązania',
                 'Aby dodać pierwszego pracownika, najpierw utwórz konto z rolą pracownik. '
@@ -141,6 +181,7 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                 </tbody>
             </table>
         </div>
+        <?php panel_pagination($basePath, '/pracownicy', $paginationParams, $employeePage); ?>
     <?php endif; ?>
 </section>
 
