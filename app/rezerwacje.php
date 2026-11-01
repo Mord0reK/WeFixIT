@@ -202,6 +202,10 @@ function rezerwacja_select_sql(): string
              JOIN kategorie_uslug k ON k.id = s.kategoria_id';
 }
 
+/*
+    Brak LIMIT/OFFSET jest świadomy: paginacja należy do zadania 403
+    i zostanie dodana razem z licznikiem wyników. To nie jest przeoczenie.
+*/
 function rezerwacje_list(array $filters = []): ?array
 {
     $pdo = rezerwacje_db();
