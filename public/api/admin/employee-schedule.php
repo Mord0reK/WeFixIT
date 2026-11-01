@@ -17,7 +17,10 @@ require_once __DIR__ . '/../../../app/log.php';
 
 $method = $_SERVER['REQUEST_METHOD'] ?? '';
 json_require_method(['POST', 'PATCH', 'DELETE']);
-json_require_content_type();
+
+if ($method === 'POST' || $method === 'PATCH') {
+    json_require_content_type();
+}
 
 $user = require_api_login();
 
@@ -120,6 +123,13 @@ if ($method === 'PATCH') {
         json_response(404, ['error' => 'Nie znaleziono wpisu grafiku.']);
     }
 
+    if ($result['status'] === 'invalid') {
+        json_response(422, [
+            'error' => 'Nieprawidłowe dane grafiku.',
+            'errors' => $result['errors'] ?? [],
+        ]);
+    }
+
     if ($result['status'] !== 'ok') {
         json_response(500, ['error' => 'Nie udało się zapisać grafiku. Wystąpił problem z serwerem.']);
     }
@@ -147,10 +157,6 @@ if ($method === 'PATCH') {
 }
 
 $result = pracownik_schedule_delete($employeeId, $scheduleId);
-
-if ($result['status'] === 'not_found') {
-    json_response(404, ['error' => 'Nie znaleziono wpisu grafiku.']);
-}
 
 if ($result['status'] !== 'ok') {
     json_response(500, ['error' => 'Nie udało się usunąć wpisu grafiku. Wystąpił problem z serwerem.']);

@@ -297,6 +297,12 @@ function pracownik_schedule_create(int $employeeId, array $data): array
     }
 }
 
+/*
+    Reaktywacja musi sprawdzić kolizję, bo po dezaktywacji wpisu można dodać
+    nowy przedział w tym samym czasie. Blokada profilu serializuje równoległe
+    zmiany, a blokada wpisu stabilizuje jego godziny do czasu UPDATE.
+    Dezaktywacja nie wymaga sprawdzania kolizji.
+*/
 function pracownik_schedule_set_active(int $employeeId, int $id, bool $active): array
 {
     $pdo = pracownicy_dostepnosc_db();
@@ -306,6 +312,62 @@ function pracownik_schedule_set_active(int $employeeId, int $id, bool $active): 
     }
 
     try {
+        $pdo->beginTransaction();
+
+        $statement = $pdo->prepare('SELECT id FROM pracownicy WHERE id = :id FOR UPDATE');
+        $statement->execute(['id' => $employeeId]);
+
+        if ($statement->fetch(PDO::FETCH_ASSOC) === false) {
+            $pdo->rollBack();
+            return ['status' => 'not_found'];
+        }
+
+        $statement = $pdo->prepare(
+            'SELECT dzien_tygodnia, czas_rozpoczecia, czas_zakonczenia
+             FROM godziny_pracy
+             WHERE id = :id AND pracownik_id = :pracownik_id
+             FOR UPDATE'
+        );
+        $statement->execute([
+            'id' => $id,
+            'pracownik_id' => $employeeId,
+        ]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+
+        if (!is_array($row)) {
+            $pdo->rollBack();
+            return ['status' => 'not_found'];
+        }
+
+        if ($active) {
+            $statement = $pdo->prepare(
+                'SELECT id
+                 FROM godziny_pracy
+                 WHERE pracownik_id = :pracownik_id
+                   AND dzien_tygodnia = :dzien_tygodnia
+                   AND aktywne = TRUE
+                   AND id <> :id
+                   AND czas_rozpoczecia < :czas_zakonczenia
+                   AND czas_zakonczenia > :czas_rozpoczecia
+                 LIMIT 1'
+            );
+            $statement->execute([
+                'pracownik_id' => $employeeId,
+                'dzien_tygodnia' => (int) $row['dzien_tygodnia'],
+                'id' => $id,
+                'czas_rozpoczecia' => (string) $row['czas_rozpoczecia'],
+                'czas_zakonczenia' => (string) $row['czas_zakonczenia'],
+            ]);
+
+            if ($statement->fetch(PDO::FETCH_ASSOC) !== false) {
+                $pdo->rollBack();
+                return [
+                    'status' => 'invalid',
+                    'errors' => ['aktywne' => PRACOWNIK_GRAFIK_OVERLAP_ERROR],
+                ];
+            }
+        }
+
         $statement = $pdo->prepare(
             'UPDATE godziny_pracy
              SET aktywne = :aktywne
@@ -317,29 +379,28 @@ function pracownik_schedule_set_active(int $employeeId, int $id, bool $active): 
             'aktywne' => $active ? 1 : 0,
         ]);
 
-        if ($statement->rowCount() > 0) {
-            return ['status' => 'ok'];
+        $pdo->commit();
+
+        return ['status' => 'ok'];
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
         }
 
-        // MySQL zwraca 0 również, gdy wartość się nie zmieniła.
-        $statement = $pdo->prepare(
-            'SELECT id FROM godziny_pracy WHERE id = :id AND pracownik_id = :pracownik_id LIMIT 1'
-        );
-        $statement->execute([
-            'id' => $id,
-            'pracownik_id' => $employeeId,
-        ]);
+        error_log('Nie udało się zmienić aktywności wpisu grafiku: ' . $e->getMessage());
+        return ['status' => 'error'];
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
 
-        return $statement->fetch(PDO::FETCH_ASSOC) !== false
-            ? ['status' => 'ok']
-            : ['status' => 'not_found'];
-    } catch (PDOException $e) {
         error_log('Nie udało się zmienić aktywności wpisu grafiku: ' . $e->getMessage());
         return ['status' => 'error'];
     }
 }
 
 // Fizyczne DELETE jest bezpieczne, bo rezerwacje nie mają klucza obcego do godziny_pracy.
+// Istnienie wpisu i ownership sprawdza wcześniej pracownik_schedule_find() w endpointcie.
 function pracownik_schedule_delete(int $employeeId, int $id): array
 {
     $pdo = pracownicy_dostepnosc_db();
@@ -362,9 +423,7 @@ function pracownik_schedule_delete(int $employeeId, int $id): array
         return ['status' => 'error'];
     }
 
-    return $statement->rowCount() > 0
-        ? ['status' => 'ok']
-        : ['status' => 'not_found'];
+    return ['status' => 'ok'];
 }
 
 // ---------------------------------------------------------------------------
