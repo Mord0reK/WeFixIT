@@ -16,8 +16,12 @@ require_once __DIR__ . '/../../../app/pracownicy.php';
 require_once __DIR__ . '/../../../app/pracownicy_uslugi.php';
 require_once __DIR__ . '/../../../app/log.php';
 
+$method = $_SERVER['REQUEST_METHOD'] ?? '';
 json_require_method(['POST']);
-json_require_content_type();
+
+if ($method === 'POST' || $method === 'PATCH') {
+    json_require_content_type();
+}
 
 $user = require_api_login();
 
@@ -51,20 +55,6 @@ if (pracownik_find_by_id($employeeId) === null) {
     json_response(404, ['error' => 'Nie znaleziono pracownika.']);
 }
 
-$beforeState = pracownik_uslugi_state($employeeId);
-
-if ($beforeState === null) {
-    json_response(500, ['error' => 'Nie udało się zapisać przypisań usług. Wystąpił problem z serwerem.']);
-}
-
-$beforeIds = [];
-
-foreach ($beforeState as $service) {
-    if ($service['przypisana']) {
-        $beforeIds[] = $service['id'];
-    }
-}
-
 $result = pracownik_uslugi_save($employeeId, $serviceIds);
 
 if ($result['status'] === 'not_found') {
@@ -82,6 +72,7 @@ if ($result['status'] !== 'ok') {
     json_response(500, ['error' => 'Nie udało się zapisać przypisań usług. Wystąpił problem z serwerem.']);
 }
 
+$beforeIds = $result['usluga_ids_before'] ?? [];
 $afterIds = $result['usluga_ids'];
 sort($beforeIds, SORT_NUMERIC);
 $addedIds = array_values(array_diff($afterIds, $beforeIds));

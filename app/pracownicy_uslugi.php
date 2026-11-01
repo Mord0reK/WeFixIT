@@ -132,9 +132,11 @@ function pracownik_uslugi_active_count(int $employeeId): ?int
 
 /*
     Zapisuje stan docelowy przypisań w jednej transakcji. Zwraca status:
-    ok, not_found, invalid albo error. Wiersze są tylko dodawane lub
-    aktualizowane — moduł nigdy nie wykonuje DELETE na uslugi_pracownikow.
-    Usługi nieaktywne można zachować, ale nie można ich przypisać ponownie.
+    ok, not_found, invalid albo error. Przy sukcesie zwraca usluga_ids
+    (stan końcowy) oraz usluga_ids_before (stan początkowy odczytany pod
+    blokadą profilu). Wiersze są tylko dodawane lub aktualizowane — moduł
+    nigdy nie wykonuje DELETE na uslugi_pracownikow. Usługi nieaktywne można
+    zachować, ale nie można ich przypisać ponownie.
 */
 function pracownik_uslugi_save(int $employeeId, array $serviceIds): array
 {
@@ -155,6 +157,21 @@ function pracownik_uslugi_save(int $employeeId, array $serviceIds): array
         if ($statement->fetch(PDO::FETCH_ASSOC) === false) {
             $pdo->rollBack();
             return ['status' => 'not_found'];
+        }
+
+        // Stan początkowy czytamy pod blokadą; aktywne przypisanie do nieaktywnej
+        // usługi również jest częścią stanu "przed zapisem".
+        $statement = $pdo->prepare(
+            'SELECT usluga_id
+             FROM uslugi_pracownikow
+             WHERE pracownik_id = :pracownik_id AND aktywne = TRUE
+             ORDER BY usluga_id ASC'
+        );
+        $statement->execute(['pracownik_id' => $employeeId]);
+        $beforeIds = [];
+
+        foreach ($statement->fetchAll(PDO::FETCH_COLUMN) as $beforeId) {
+            $beforeIds[] = (int) $beforeId;
         }
 
         $activeIds = [];
@@ -225,7 +242,11 @@ function pracownik_uslugi_save(int $employeeId, array $serviceIds): array
 
         $pdo->commit();
 
-        return ['status' => 'ok', 'usluga_ids' => $assignedIds];
+        return [
+            'status' => 'ok',
+            'usluga_ids' => $assignedIds,
+            'usluga_ids_before' => $beforeIds,
+        ];
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
