@@ -289,7 +289,7 @@ test('102. walidacja identyfikatora, roli, aktywności i pustego body', function
         [
             'payload' => ['id' => 4],
             'status' => 422,
-            'field' => null,
+            'field' => 'id',
             'label' => 'brak pól do zmiany',
         ],
     ];
@@ -301,6 +301,9 @@ test('102. walidacja identyfikatora, roli, aktywności i pustego body', function
             $case['payload'],
             $session['csrf']
         );
+
+        // 404 dla nieistniejącego konta i 422 dla błędnych danych to świadome
+        // rozróżnienie: wywołujący jest administratorem i widzi listę kont.
         assert_status($case['status'], $response, 'Przypadek "' . $case['label'] . '" powinien dać ' . $case['status']);
 
         if ($case['field'] !== null) {
@@ -318,6 +321,10 @@ test('102. walidacja identyfikatora, roli, aktywności i pustego body', function
         'headers' => ['X-CSRF-Token' => $session['csrf']],
     ]);
     assert_status(422, $empty, 'Puste body powinno dać 422');
+    assert_true(
+        isset(json_body($empty)['errors']['id']),
+        'Puste body powinno zwrócić błąd przy kluczu id'
+    );
 
     $row = test_db()->query('SELECT rola, aktywny FROM uzytkownicy WHERE id = 4')->fetch();
     assert_same('klient', (string) $row['rola'], 'Walidacja nie może zmienić roli');
@@ -439,6 +446,8 @@ test('105. odpowiedzi nie ujawniają hashy, SQL ani ścieżek', function (): voi
     $forbidden = [
         'haslo_hash',
         '$2y$',
+        '+48123456780',
+        '+48987654321',
         'SQLSTATE',
         'SELECT ',
         'UPDATE ',
@@ -460,4 +469,38 @@ test('105. odpowiedzi nie ujawniają hashy, SQL ani ścieżek', function (): voi
     $logFile = $GLOBALS['__test_server_log'] ?? '';
     assert_true(is_string($logFile) && $logFile !== '', 'Brak ścieżki logu serwera testowego');
     assert_same([], server_log_errors($logFile), 'Log serwera nie powinien zawierać błędów PHP');
+});
+
+test('106. dezaktywacja odbiera dostęp aktywnej sesji klienta', function (): void {
+    admin_users_reset_base();
+
+    $client = login_as('jan.kowalski@example.com');
+    assert_status(200, $client['response'], 'Logowanie klienta powinno się udać');
+    $panelBefore = http_request($client['cookies'], 'GET', '/panel.php');
+    assert_status(200, $panelBefore, 'Aktywny klient powinien mieć dostęp do panelu');
+
+    $admin = login_as('admin@wefixit.pl');
+    assert_status(200, $admin['response'], 'Logowanie administratora powinno się udać');
+    $csrf = csrf_from_page($admin['cookies'], '/uzytkownicy.php');
+
+    try {
+        $deactivate = patch_json($admin['cookies'], '/api/admin/users.php', [
+            'id' => 4,
+            'aktywny' => false,
+        ], $csrf);
+        assert_status(200, $deactivate, 'Dezaktywacja konta klienta powinna dać 200');
+
+        $panelAfter = http_request($client['cookies'], 'GET', '/panel.php');
+        assert_status(302, $panelAfter, 'Dezaktywowany klient powinien zostać przekierowany z panelu');
+        assert_same(
+            '/login',
+            header_value($panelAfter, 'location'),
+            'Przekierowanie powinno prowadzić na /login'
+        );
+
+        $me = http_request($client['cookies'], 'GET', '/api/me.php');
+        assert_status(401, $me, 'Dezaktywowana sesja powinna dostać 401 z /api/me');
+    } finally {
+        admin_users_set_user(4, 'klient', true);
+    }
 });
