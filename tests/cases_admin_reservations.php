@@ -303,21 +303,29 @@ test('113. nielegalne przejścia dają 422 i nie zmieniają rekordu', function (
 
 test('114. endpoint przyjmuje GET i PATCH, a POST i DELETE dają 405', function (): void {
     $cookies = [];
-    $responses = [
-        'POST' => post_json($cookies, '/api/admin/reservations.php', ['id' => 4]),
-        'DELETE' => delete_json($cookies, '/api/admin/reservations.php', ['id' => 4]),
-    ];
+    $postResponse = post_json($cookies, '/api/admin/reservations.php', ['id' => 4]);
+    assert_status(405, $postResponse, 'POST na endpoint rezerwacji powinien dać 405');
 
-    foreach ($responses as $method => $response) {
-        assert_status(405, $response, $method . ' na endpoint rezerwacji powinien dać 405');
+    $postAllow = header_value($postResponse, 'allow');
+    assert_true(is_string($postAllow) && $postAllow !== '', 'POST powinien zwrócić nagłówek Allow');
 
-        $allow = header_value($response, 'allow');
-        assert_true(is_string($allow) && $allow !== '', $method . ' powinien zwrócić nagłówek Allow');
+    $postMethods = array_values(array_filter(array_map('trim', explode(',', $postAllow))));
+    assert_true(in_array('GET', $postMethods, true), 'Allow dla POST powinno zawierać GET');
+    assert_true(in_array('PATCH', $postMethods, true), 'Allow dla POST powinno zawierać PATCH');
+    assert_true(!in_array('POST', $postMethods, true), 'Allow dla POST nie może zawierać POST');
+    assert_true(!in_array('DELETE', $postMethods, true), 'Allow dla POST nie może zawierać DELETE');
+    sort($postMethods);
+    assert_same(['GET', 'PATCH'], $postMethods, 'Allow dla POST powinno zawierać wyłącznie GET i PATCH');
 
-        $methods = array_values(array_filter(array_map('trim', explode(',', $allow))));
-        sort($methods);
-        assert_same(['GET', 'PATCH'], $methods, 'Allow powinno zawierać wyłącznie GET i PATCH');
-    }
+    $deleteResponse = delete_json($cookies, '/api/admin/reservations.php', ['id' => 4]);
+    assert_status(405, $deleteResponse, 'DELETE na endpoint rezerwacji powinien dać 405');
+
+    $deleteAllow = header_value($deleteResponse, 'allow');
+    assert_true(is_string($deleteAllow) && $deleteAllow !== '', 'DELETE powinien zwrócić nagłówek Allow');
+
+    $deleteMethods = array_values(array_filter(array_map('trim', explode(',', $deleteAllow))));
+    sort($deleteMethods);
+    assert_same(['GET', 'PATCH'], $deleteMethods, 'Allow dla DELETE powinno zawierać wyłącznie GET i PATCH');
 
     admin_reservations_reset_base();
     $session = admin_reservations_admin_session();
