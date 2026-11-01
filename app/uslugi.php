@@ -437,7 +437,7 @@ function uslugi_list_paginated(
         $statement = $pdo->prepare(
             usluga_list_select_sql()
             . $where
-            . ' ORDER BY u.nazwa ASC '
+            . ' ORDER BY u.nazwa ASC, u.id ASC '
             . pagination_limit_sql($size, $offset)
         );
         $statement->execute($params);

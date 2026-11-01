@@ -288,7 +288,7 @@ function pracownicy_list_paginated(
         $statement = $pdo->prepare(
             pracownicy_list_select_sql()
             . $where
-            . ' ORDER BY u.nazwisko ASC, u.imie ASC '
+            . ' ORDER BY u.nazwisko ASC, u.imie ASC, p.id ASC '
             . pagination_limit_sql($size, $offset)
         );
         $statement->execute($params);
