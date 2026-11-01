@@ -32,7 +32,11 @@ function json_require_method(array $methods): void
     json_response(405, ['error' => 'Nieprawidłowe żądanie.']);
 }
 
-// Endpointy przyjmujące JSON akceptują wyłącznie application/json (także z parametrem).
+/*
+    Nagłówek sprawdzamy tylko dla metod z ciałem JSON (POST i PATCH).
+    DELETE nie opisuje reprezentacji zasobu, więc nie wymaga Content-Type;
+    endpoint nadal może odczytać opcjonalne body JSON z identyfikatorem.
+*/
 function json_require_content_type(): void
 {
     $contentType = strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '', 2)[0]));
