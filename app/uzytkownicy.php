@@ -70,7 +70,6 @@ function uzytkownik_row(array $row): array
         'imie' => (string) $row['imie'],
         'nazwisko' => (string) $row['nazwisko'],
         'email' => (string) $row['email'],
-        'telefon' => (string) $row['telefon'],
         'rola' => (string) $row['rola'],
         'aktywny' => (int) $row['aktywny'] === 1,
         'utworzono' => (string) $row['utworzono'],
@@ -114,7 +113,6 @@ function uzytkownicy_list(string $role = '', string $status = 'all'): ?array
                 u.imie,
                 u.nazwisko,
                 u.email,
-                u.telefon,
                 u.rola,
                 u.aktywny,
                 u.utworzono,
@@ -156,7 +154,6 @@ function uzytkownik_find_by_id(int $id): ?array
                 u.imie,
                 u.nazwisko,
                 u.email,
-                u.telefon,
                 u.rola,
                 u.aktywny,
                 u.utworzono,
@@ -187,10 +184,10 @@ function uzytkownik_change_errors(array $data): array
 
     if (!is_int($id) || $id <= 0) {
         $errors['id'] = UZYTKOWNIK_ID_ERROR;
-    }
-
-    if (!$hasRole && !$hasActive) {
-        $errors['zmiana'] = UZYTKOWNIK_NO_CHANGES_ERROR;
+    } elseif (!$hasRole && !$hasActive) {
+        // Brak pól do zmiany dotyczy całego żądania, więc używamy klucza id.
+        // Przy niepoprawnym id zwracamy wyłącznie błąd identyfikatora.
+        $errors['id'] = UZYTKOWNIK_NO_CHANGES_ERROR;
     }
 
     if ($hasRole && uzytkownik_role_value($data['rola']) === null) {

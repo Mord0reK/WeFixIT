@@ -130,9 +130,6 @@ panel_layout_head($user, 'Użytkownicy — WeFixIT', 'users');
                             </td>
                             <td class="<?= PANEL_TD_CLASS ?>">
                                 <?= htmlspecialchars($managedUser['email'], ENT_QUOTES, 'UTF-8') ?>
-                                <span class="block text-xs text-zinc-500 dark:text-zinc-400">
-                                    <?= htmlspecialchars($managedUser['telefon'], ENT_QUOTES, 'UTF-8') ?>
-                                </span>
                             </td>
                             <td class="<?= PANEL_TD_CLASS ?>">
                                 <?= panel_badge(
