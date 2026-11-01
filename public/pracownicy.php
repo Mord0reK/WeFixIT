@@ -108,6 +108,10 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                                         class="<?= panel_button_classes('ghost') ?>">
                                         Usługi
                                     </a>
+                                    <a href="<?= htmlspecialchars($basePath . '/pracownicy-dostepnosc?id=' . $employee['id'], ENT_QUOTES, 'UTF-8') ?>"
+                                        class="<?= panel_button_classes('ghost') ?>">
+                                        Dostępność
+                                    </a>
                                     <button type="button" class="<?= panel_button_classes('ghost') ?>"
                                         data-employee-edit
                                         data-id="<?= $employee['id'] ?>"
