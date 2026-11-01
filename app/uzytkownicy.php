@@ -4,12 +4,14 @@ declare(strict_types=1);
 /*
     Moduł administracji kontami użytkowników.
 
-    Obsługuje listę z filtrami, odczyt po id oraz zmianę roli i aktywności.
-    Nie tworzy kont, nie zmienia haseł i nie usuwa użytkowników — te operacje
+    Obsługuje listę z filtrami, wyszukiwaniem i paginacją, odczyt po id oraz
+    zmianę roli i aktywności. Nie tworzy kont, nie zmienia haseł i nie usuwa
+    użytkowników — te operacje
     mają własne ścieżki. Moduł nie zawiera HTML ani logiki HTTP i nigdy nie
     pobiera kolumny haslo_hash.
 */
 require_once __DIR__ . '/../public/config.php';
+require_once __DIR__ . '/pagination.php';
 
 const UZYTKOWNIK_ROLES = ['klient', 'pracownik', 'admin'];
 const UZYTKOWNIK_STATUS_FILTERS = ['all', 'active', 'inactive'];
@@ -80,16 +82,11 @@ function uzytkownik_row(array $row): array
     ];
 }
 
-function uzytkownicy_list(string $role = '', string $status = 'all'): ?array
+function uzytkownik_list_conditions(string $role, string $status, string $search): array
 {
-    $pdo = uzytkownicy_db();
-
-    if ($pdo === null) {
-        return null;
-    }
-
     $role = uzytkownik_role_filter($role);
     $status = uzytkownik_status_filter($status);
+    $search = pagination_search_value($search);
     $conditions = [];
     $params = [];
 
@@ -104,11 +101,22 @@ function uzytkownicy_list(string $role = '', string $status = 'all'): ?array
         $conditions[] = 'u.aktywny = FALSE';
     }
 
-    $where = $conditions !== [] ? ' WHERE ' . implode(' AND ', $conditions) : '';
+    if ($search !== '') {
+        $pattern = pagination_like_pattern($search);
+        $conditions[] = '(u.imie LIKE CONCAT(\'%\', :szukaj_imie, \'%\')'
+            . ' OR u.nazwisko LIKE CONCAT(\'%\', :szukaj_nazwisko, \'%\')'
+            . ' OR u.email LIKE CONCAT(\'%\', :szukaj_email, \'%\'))';
+        $params['szukaj_imie'] = $pattern;
+        $params['szukaj_nazwisko'] = $pattern;
+        $params['szukaj_email'] = $pattern;
+    }
 
-    try {
-        $statement = $pdo->prepare(
-            'SELECT
+    return [$conditions, $params];
+}
+
+function uzytkownik_list_select_sql(): string
+{
+    return 'SELECT
                 u.id,
                 u.imie,
                 u.nazwisko,
@@ -119,7 +127,23 @@ function uzytkownicy_list(string $role = '', string $status = 'all'): ?array
                 p.id AS pracownik_id,
                 p.aktywny AS pracownik_aktywny
              FROM uzytkownicy u
-             LEFT JOIN pracownicy p ON p.uzytkownik_id = u.id'
+             LEFT JOIN pracownicy p ON p.uzytkownik_id = u.id';
+}
+
+function uzytkownicy_list(string $role = '', string $status = 'all'): ?array
+{
+    $pdo = uzytkownicy_db();
+
+    if ($pdo === null) {
+        return null;
+    }
+
+    [$conditions, $params] = uzytkownik_list_conditions($role, $status, '');
+    $where = $conditions !== [] ? ' WHERE ' . implode(' AND ', $conditions) : '';
+
+    try {
+        $statement = $pdo->prepare(
+            uzytkownik_list_select_sql()
             . $where
             . ' ORDER BY u.nazwisko ASC, u.imie ASC, u.id ASC'
         );
@@ -137,6 +161,71 @@ function uzytkownicy_list(string $role = '', string $status = 'all'): ?array
     }
 
     return $users;
+}
+
+/*
+    Wariant paginowany zachowuje dotychczasową funkcję dla pełnych list
+    potrzebnych w filtrach innych modułów.
+*/
+function uzytkownicy_list_paginated(
+    string $role = '',
+    string $status = 'all',
+    string $search = '',
+    int $page = 1,
+    int $size = 25
+): ?array
+{
+    $pdo = uzytkownicy_db();
+
+    if ($pdo === null) {
+        return null;
+    }
+
+    $page = pagination_page($page);
+    $size = pagination_size($size);
+    [$conditions, $params] = uzytkownik_list_conditions($role, $status, $search);
+    $where = $conditions !== [] ? ' WHERE ' . implode(' AND ', $conditions) : '';
+
+    try {
+        $statement = $pdo->prepare('SELECT COUNT(*) FROM uzytkownicy u' . $where);
+        $statement->execute($params);
+        $total = (int) $statement->fetchColumn();
+    } catch (PDOException $e) {
+        error_log('Nie udało się policzyć użytkowników: ' . $e->getMessage());
+        return null;
+    }
+
+    $pages = pagination_total_pages($total, $size);
+    $page = min($page, $pages);
+    $offset = pagination_offset($page, $size);
+
+    try {
+        $statement = $pdo->prepare(
+            uzytkownik_list_select_sql()
+            . $where
+            . ' ORDER BY u.nazwisko ASC, u.imie ASC, u.id ASC '
+            . pagination_limit_sql($size, $offset)
+        );
+        $statement->execute($params);
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('Nie udało się pobrać listy użytkowników: ' . $e->getMessage());
+        return null;
+    }
+
+    $users = [];
+
+    foreach ($rows as $row) {
+        $users[] = uzytkownik_row($row);
+    }
+
+    return [
+        'items' => $users,
+        'total' => $total,
+        'page' => $page,
+        'size' => $size,
+        'pages' => $pages,
+    ];
 }
 
 function uzytkownik_find_by_id(int $id): ?array
