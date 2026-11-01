@@ -4,17 +4,29 @@ declare(strict_types=1);
 /*
     Strona kategorii usług w panelu administratora.
 
-    Lista pochodzi z app/kategorie.php, a formularz dodawania i edycji wysyła
-    żądania fetch() do /api/admin/categories. Widok nie wykonuje SQL ani
-    operacji zapisu.
+    Lista pochodzi z app/kategorie.php i obsługuje wyszukiwanie oraz paginację.
+    Formularz dodawania i edycji wysyła żądania fetch() do /api/admin/categories.
+    Widok nie wykonuje SQL ani operacji zapisu.
 */
 require_once dirname(__DIR__) . '/app/panel_layout.php';
 require_once dirname(__DIR__) . '/app/kategorie.php';
 
 $user = require_role(['admin']);
-$categories = kategorie_list();
 $basePath = auth_base_path();
+$categoriesUrl = $basePath . '/kategorie';
 $categoriesApi = $basePath . '/api/admin/categories';
+$search = pagination_search_value($_GET['szukaj'] ?? null);
+$page = pagination_page($_GET['page'] ?? null);
+$size = pagination_size($_GET['size'] ?? null);
+$categoryPage = kategorie_list_paginated($page, $size, $search);
+$categories = $categoryPage['items'] ?? null;
+$hasFilters = $search !== '';
+$paginationParams = ['size' => $size];
+
+if ($search !== '') {
+    $paginationParams['szukaj'] = $search;
+}
+
 $csrfToken = csrf_token();
 
 panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
@@ -30,17 +42,46 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
     );
     ?>
 
+    <form id="categories-filter-form" method="get"
+        action="<?= htmlspecialchars($categoriesUrl, ENT_QUOTES, 'UTF-8') ?>"
+        class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2">
+        <input type="hidden" name="size" value="<?= $size ?>">
+
+        <div>
+            <label for="categories-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
+            <input id="categories-filter-search" name="szukaj" type="search" maxlength="100"
+                value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
+                placeholder="Nazwa kategorii" class="<?= LAYOUT_INPUT_CLASS ?>">
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 sm:items-end">
+            <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
+            <?php if ($hasFilters): ?>
+                <a href="<?= htmlspecialchars($categoriesUrl, ENT_QUOTES, 'UTF-8') ?>"
+                    class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
+            <?php endif; ?>
+        </div>
+    </form>
+
     <?php if ($categories === null): ?>
         <div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
             Nie udało się pobrać listy kategorii. Spróbuj ponownie później.
         </div>
     <?php elseif ($categories === []): ?>
         <?php
-        panel_empty_state(
-            'Brak kategorii',
-            'Dodaj pierwszą kategorię, aby przypisywać do niej usługi.',
-            ['label' => 'Dodaj kategorię', 'href' => '#category-form']
-        );
+        if ($hasFilters) {
+            panel_empty_state(
+                'Brak kategorii dla wybranej frazy',
+                'Zmień frazę wyszukiwania, aby zobaczyć inne kategorie.',
+                ['label' => 'Wyczyść wyszukiwanie', 'href' => $categoriesUrl]
+            );
+        } else {
+            panel_empty_state(
+                'Brak kategorii',
+                'Dodaj pierwszą kategorię, aby przypisywać do niej usługi.',
+                ['label' => 'Dodaj kategorię', 'href' => '#category-form']
+            );
+        }
         ?>
     <?php else: ?>
         <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">
@@ -110,6 +151,7 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
                 </tbody>
             </table>
         </div>
+        <?php panel_pagination($basePath, '/kategorie', $paginationParams, $categoryPage); ?>
     <?php endif; ?>
 </section>
 

@@ -9,10 +9,12 @@ declare(strict_types=1);
     Rejestracja kont ma własną ścieżkę, a nadanie roli pracownik wymaga
     świadomej decyzji administratora.
 
-    Moduł obsługuje listę, odczyt, zapis opisu i aktywności oraz bezpieczne
-    usuwanie. Nie zawiera HTML ani logiki HTTP i nigdy nie zwraca haslo_hash.
+    Moduł obsługuje listę z wyszukiwaniem i paginacją, odczyt, zapis opisu
+    i aktywności oraz bezpieczne usuwanie. Nie zawiera HTML ani logiki HTTP
+    i nigdy nie zwraca haslo_hash.
 */
 require_once __DIR__ . '/../public/config.php';
+require_once __DIR__ . '/pagination.php';
 
 // Wspólne komunikaty, żeby endpoint i widok nie powielały tych samych tekstów.
 const PRACOWNIK_USER_TAKEN_ERROR = 'To konto ma już profil pracownika.';
@@ -147,18 +149,28 @@ function pracownik_errors(array $data, ?int $ignoreProfileId = null): array
     return $errors;
 }
 
-// Lista profili z danymi konta i licznikami zależności.
-function pracownicy_list(): ?array
+function pracownik_list_conditions(string $search): array
 {
-    $pdo = pracownicy_db();
+    $search = pagination_search_value($search);
 
-    if ($pdo === null) {
-        return null;
+    if ($search === '') {
+        return [[], []];
     }
 
-    try {
-        $statement = $pdo->query(
-            'SELECT
+    $pattern = pagination_like_pattern($search);
+
+    return [
+        ['(u.imie LIKE CONCAT(\'%\', :szukaj_imie, \'%\') OR u.nazwisko LIKE CONCAT(\'%\', :szukaj_nazwisko, \'%\'))'],
+        [
+            'szukaj_imie' => $pattern,
+            'szukaj_nazwisko' => $pattern,
+        ],
+    ];
+}
+
+function pracownicy_list_select_sql(): string
+{
+    return 'SELECT
                 p.id,
                 p.uzytkownik_id,
                 p.opis,
@@ -179,8 +191,44 @@ function pracownicy_list(): ?array
                 (SELECT COUNT(*) FROM rezerwacje r
                  WHERE r.pracownik_id = p.id) AS reservations_total
              FROM pracownicy p
-             JOIN uzytkownicy u ON u.id = p.uzytkownik_id
-             ORDER BY u.nazwisko ASC, u.imie ASC'
+             JOIN uzytkownicy u ON u.id = p.uzytkownik_id';
+}
+
+function pracownik_list_row(array $row): array
+{
+    $dependencies = (int) $row['assignments_total']
+        + (int) $row['schedules_total']
+        + (int) $row['absences_total']
+        + (int) $row['reservations_total'];
+
+    return [
+        'id' => (int) $row['id'],
+        'uzytkownik_id' => (int) $row['uzytkownik_id'],
+        'imie' => (string) $row['imie'],
+        'nazwisko' => (string) $row['nazwisko'],
+        'email' => (string) $row['email'],
+        'rola' => (string) $row['rola'],
+        'konto_aktywne' => (int) $row['konto_aktywne'] === 1,
+        'opis' => $row['opis'] !== null ? (string) $row['opis'] : null,
+        'aktywny' => (int) $row['aktywny'] === 1,
+        'uslugi_active' => (int) $row['uslugi_active'],
+        'dependencies_total' => $dependencies,
+        'has_dependencies' => $dependencies > 0,
+    ];
+}
+
+// Lista profili z danymi konta i licznikami zależności.
+function pracownicy_list(): ?array
+{
+    $pdo = pracownicy_db();
+
+    if ($pdo === null) {
+        return null;
+    }
+
+    try {
+        $statement = $pdo->query(
+            pracownicy_list_select_sql() . ' ORDER BY u.nazwisko ASC, u.imie ASC'
         );
         $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
@@ -191,28 +239,78 @@ function pracownicy_list(): ?array
     $employees = [];
 
     foreach ($rows as $row) {
-        $dependencies = (int) $row['assignments_total']
-            + (int) $row['schedules_total']
-            + (int) $row['absences_total']
-            + (int) $row['reservations_total'];
-
-        $employees[] = [
-            'id' => (int) $row['id'],
-            'uzytkownik_id' => (int) $row['uzytkownik_id'],
-            'imie' => (string) $row['imie'],
-            'nazwisko' => (string) $row['nazwisko'],
-            'email' => (string) $row['email'],
-            'rola' => (string) $row['rola'],
-            'konto_aktywne' => (int) $row['konto_aktywne'] === 1,
-            'opis' => $row['opis'] !== null ? (string) $row['opis'] : null,
-            'aktywny' => (int) $row['aktywny'] === 1,
-            'uslugi_active' => (int) $row['uslugi_active'],
-            'dependencies_total' => $dependencies,
-            'has_dependencies' => $dependencies > 0,
-        ];
+        $employees[] = pracownik_list_row($row);
     }
 
     return $employees;
+}
+
+/*
+    Wariant paginowany jest osobną funkcją, bo dotychczasowe wywołania
+    potrzebują pełnej listy pracowników do formularzy i filtrów.
+*/
+function pracownicy_list_paginated(
+    string $search = '',
+    int $page = 1,
+    int $size = 25
+): ?array
+{
+    $pdo = pracownicy_db();
+
+    if ($pdo === null) {
+        return null;
+    }
+
+    $page = pagination_page($page);
+    $size = pagination_size($size);
+    [$conditions, $params] = pracownik_list_conditions($search);
+    $where = $conditions !== [] ? ' WHERE ' . implode(' AND ', $conditions) : '';
+    $countSql = 'SELECT COUNT(*) FROM pracownicy p';
+
+    if ($conditions !== []) {
+        $countSql .= ' JOIN uzytkownicy u ON u.id = p.uzytkownik_id';
+    }
+
+    try {
+        $statement = $pdo->prepare($countSql . $where);
+        $statement->execute($params);
+        $total = (int) $statement->fetchColumn();
+    } catch (PDOException $e) {
+        error_log('Nie udało się policzyć pracowników: ' . $e->getMessage());
+        return null;
+    }
+
+    $pages = pagination_total_pages($total, $size);
+    $page = min($page, $pages);
+    $offset = pagination_offset($page, $size);
+
+    try {
+        $statement = $pdo->prepare(
+            pracownicy_list_select_sql()
+            . $where
+            . ' ORDER BY u.nazwisko ASC, u.imie ASC, p.id ASC '
+            . pagination_limit_sql($size, $offset)
+        );
+        $statement->execute($params);
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('Nie udało się pobrać listy pracowników: ' . $e->getMessage());
+        return null;
+    }
+
+    $employees = [];
+
+    foreach ($rows as $row) {
+        $employees[] = pracownik_list_row($row);
+    }
+
+    return [
+        'items' => $employees,
+        'total' => $total,
+        'page' => $page,
+        'size' => $size,
+        'pages' => $pages,
+    ];
 }
 
 function pracownik_find_by_id(int $id): ?array

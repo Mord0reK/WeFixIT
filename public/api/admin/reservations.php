@@ -28,7 +28,9 @@ if (($user['rola'] ?? '') !== 'admin') {
 }
 
 if ($method === 'GET') {
-    $reservations = rezerwacje_list([
+    $page = pagination_page($_GET['page'] ?? null);
+    $size = pagination_size($_GET['size'] ?? null);
+    $result = rezerwacje_list_paginated([
         'data_od' => $_GET['data_od'] ?? null,
         'data_do' => $_GET['data_do'] ?? null,
         'status' => $_GET['status'] ?? null,
@@ -36,13 +38,23 @@ if ($method === 'GET') {
         'usluga_id' => $_GET['usluga_id'] ?? null,
         'uzytkownik_id' => $_GET['uzytkownik_id'] ?? null,
         'kierunek' => $_GET['kierunek'] ?? null,
-    ]);
+        'szukaj' => $_GET['szukaj'] ?? null,
+    ], $page, $size);
 
-    if ($reservations === null) {
+    if ($result === null) {
         json_response(500, ['error' => 'Nie udało się pobrać rezerwacji. Wystąpił problem z serwerem.']);
     }
 
-    json_response(200, ['success' => true, 'rezerwacje' => $reservations]);
+    json_response(200, [
+        'success' => true,
+        'rezerwacje' => $result['items'],
+        'paginacja' => [
+            'strona' => $result['page'],
+            'rozmiar' => $result['size'],
+            'stron' => $result['pages'],
+            'razem' => $result['total'],
+        ],
+    ]);
 }
 
 if (!csrf_verify(csrf_token_from_request())) {

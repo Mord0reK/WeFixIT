@@ -1069,6 +1069,9 @@
   .accent-zinc-900 {
     accent-color: var(--color-zinc-900);
   }
+  .opacity-50 {
+    opacity: 50%;
+  }
   .shadow-lg {
     --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 4px 6px -4px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
@@ -1353,12 +1356,6 @@
     }
     .lg\:grid-cols-\[18rem_1fr\] {
       grid-template-columns: 18rem 1fr;
-    }
-    .lg\:grid-cols-\[minmax\(0\,1fr\)_minmax\(0\,1fr\)_auto\] {
-      grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto;
-    }
-    .lg\:items-end {
-      align-items: flex-end;
     }
     .lg\:p-8 {
       padding: calc(var(--spacing) * 8);

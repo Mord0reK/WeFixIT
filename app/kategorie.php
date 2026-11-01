@@ -4,11 +4,13 @@ declare(strict_types=1);
 /*
     Moduł danych i walidacji kategorii usług.
 
-    Odpowiada za odczyt listy z liczbą usług, zapis nazwy i opisu, zmianę
-    flagi aktywności oraz usuwanie kategorii. Nie zawiera HTML ani logiki HTTP.
+    Odpowiada za odczyt listy z liczbą usług, wariant paginowany z wyszukiwaniem,
+    zapis nazwy i opisu, zmianę flagi aktywności oraz usuwanie kategorii.
+    Nie zawiera HTML ani logiki HTTP.
     Reguły walidacji zwracają mapę błędów przypisanych do pól.
 */
 require_once __DIR__ . '/../public/config.php';
+require_once __DIR__ . '/pagination.php';
 
 // Wspólne komunikaty, żeby endpoint i widok nie powielały tych samych tekstów.
 const KATEGORIA_NAME_TAKEN_ERROR = 'Kategoria o tej nazwie już istnieje.';
@@ -110,6 +112,36 @@ function kategoria_errors(array $data, ?int $ignoreId = null): array
         + kategoria_description_errors($data['opis'] ?? null);
 }
 
+function kategorie_list_select_sql(): string
+{
+    return 'SELECT
+                k.id,
+                k.nazwa,
+                k.opis,
+                k.aktywna,
+                COUNT(u.id) AS uslugi_total,
+                COALESCE(SUM(CASE WHEN u.aktywna = TRUE THEN 1 ELSE 0 END), 0) AS uslugi_active
+             FROM kategorie_uslug k
+             LEFT JOIN uslugi u ON u.kategoria_id = k.id';
+}
+
+function kategorie_list_group_order_sql(): string
+{
+    return ' GROUP BY k.id, k.nazwa, k.opis, k.aktywna ORDER BY k.nazwa ASC';
+}
+
+function kategoria_list_row(array $row): array
+{
+    return [
+        'id' => (int) $row['id'],
+        'nazwa' => (string) $row['nazwa'],
+        'opis' => $row['opis'] !== null ? (string) $row['opis'] : null,
+        'aktywna' => (int) $row['aktywna'] === 1,
+        'uslugi_total' => (int) $row['uslugi_total'],
+        'uslugi_active' => (int) $row['uslugi_active'],
+    ];
+}
+
 // Lista wszystkich kategorii wraz z liczbą przypisanych usług, także nieaktywnych.
 function kategorie_list(): ?array
 {
@@ -121,17 +153,7 @@ function kategorie_list(): ?array
 
     try {
         $statement = $pdo->query(
-            'SELECT
-                k.id,
-                k.nazwa,
-                k.opis,
-                k.aktywna,
-                COUNT(u.id) AS uslugi_total,
-                COALESCE(SUM(CASE WHEN u.aktywna = TRUE THEN 1 ELSE 0 END), 0) AS uslugi_active
-             FROM kategorie_uslug k
-             LEFT JOIN uslugi u ON u.kategoria_id = k.id
-             GROUP BY k.id, k.nazwa, k.opis, k.aktywna
-             ORDER BY k.nazwa ASC'
+            kategorie_list_select_sql() . kategorie_list_group_order_sql()
         );
         $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
@@ -142,17 +164,79 @@ function kategorie_list(): ?array
     $categories = [];
 
     foreach ($rows as $row) {
-        $categories[] = [
-            'id' => (int) $row['id'],
-            'nazwa' => (string) $row['nazwa'],
-            'opis' => $row['opis'] !== null ? (string) $row['opis'] : null,
-            'aktywna' => (int) $row['aktywna'] === 1,
-            'uslugi_total' => (int) $row['uslugi_total'],
-            'uslugi_active' => (int) $row['uslugi_active'],
-        ];
+        $categories[] = kategoria_list_row($row);
     }
 
     return $categories;
+}
+
+/*
+    Wariant paginowany powstaje obok dotychczasowej listy, żeby formularze
+    filtrów nadal mogły pobierać pełną listę bez zmiany sygnatury funkcji.
+    Wyszukiwanie po nazwie jest potrzebne stronom panelu i testom zadania 403.
+*/
+function kategorie_list_paginated(int $page = 1, int $size = 25, string $search = ''): ?array
+{
+    $pdo = kategorie_db();
+
+    if ($pdo === null) {
+        return null;
+    }
+
+    $page = pagination_page($page);
+    $size = pagination_size($size);
+    $search = pagination_search_value($search);
+    $conditions = [];
+    $params = [];
+
+    if ($search !== '') {
+        $conditions[] = 'k.nazwa LIKE CONCAT(\'%\', :szukaj, \'%\')';
+        $params['szukaj'] = pagination_like_pattern($search);
+    }
+
+    $where = $conditions !== [] ? ' WHERE ' . implode(' AND ', $conditions) : '';
+
+    try {
+        $statement = $pdo->prepare('SELECT COUNT(*) FROM kategorie_uslug k' . $where);
+        $statement->execute($params);
+        $total = (int) $statement->fetchColumn();
+    } catch (PDOException $e) {
+        error_log('Nie udało się policzyć kategorii: ' . $e->getMessage());
+        return null;
+    }
+
+    $pages = pagination_total_pages($total, $size);
+    $page = min($page, $pages);
+    $offset = pagination_offset($page, $size);
+
+    try {
+        $statement = $pdo->prepare(
+            kategorie_list_select_sql()
+            . $where
+            . kategorie_list_group_order_sql()
+            . ' '
+            . pagination_limit_sql($size, $offset)
+        );
+        $statement->execute($params);
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('Nie udało się pobrać listy kategorii: ' . $e->getMessage());
+        return null;
+    }
+
+    $categories = [];
+
+    foreach ($rows as $row) {
+        $categories[] = kategoria_list_row($row);
+    }
+
+    return [
+        'items' => $categories,
+        'total' => $total,
+        'page' => $page,
+        'size' => $size,
+        'pages' => $pages,
+    ];
 }
 
 function kategoria_find_by_id(int $id): ?array

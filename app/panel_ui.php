@@ -107,6 +107,67 @@ function panel_empty_state(string $title, string $description, array $action = [
     <?php
 }
 
+/*
+    Pasek paginacji listy. Linki budujemy z tej samej tablicy parametrów co
+    filtry, więc przejście na kolejną stronę nie gubi wyszukiwania ani filtrów.
+*/
+function panel_pagination(string $basePath, string $path, array $params, array $pagination): void
+{
+    $page = (int) ($pagination['page'] ?? 1);
+    $pages = max(1, (int) ($pagination['pages'] ?? 1));
+    $total = (int) ($pagination['total'] ?? 0);
+    $size = (int) ($pagination['size'] ?? 25);
+    $page = max(1, min($page, $pages));
+
+    if ($total <= $size || $pages <= 1) {
+        return;
+    }
+
+    $buildUrl = static function (int $targetPage) use ($basePath, $path, $params): string {
+        $query = $params;
+        $query['page'] = $targetPage;
+
+        return $basePath . $path . '?' . http_build_query($query);
+    };
+
+    $visiblePages = 7;
+    $start = max(1, $page - 3);
+    $end = min($pages, $start + $visiblePages - 1);
+    $start = max(1, $end - $visiblePages + 1);
+    ?>
+    <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        data-pagination>
+        <p class="text-sm text-zinc-500 dark:text-zinc-400">
+            Strona <?= $page ?> z <?= $pages ?> (<?= $total ?> rekordów)
+        </p>
+        <nav aria-label="Paginacja" class="flex flex-wrap items-center gap-1">
+            <?php if ($page > 1): ?>
+                <a href="<?= htmlspecialchars($buildUrl($page - 1), ENT_QUOTES, 'UTF-8') ?>"
+                    class="<?= panel_button_classes('ghost') ?>" rel="prev">Poprzednia</a>
+            <?php else: ?>
+                <span class="<?= panel_button_classes('ghost') ?> opacity-50" aria-disabled="true">Poprzednia</span>
+            <?php endif; ?>
+
+            <?php for ($number = $start; $number <= $end; $number++): ?>
+                <?php if ($number === $page): ?>
+                    <span class="<?= panel_button_classes('primary') ?>" aria-current="page"><?= $number ?></span>
+                <?php else: ?>
+                    <a href="<?= htmlspecialchars($buildUrl($number), ENT_QUOTES, 'UTF-8') ?>"
+                        class="<?= panel_button_classes('secondary') ?>"><?= $number ?></a>
+                <?php endif; ?>
+            <?php endfor; ?>
+
+            <?php if ($page < $pages): ?>
+                <a href="<?= htmlspecialchars($buildUrl($page + 1), ENT_QUOTES, 'UTF-8') ?>"
+                    class="<?= panel_button_classes('ghost') ?>" rel="next">Następna</a>
+            <?php else: ?>
+                <span class="<?= panel_button_classes('ghost') ?> opacity-50" aria-disabled="true">Następna</span>
+            <?php endif; ?>
+        </nav>
+    </div>
+    <?php
+}
+
 // Komunikat błędu pola ukryty do czasu odsłonięcia przez JavaScript.
 function panel_field_error(string $id): string
 {

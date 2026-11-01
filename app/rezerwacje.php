@@ -4,13 +4,15 @@ declare(strict_types=1);
 /*
     Moduł danych i walidacji rezerwacji w panelu administratora.
 
-    Obsługuje listę z filtrami, odczyt pojedynczej rezerwacji i zmianę statusu
-    według jawnej maszyny stanów. Rezerwacji nie usuwamy — anulowanie jest
+    Obsługuje listę z filtrami, wyszukiwaniem i paginacją, odczyt pojedynczej
+    rezerwacji i zmianę statusu według jawnej maszyny stanów.
+    Rezerwacji nie usuwamy — anulowanie jest
     wyłącznie zmianą statusu. Status i anulowano zawsze zapisujemy w jednej
     instrukcji UPDATE, bo CHECK chk_rezerwacje_anulowanie wiąże oba pola.
     Moduł nie zawiera HTML ani logiki HTTP.
 */
 require_once __DIR__ . '/../public/config.php';
+require_once __DIR__ . '/pagination.php';
 
 const REZERWACJA_STATUSES = [
     'oczekujaca',
@@ -202,18 +204,8 @@ function rezerwacja_select_sql(): string
              JOIN kategorie_uslug k ON k.id = s.kategoria_id';
 }
 
-/*
-    Brak LIMIT/OFFSET jest świadomy: paginacja należy do zadania 403
-    i zostanie dodana razem z licznikiem wyników. To nie jest przeoczenie.
-*/
-function rezerwacje_list(array $filters = []): ?array
+function rezerwacja_list_conditions(array $filters): array
 {
-    $pdo = rezerwacje_db();
-
-    if ($pdo === null) {
-        return null;
-    }
-
     $conditions = [];
     $params = [];
     $dateFrom = rezerwacja_filter_date($filters['data_od'] ?? null);
@@ -223,6 +215,7 @@ function rezerwacje_list(array $filters = []): ?array
     $serviceId = rezerwacja_filter_id($filters['usluga_id'] ?? null);
     $userId = rezerwacja_filter_id($filters['uzytkownik_id'] ?? null);
     $direction = rezerwacja_sort_direction($filters['kierunek'] ?? null);
+    $search = pagination_search_value($filters['szukaj'] ?? null);
 
     if ($dateFrom !== null) {
         $conditions[] = 'r.czas_rozpoczecia >= :data_od';
@@ -254,6 +247,34 @@ function rezerwacje_list(array $filters = []): ?array
         $params['uzytkownik_id'] = $userId;
     }
 
+    if ($search !== '') {
+        $pattern = pagination_like_pattern($search);
+        $conditions[] = '(u.nazwisko LIKE CONCAT(\'%\', :szukaj_klient, \'%\')'
+            . ' OR pu.nazwisko LIKE CONCAT(\'%\', :szukaj_pracownik, \'%\'))';
+        $params['szukaj_klient'] = $pattern;
+        $params['szukaj_pracownik'] = $pattern;
+    }
+
+    return [
+        'conditions' => $conditions,
+        'params' => $params,
+        'search' => $search,
+        'direction' => $direction,
+    ];
+}
+
+function rezerwacje_list(array $filters = []): ?array
+{
+    $pdo = rezerwacje_db();
+
+    if ($pdo === null) {
+        return null;
+    }
+
+    $filterData = rezerwacja_list_conditions($filters);
+    $conditions = $filterData['conditions'];
+    $params = $filterData['params'];
+    $direction = $filterData['direction'];
     $where = $conditions !== [] ? ' WHERE ' . implode(' AND ', $conditions) : '';
     $order = $direction === 'asc' ? 'ASC' : 'DESC';
 
@@ -277,6 +298,81 @@ function rezerwacje_list(array $filters = []): ?array
     }
 
     return $reservations;
+}
+
+/*
+    Wariant paginowany jest osobną funkcją, żeby dotychczasowa lista mogła
+    nadal zwracać wszystkie rekordy wywołującym, którzy nie potrzebują stron.
+    Wyszukiwanie obejmuje nazwiska klienta i pracownika.
+*/
+function rezerwacje_list_paginated(
+    array $filters = [],
+    int $page = 1,
+    int $size = 25
+): ?array
+{
+    $pdo = rezerwacje_db();
+
+    if ($pdo === null) {
+        return null;
+    }
+
+    $page = pagination_page($page);
+    $size = pagination_size($size);
+    $filterData = rezerwacja_list_conditions($filters);
+    $conditions = $filterData['conditions'];
+    $params = $filterData['params'];
+    $direction = $filterData['direction'];
+    $where = $conditions !== [] ? ' WHERE ' . implode(' AND ', $conditions) : '';
+    $order = $direction === 'asc' ? 'ASC' : 'DESC';
+    $countSql = 'SELECT COUNT(*) FROM rezerwacje r';
+
+    if ($filterData['search'] !== '') {
+        $countSql .= ' JOIN uzytkownicy u ON u.id = r.uzytkownik_id'
+            . ' JOIN pracownicy p ON p.id = r.pracownik_id'
+            . ' JOIN uzytkownicy pu ON pu.id = p.uzytkownik_id';
+    }
+
+    try {
+        $statement = $pdo->prepare($countSql . $where);
+        $statement->execute($params);
+        $total = (int) $statement->fetchColumn();
+    } catch (PDOException $e) {
+        error_log('Nie udało się policzyć rezerwacji: ' . $e->getMessage());
+        return null;
+    }
+
+    $pages = pagination_total_pages($total, $size);
+    $page = min($page, $pages);
+    $offset = pagination_offset($page, $size);
+
+    try {
+        $statement = $pdo->prepare(
+            rezerwacja_select_sql()
+            . $where
+            . ' ORDER BY r.czas_rozpoczecia ' . $order . ', r.id ' . $order . ' '
+            . pagination_limit_sql($size, $offset)
+        );
+        $statement->execute($params);
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('Nie udało się pobrać listy rezerwacji: ' . $e->getMessage());
+        return null;
+    }
+
+    $reservations = [];
+
+    foreach ($rows as $row) {
+        $reservations[] = rezerwacja_row($row);
+    }
+
+    return [
+        'items' => $reservations,
+        'total' => $total,
+        'page' => $page,
+        'size' => $size,
+        'pages' => $pages,
+    ];
 }
 
 function rezerwacja_find_by_id(int $id): ?array

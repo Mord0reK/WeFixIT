@@ -4,9 +4,10 @@ declare(strict_types=1);
 /*
     Strona rezerwacji w panelu administratora.
 
-    Wyświetla listę z filtrami i pozwala zmienić status rezerwacji przez
-    endpoint JSON. Anulowanie i cofnięcie anulowania wymagają potwierdzenia
-    window.panelConfirm. Widok nie wykonuje SQL ani operacji zapisu.
+    Wyświetla listę z filtrami, wyszukiwaniem i paginacją oraz pozwala zmienić
+    status rezerwacji przez endpoint JSON. Anulowanie i cofnięcie anulowania
+    wymagają potwierdzenia window.panelConfirm. Widok nie wykonuje SQL ani
+    operacji zapisu.
 */
 require_once dirname(__DIR__) . '/app/panel_layout.php';
 require_once dirname(__DIR__) . '/app/rezerwacje.php';
@@ -25,7 +26,10 @@ $employeeFilter = rezerwacja_filter_id($_GET['pracownik_id'] ?? null);
 $serviceFilter = rezerwacja_filter_id($_GET['usluga_id'] ?? null);
 $clientFilter = rezerwacja_filter_id($_GET['uzytkownik_id'] ?? null);
 $sortDirection = rezerwacja_sort_direction($_GET['kierunek'] ?? null);
-$reservations = rezerwacje_list([
+$search = pagination_search_value($_GET['szukaj'] ?? null);
+$page = pagination_page($_GET['page'] ?? null);
+$size = pagination_size($_GET['size'] ?? null);
+$reservationPage = rezerwacje_list_paginated([
     'data_od' => $dateFrom,
     'data_do' => $dateTo,
     'status' => $statusFilter,
@@ -33,7 +37,9 @@ $reservations = rezerwacje_list([
     'usluga_id' => $serviceFilter,
     'uzytkownik_id' => $clientFilter,
     'kierunek' => $sortDirection,
-]);
+    'szukaj' => $search,
+], $page, $size);
+$reservations = $reservationPage['items'] ?? null;
 $employees = pracownicy_list();
 $services = uslugi_list();
 $clients = uzytkownicy_list('klient');
@@ -42,7 +48,38 @@ $filtersActive = $dateFrom !== null
     || $statusFilter !== ''
     || $employeeFilter > 0
     || $serviceFilter > 0
-    || $clientFilter > 0;
+    || $clientFilter > 0
+    || $search !== '';
+$paginationParams = ['size' => $size, 'kierunek' => $sortDirection];
+
+if ($dateFrom !== null) {
+    $paginationParams['data_od'] = $dateFrom;
+}
+
+if ($dateTo !== null) {
+    $paginationParams['data_do'] = $dateTo;
+}
+
+if ($statusFilter !== '') {
+    $paginationParams['status'] = $statusFilter;
+}
+
+if ($employeeFilter > 0) {
+    $paginationParams['pracownik_id'] = $employeeFilter;
+}
+
+if ($serviceFilter > 0) {
+    $paginationParams['usluga_id'] = $serviceFilter;
+}
+
+if ($clientFilter > 0) {
+    $paginationParams['uzytkownik_id'] = $clientFilter;
+}
+
+if ($search !== '') {
+    $paginationParams['szukaj'] = $search;
+}
+
 $csrfToken = csrf_token();
 $statusLabels = [
     'oczekujaca' => 'Oczekująca',
@@ -80,6 +117,14 @@ panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
         action="<?= htmlspecialchars($reservationsUrl, ENT_QUOTES, 'UTF-8') ?>"
         class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2 xl:grid-cols-3">
         <input type="hidden" name="kierunek" value="<?= htmlspecialchars($sortDirection, ENT_QUOTES, 'UTF-8') ?>">
+        <input type="hidden" name="size" value="<?= $size ?>">
+
+        <div>
+            <label for="reservations-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
+            <input id="reservations-filter-search" name="szukaj" type="search" maxlength="100"
+                value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
+                placeholder="Nazwisko klienta lub pracownika" class="<?= LAYOUT_INPUT_CLASS ?>">
+        </div>
 
         <div>
             <label for="reservations-filter-from" class="<?= LAYOUT_LABEL_CLASS ?>">Data od</label>
@@ -165,7 +210,7 @@ panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
         if ($filtersActive) {
             panel_empty_state(
                 'Brak rezerwacji dla wybranych filtrów',
-                'Zmień zakres dat lub pozostałe filtry, aby zobaczyć inne rezerwacje.',
+                'Zmień zakres dat, filtry lub frazę wyszukiwania, aby zobaczyć inne rezerwacje.',
                 ['label' => 'Wyczyść filtry', 'href' => $reservationsUrl]
             );
         } else {
@@ -274,6 +319,7 @@ panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
                 </tbody>
             </table>
         </div>
+        <?php panel_pagination($basePath, '/rezerwacje', $paginationParams, $reservationPage); ?>
     <?php endif; ?>
 
     <p id="reservations-error" role="alert" class="mt-3 hidden text-sm text-red-600 dark:text-red-400"></p>

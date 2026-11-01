@@ -4,11 +4,13 @@ declare(strict_types=1);
 /*
     Moduł danych i walidacji usług.
 
-    Odpowiada za listę z filtrami, odczyt pojedynczej usługi, zapis, zmianę
-    aktywności i bezpieczne usuwanie. Nie zawiera HTML ani logiki HTTP.
+    Odpowiada za listę z filtrami i wyszukiwaniem, wariant paginowany, odczyt
+    pojedynczej usługi, zapis, zmianę aktywności i bezpieczne usuwanie.
+    Nie zawiera HTML ani logiki HTTP.
     Walidacja zwraca mapę błędów przypisanych do pól i nie rzuca wyjątków.
 */
 require_once __DIR__ . '/../public/config.php';
+require_once __DIR__ . '/pagination.php';
 
 // Wspólne komunikaty, żeby endpoint i widok nie powielały tych samych tekstów.
 const USLUGA_NAME_TAKEN_ERROR = 'Usługa o tej nazwie już istnieje w tej kategorii.';
@@ -300,17 +302,11 @@ function usluga_errors(
     return $errors;
 }
 
-// Lista usług z nazwą kategorii i licznikami przypisań pracowników.
-function uslugi_list(int $categoryId = 0, string $status = 'all'): ?array
+function usluga_list_conditions(int $categoryId, string $status, string $search): array
 {
-    $pdo = uslugi_db();
-
-    if ($pdo === null) {
-        return null;
-    }
-
     $categoryId = usluga_filter_category_id($categoryId);
     $status = usluga_filter_status($status);
+    $search = pagination_search_value($search);
     $conditions = [];
     $params = [];
 
@@ -325,11 +321,17 @@ function uslugi_list(int $categoryId = 0, string $status = 'all'): ?array
         $conditions[] = 'u.aktywna = FALSE';
     }
 
-    $where = $conditions !== [] ? ' WHERE ' . implode(' AND ', $conditions) : '';
+    if ($search !== '') {
+        $conditions[] = 'u.nazwa LIKE CONCAT(\'%\', :szukaj, \'%\')';
+        $params['szukaj'] = pagination_like_pattern($search);
+    }
 
-    try {
-        $statement = $pdo->prepare(
-            'SELECT
+    return [$conditions, $params];
+}
+
+function usluga_list_select_sql(): string
+{
+    return 'SELECT
                 u.id,
                 u.kategoria_id,
                 u.nazwa,
@@ -343,9 +345,41 @@ function uslugi_list(int $categoryId = 0, string $status = 'all'): ?array
                 (SELECT COUNT(*) FROM uslugi_pracownikow up
                  WHERE up.usluga_id = u.id AND up.aktywne = TRUE) AS pracownicy_active
              FROM uslugi u
-             JOIN kategorie_uslug k ON k.id = u.kategoria_id'
-            . $where
-            . ' ORDER BY u.nazwa ASC'
+             JOIN kategorie_uslug k ON k.id = u.kategoria_id';
+}
+
+function usluga_list_row(array $row): array
+{
+    return [
+        'id' => (int) $row['id'],
+        'kategoria_id' => (int) $row['kategoria_id'],
+        'kategoria_nazwa' => (string) $row['kategoria_nazwa'],
+        'kategoria_aktywna' => (int) $row['kategoria_aktywna'] === 1,
+        'nazwa' => (string) $row['nazwa'],
+        'opis' => $row['opis'] !== null ? (string) $row['opis'] : null,
+        'czas_trwania_minuty' => (int) $row['czas_trwania_minuty'],
+        'cena' => (string) $row['cena'],
+        'aktywna' => (int) $row['aktywna'] === 1,
+        'pracownicy_active' => (int) $row['pracownicy_active'],
+        'przypisania_total' => (int) $row['przypisania_total'],
+    ];
+}
+
+// Lista usług z nazwą kategorii i licznikami przypisań pracowników.
+function uslugi_list(int $categoryId = 0, string $status = 'all'): ?array
+{
+    $pdo = uslugi_db();
+
+    if ($pdo === null) {
+        return null;
+    }
+
+    [$conditions, $params] = usluga_list_conditions($categoryId, $status, '');
+    $where = $conditions !== [] ? ' WHERE ' . implode(' AND ', $conditions) : '';
+
+    try {
+        $statement = $pdo->prepare(
+            usluga_list_select_sql() . $where . ' ORDER BY u.nazwa ASC'
         );
         $statement->execute($params);
         $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
@@ -357,22 +391,75 @@ function uslugi_list(int $categoryId = 0, string $status = 'all'): ?array
     $services = [];
 
     foreach ($rows as $row) {
-        $services[] = [
-            'id' => (int) $row['id'],
-            'kategoria_id' => (int) $row['kategoria_id'],
-            'kategoria_nazwa' => (string) $row['kategoria_nazwa'],
-            'kategoria_aktywna' => (int) $row['kategoria_aktywna'] === 1,
-            'nazwa' => (string) $row['nazwa'],
-            'opis' => $row['opis'] !== null ? (string) $row['opis'] : null,
-            'czas_trwania_minuty' => (int) $row['czas_trwania_minuty'],
-            'cena' => (string) $row['cena'],
-            'aktywna' => (int) $row['aktywna'] === 1,
-            'pracownicy_active' => (int) $row['pracownicy_active'],
-            'przypisania_total' => (int) $row['przypisania_total'],
-        ];
+        $services[] = usluga_list_row($row);
     }
 
     return $services;
+}
+
+/*
+    Wariant paginowany dodajemy obok dotychczasowej listy, ponieważ formularze
+    filtrów nadal pobierają pełną listę usług bez zmiany swoich wywołań.
+*/
+function uslugi_list_paginated(
+    int $categoryId = 0,
+    string $status = 'all',
+    string $search = '',
+    int $page = 1,
+    int $size = 25
+): ?array
+{
+    $pdo = uslugi_db();
+
+    if ($pdo === null) {
+        return null;
+    }
+
+    $page = pagination_page($page);
+    $size = pagination_size($size);
+    [$conditions, $params] = usluga_list_conditions($categoryId, $status, $search);
+    $where = $conditions !== [] ? ' WHERE ' . implode(' AND ', $conditions) : '';
+
+    try {
+        $statement = $pdo->prepare('SELECT COUNT(*) FROM uslugi u' . $where);
+        $statement->execute($params);
+        $total = (int) $statement->fetchColumn();
+    } catch (PDOException $e) {
+        error_log('Nie udało się policzyć usług: ' . $e->getMessage());
+        return null;
+    }
+
+    $pages = pagination_total_pages($total, $size);
+    $page = min($page, $pages);
+    $offset = pagination_offset($page, $size);
+
+    try {
+        $statement = $pdo->prepare(
+            usluga_list_select_sql()
+            . $where
+            . ' ORDER BY u.nazwa ASC, u.id ASC '
+            . pagination_limit_sql($size, $offset)
+        );
+        $statement->execute($params);
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('Nie udało się pobrać listy usług: ' . $e->getMessage());
+        return null;
+    }
+
+    $services = [];
+
+    foreach ($rows as $row) {
+        $services[] = usluga_list_row($row);
+    }
+
+    return [
+        'items' => $services,
+        'total' => $total,
+        'page' => $page,
+        'size' => $size,
+        'pages' => $pages,
+    ];
 }
 
 function usluga_find_by_id(int $id): ?array
