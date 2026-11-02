@@ -38,6 +38,21 @@ if ($search !== '') {
     $paginationParams['szukaj'] = $search;
 }
 
+$exportParams = ['typ' => 'uzytkownicy'];
+
+if ($roleFilter !== '') {
+    $exportParams['rola'] = $roleFilter;
+}
+
+if ($statusFilter !== 'all') {
+    $exportParams['status'] = $statusFilter;
+}
+
+if ($search !== '') {
+    $exportParams['szukaj'] = $search;
+}
+
+$exportUrl = $basePath . '/eksport?' . http_build_query($exportParams);
 $csrfToken = csrf_token();
 $roleLabels = [
     'klient' => 'Klient',
@@ -56,7 +71,10 @@ panel_layout_head($user, 'Użytkownicy — WeFixIT', 'users');
     <?php
     panel_section_header(
         'Użytkownicy',
-        'Zarządzaj rolami i aktywnością kont. Panel nie tworzy ani nie usuwa kont.'
+        'Zarządzaj rolami i aktywnością kont. Panel nie tworzy ani nie usuwa kont.',
+        [
+            ['label' => 'Eksportuj CSV', 'href' => $exportUrl],
+        ]
     );
     ?>
 

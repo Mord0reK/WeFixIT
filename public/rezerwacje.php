@@ -80,6 +80,8 @@ if ($search !== '') {
     $paginationParams['szukaj'] = $search;
 }
 
+$exportParams = ['typ' => 'rezerwacje'] + array_diff_key($paginationParams, ['size' => true]);
+$exportUrl = $basePath . '/eksport?' . http_build_query($exportParams);
 $csrfToken = csrf_token();
 $statusLabels = [
     'oczekujaca' => 'Oczekująca',
@@ -109,7 +111,10 @@ panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
     <?php
     panel_section_header(
         'Rezerwacje',
-        'Przeglądaj rezerwacje i zarządzaj ich statusem. Panel nie tworzy nowych rezerwacji.'
+        'Przeglądaj rezerwacje i zarządzaj ich statusem. Panel nie tworzy nowych rezerwacji.',
+        [
+            ['label' => 'Eksportuj CSV', 'href' => $exportUrl],
+        ]
     );
     ?>
 
