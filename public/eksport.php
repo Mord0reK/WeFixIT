@@ -20,7 +20,7 @@ function csv_export_cell(mixed $value): string
 
     $string = (string) $value;
 
-    if ($string !== '' && in_array($string[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+    if ($string !== '' && in_array($string[0], ['=', '+', '-', '@', "\t", "\r", "\n"], true)) {
         return "'" . $string;
     }
 
@@ -59,6 +59,12 @@ if ($type === 'rezerwacje') {
     ];
     $rows = rezerwacje_list($filters);
     $filename = 'rezerwacje-' . date('Y-m-d') . '.csv';
+
+    /*
+        Rezerwacja jest dokumentem, dlatego eksport celowo zawiera e-mail
+        klienta. Eksport użytkowników zawiera e-mail wyłącznie jako
+        identyfikator konta i nigdy nie zawiera telefonu ani hasła.
+    */
     $headers = [
         'ID',
         'Data rozpoczęcia',
@@ -85,7 +91,8 @@ if ($type === 'rezerwacje') {
 } else {
     $role = uzytkownik_role_filter($_GET['rola'] ?? null);
     $status = uzytkownik_status_filter($_GET['status'] ?? null);
-    $rows = uzytkownicy_list($role, $status);
+    $search = pagination_search_value($_GET['szukaj'] ?? null);
+    $rows = uzytkownicy_list($role, $status, $search);
     $filename = 'uzytkownicy-' . date('Y-m-d') . '.csv';
     $headers = [
         'ID',

@@ -48,6 +48,10 @@ if ($statusFilter !== 'all') {
     $exportParams['status'] = $statusFilter;
 }
 
+if ($search !== '') {
+    $exportParams['szukaj'] = $search;
+}
+
 $exportUrl = $basePath . '/eksport?' . http_build_query($exportParams);
 $csrfToken = csrf_token();
 $roleLabels = [

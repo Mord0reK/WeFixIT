@@ -130,7 +130,7 @@ function uzytkownik_list_select_sql(): string
              LEFT JOIN pracownicy p ON p.uzytkownik_id = u.id';
 }
 
-function uzytkownicy_list(string $role = '', string $status = 'all'): ?array
+function uzytkownicy_list(string $role = '', string $status = 'all', string $search = ''): ?array
 {
     $pdo = uzytkownicy_db();
 
@@ -138,7 +138,7 @@ function uzytkownicy_list(string $role = '', string $status = 'all'): ?array
         return null;
     }
 
-    [$conditions, $params] = uzytkownik_list_conditions($role, $status, '');
+    [$conditions, $params] = uzytkownik_list_conditions($role, $status, $search);
     $where = $conditions !== [] ? ' WHERE ' . implode(' AND ', $conditions) : '';
 
     try {
