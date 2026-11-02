@@ -410,6 +410,9 @@
   .mt-6 {
     margin-top: calc(var(--spacing) * 6);
   }
+  .mt-8 {
+    margin-top: calc(var(--spacing) * 8);
+  }
   .mt-10 {
     margin-top: calc(var(--spacing) * 10);
   }
@@ -458,6 +461,9 @@
   .h-1\.5 {
     height: calc(var(--spacing) * 1.5);
   }
+  .h-3\.5 {
+    height: calc(var(--spacing) * 3.5);
+  }
   .h-4 {
     height: calc(var(--spacing) * 4);
   }
@@ -494,6 +500,9 @@
   .h-full {
     height: 100%;
   }
+  .max-h-48 {
+    max-height: calc(var(--spacing) * 48);
+  }
   .min-h-24 {
     min-height: calc(var(--spacing) * 24);
   }
@@ -502,6 +511,9 @@
   }
   .w-1\.5 {
     width: calc(var(--spacing) * 1.5);
+  }
+  .w-3\.5 {
+    width: calc(var(--spacing) * 3.5);
   }
   .w-4 {
     width: calc(var(--spacing) * 4);
@@ -677,6 +689,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .overflow-auto {
+    overflow: auto;
   }
   .overflow-hidden {
     overflow: hidden;
@@ -857,6 +872,9 @@
   .p-0 {
     padding: 0px;
   }
+  .p-2 {
+    padding: calc(var(--spacing) * 2);
+  }
   .p-2\.5 {
     padding: calc(var(--spacing) * 2.5);
   }
@@ -901,6 +919,9 @@
   }
   .pe-2 {
     padding-inline-end: calc(var(--spacing) * 2);
+  }
+  .pt-8 {
+    padding-top: calc(var(--spacing) * 8);
   }
   .pb-3 {
     padding-bottom: calc(var(--spacing) * 3);
@@ -992,6 +1013,9 @@
   }
   .whitespace-nowrap {
     white-space: nowrap;
+  }
+  .whitespace-pre-wrap {
+    white-space: pre-wrap;
   }
   .text-amber-700 {
     color: var(--color-amber-700);
@@ -1350,6 +1374,9 @@
     .lg\:h-screen {
       height: 100vh;
     }
+    .lg\:w-72 {
+      width: calc(var(--spacing) * 72);
+    }
     .lg\:w-auto {
       width: auto;
     }
@@ -1362,6 +1389,12 @@
     }
     .lg\:grid-cols-\[18rem_1fr\] {
       grid-template-columns: 18rem 1fr;
+    }
+    .lg\:grid-cols-\[minmax\(0\,1fr\)_minmax\(0\,1fr\)_auto\] {
+      grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto;
+    }
+    .lg\:items-end {
+      align-items: flex-end;
     }
     .lg\:p-8 {
       padding: calc(var(--spacing) * 8);
@@ -1650,6 +1683,9 @@
       }
       .dark\:hover\:text-zinc-200:hover {
         color: var(--color-zinc-200);
+      }
+      .dark\:hover\:text-zinc-300:hover {
+        color: var(--color-zinc-300);
       }
     }
     .dark\:focus-visible\:border-zinc-600:focus-visible {

@@ -120,7 +120,7 @@ panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
 
     <form id="reservations-filter-form" method="get"
         action="<?= htmlspecialchars($reservationsUrl, ENT_QUOTES, 'UTF-8') ?>"
-        class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2 xl:grid-cols-3">
+        class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <input type="hidden" name="kierunek" value="<?= htmlspecialchars($sortDirection, ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="size" value="<?= $size ?>">
 

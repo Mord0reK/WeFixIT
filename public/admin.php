@@ -21,12 +21,12 @@ $usersUrl = $basePath . '/uzytkownicy';
 $reservationsUrl = $basePath . '/rezerwacje';
 $logUrl = $basePath . '/log';
 
-panel_layout_head($user, 'Dashboard — WeFixIT', 'home');
+panel_layout_head($user, 'Strona główna — WeFixIT', 'home');
 ?>
 <section class="<?= PANEL_CARD_WIDE_CLASS ?>">
     <?php
     panel_section_header(
-        'Dashboard',
+        'Strona główna',
         'Przegląd najważniejszych danych serwisu.',
         [
             ['label' => 'Kategorie', 'href' => $categoriesUrl],

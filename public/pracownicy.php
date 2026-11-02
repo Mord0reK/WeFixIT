@@ -49,7 +49,7 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
 
     <form id="employees-filter-form" method="get"
         action="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
-        class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2">
+        class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <input type="hidden" name="size" value="<?= $size ?>">
 
         <div>
@@ -165,14 +165,21 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                                         data-employee-toggle
                                         data-id="<?= $employee['id'] ?>"
                                         data-name="<?= htmlspecialchars($employee['imie'] . ' ' . $employee['nazwisko'], ENT_QUOTES, 'UTF-8') ?>"
-                                        data-active="<?= $employee['aktywny'] ? '1' : '0' ?>">
-                                        <?= $employee['aktywny'] ? 'Dezaktywuj' : 'Aktywuj' ?>
+                                        data-active="<?= $employee['aktywny'] ? '1' : '0' ?>"
+                                        title="<?= $employee['aktywny'] ? 'Dezaktywuj' : 'Aktywuj' ?>"
+                                        aria-label="<?= $employee['aktywny'] ? 'Dezaktywuj' : 'Aktywuj' ?>">
+                                        <?php if ($employee['aktywny']): ?>
+                                            <?= panel_icon('circle-slash', 'h-4 w-4 shrink-0') ?>
+                                        <?php else: ?>
+                                            <?= panel_icon('circle-check', 'h-4 w-4 shrink-0') ?>
+                                        <?php endif; ?>
                                     </button>
                                     <button type="button" class="<?= panel_button_classes('danger') ?>"
                                         data-employee-delete
                                         data-id="<?= $employee['id'] ?>"
-                                        data-name="<?= htmlspecialchars($employee['imie'] . ' ' . $employee['nazwisko'], ENT_QUOTES, 'UTF-8') ?>">
-                                        Usuń
+                                        data-name="<?= htmlspecialchars($employee['imie'] . ' ' . $employee['nazwisko'], ENT_QUOTES, 'UTF-8') ?>"
+                                        title="Usuń" aria-label="Usuń">
+                                        <?= panel_icon('trash', 'h-4 w-4 shrink-0') ?>
                                     </button>
                                 </div>
                             </td>
@@ -204,7 +211,7 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
 <?php endif; ?>
 
 <?php if ($hasEmployees || $hasAvailableAccounts): ?>
-    <section id="employee-form-card" class="<?= PANEL_CARD_WIDE_CLASS ?> mt-6 <?= $hasAvailableAccounts ? '' : 'hidden' ?>">
+    <section id="employee-form-card" class="<?= PANEL_CARD_WIDE_CLASS ?> mt-8 border-t border-zinc-200 pt-8 dark:border-zinc-800 <?= $hasAvailableAccounts ? '' : 'hidden' ?>">
         <h2 id="employee-form-title" class="text-lg font-semibold tracking-tight">Dodaj pracownika</h2>
         <p id="employee-form-hint" class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
             Profil zostanie powiązany z istniejącym kontem o roli pracownik.

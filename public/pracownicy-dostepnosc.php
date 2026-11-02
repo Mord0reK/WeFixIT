@@ -159,8 +159,12 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
                                                 class="<?= panel_button_classes('ghost') ?>"
                                                 data-schedule-toggle
                                                 data-id="<?= $entry['id'] ?>"
-                                                data-active="<?= $entry['aktywne'] ? '1' : '0' ?>">
-                                                <?= $entry['aktywne'] ? 'Dezaktywuj' : 'Aktywuj' ?>
+                                                data-active="<?= $entry['aktywne'] ? '1' : '0' ?>"
+                                                title="<?= $entry['aktywne'] ? 'Dezaktywuj' : 'Aktywuj' ?>"
+                                                aria-label="<?= $entry['aktywne'] ? 'Dezaktywuj' : 'Aktywuj' ?>">
+                                                <?= $entry['aktywne']
+                                                    ? 'Dezaktywuj'
+                                                    : panel_icon('circle-check', 'h-4 w-4 shrink-0') ?>
                                             </button>
                                             <button type="button"
                                                 class="<?= panel_button_classes('danger') ?>"
