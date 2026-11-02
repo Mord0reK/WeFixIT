@@ -306,9 +306,6 @@
   .pointer-events-none {
     pointer-events: none;
   }
-  .collapse {
-    visibility: collapse;
-  }
   .sr-only {
     position: absolute;
     width: 1px;
@@ -332,17 +329,11 @@
   .static {
     position: static;
   }
-  .sticky {
-    position: sticky;
-  }
   .inset-0 {
     inset: 0px;
   }
   .inset-y-0 {
     inset-block: 0px;
-  }
-  .top-0 {
-    top: 0px;
   }
   .right-4 {
     right: calc(var(--spacing) * 4);
@@ -352,9 +343,6 @@
   }
   .left-0 {
     left: 0px;
-  }
-  .z-20 {
-    z-index: 20;
   }
   .z-30 {
     z-index: 30;
@@ -431,9 +419,6 @@
   .mb-6 {
     margin-bottom: calc(var(--spacing) * 6);
   }
-  .ml-auto {
-    margin-left: auto;
-  }
   .block {
     display: block;
   }
@@ -473,9 +458,6 @@
   .h-6 {
     height: calc(var(--spacing) * 6);
   }
-  .h-8 {
-    height: calc(var(--spacing) * 8);
-  }
   .h-9 {
     height: calc(var(--spacing) * 9);
   }
@@ -500,9 +482,6 @@
   .h-full {
     height: 100%;
   }
-  .max-h-48 {
-    max-height: calc(var(--spacing) * 48);
-  }
   .min-h-24 {
     min-height: calc(var(--spacing) * 24);
   }
@@ -523,9 +502,6 @@
   }
   .w-6 {
     width: calc(var(--spacing) * 6);
-  }
-  .w-8 {
-    width: calc(var(--spacing) * 8);
   }
   .w-9 {
     width: calc(var(--spacing) * 9);
@@ -553,9 +529,6 @@
   }
   .max-w-2xl {
     max-width: var(--container-2xl);
-  }
-  .max-w-6xl {
-    max-width: var(--container-6xl);
   }
   .max-w-\[calc\(100vw-2rem\)\] {
     max-width: calc(100vw - 2rem);
@@ -690,9 +663,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .overflow-auto {
-    overflow: auto;
-  }
   .overflow-hidden {
     overflow: hidden;
   }
@@ -818,12 +788,6 @@
   .bg-white {
     background-color: var(--color-white);
   }
-  .bg-white\/80 {
-    background-color: color-mix(in srgb, #fff 80%, transparent);
-    @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in oklab, var(--color-white) 80%, transparent);
-    }
-  }
   .bg-white\/95 {
     background-color: color-mix(in srgb, #fff 95%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
@@ -871,9 +835,6 @@
   }
   .p-0 {
     padding: 0px;
-  }
-  .p-2 {
-    padding: calc(var(--spacing) * 2);
   }
   .p-2\.5 {
     padding: calc(var(--spacing) * 2.5);
@@ -1014,9 +975,6 @@
   .whitespace-nowrap {
     white-space: nowrap;
   }
-  .whitespace-pre-wrap {
-    white-space: pre-wrap;
-  }
   .text-amber-700 {
     color: var(--color-amber-700);
   }
@@ -1061,9 +1019,6 @@
   }
   .text-zinc-200 {
     color: var(--color-zinc-200);
-  }
-  .text-zinc-300 {
-    color: var(--color-zinc-300);
   }
   .text-zinc-400 {
     color: var(--color-zinc-400);
@@ -1146,11 +1101,6 @@
   }
   .transition {
     transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
-    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
-    transition-duration: var(--tw-duration, var(--default-transition-duration));
-  }
-  .transition-\[width\,transform\,box-shadow\] {
-    transition-property: width,transform,box-shadow;
     transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
     transition-duration: var(--tw-duration, var(--default-transition-duration));
   }
@@ -1298,20 +1248,7 @@
   .disabled\:opacity-60:disabled {
     opacity: 60%;
   }
-  @supports (backdrop-filter: var(--tw)) {
-    .supports-\[backdrop-filter\]\:bg-white\/60 {
-      background-color: color-mix(in srgb, #fff 60%, transparent);
-    }
-    @supports (color: color-mix(in lab, red, red)) {
-      .supports-\[backdrop-filter\]\:bg-white\/60 {
-        background-color: color-mix(in oklab, var(--color-white) 60%, transparent);
-      }
-    }
-  }
   @media (width >= 40rem) {
-    .sm\:inline {
-      display: inline;
-    }
     .sm\:w-48 {
       width: calc(var(--spacing) * 48);
     }
@@ -1368,89 +1305,18 @@
     .lg\:hidden {
       display: none;
     }
-    .lg\:inline-flex {
-      display: inline-flex;
-    }
     .lg\:h-screen {
       height: 100vh;
-    }
-    .lg\:w-72 {
-      width: calc(var(--spacing) * 72);
-    }
-    .lg\:w-auto {
-      width: auto;
     }
     .lg\:translate-x-0 {
       --tw-translate-x: 0px;
       translate: var(--tw-translate-x) var(--tw-translate-y);
     }
-    .lg\:grid-cols-\[6rem_1fr\] {
-      grid-template-columns: 6rem 1fr;
-    }
     .lg\:grid-cols-\[18rem_1fr\] {
       grid-template-columns: 18rem 1fr;
     }
-    .lg\:grid-cols-\[minmax\(0\,1fr\)_minmax\(0\,1fr\)_auto\] {
-      grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto;
-    }
-    .lg\:items-end {
-      align-items: flex-end;
-    }
     .lg\:p-8 {
       padding: calc(var(--spacing) * 8);
-    }
-    .lg\:px-8 {
-      padding-inline: calc(var(--spacing) * 8);
-    }
-    .lg\:transition-\[grid-template-columns\] {
-      transition-property: grid-template-columns;
-      transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
-      transition-duration: var(--tw-duration, var(--default-transition-duration));
-    }
-    .lg\:duration-200 {
-      --tw-duration: 200ms;
-      transition-duration: 200ms;
-    }
-    .lg\:ease-out {
-      --tw-ease: var(--ease-out);
-      transition-timing-function: var(--ease-out);
-    }
-    .lg\:group-data-\[state\=collapsed\]\:hidden:is(:where(.group)[data-state="collapsed"] *) {
-      display: none;
-    }
-    .lg\:group-data-\[state\=collapsed\]\:w-full:is(:where(.group)[data-state="collapsed"] *) {
-      width: 100%;
-    }
-    .lg\:group-data-\[state\=collapsed\]\:flex-col:is(:where(.group)[data-state="collapsed"] *) {
-      flex-direction: column;
-    }
-    .lg\:group-data-\[state\=collapsed\]\:justify-center:is(:where(.group)[data-state="collapsed"] *) {
-      justify-content: center;
-    }
-    .lg\:group-data-\[state\=collapsed\]\:gap-2:is(:where(.group)[data-state="collapsed"] *) {
-      gap: calc(var(--spacing) * 2);
-    }
-    .lg\:group-data-\[state\=collapsed\]\:border-transparent:is(:where(.group)[data-state="collapsed"] *) {
-      border-color: transparent;
-    }
-    .lg\:group-data-\[state\=collapsed\]\:bg-transparent:is(:where(.group)[data-state="collapsed"] *) {
-      background-color: transparent;
-    }
-    .lg\:group-data-\[state\=collapsed\]\:p-0:is(:where(.group)[data-state="collapsed"] *) {
-      padding: 0px;
-    }
-    .lg\:group-data-\[state\=collapsed\]\:px-2:is(:where(.group)[data-state="collapsed"] *) {
-      padding-inline: calc(var(--spacing) * 2);
-    }
-    .lg\:data-\[state\=hover\]\:z-50[data-state="hover"] {
-      z-index: 50;
-    }
-    .lg\:data-\[state\=hover\]\:w-72[data-state="hover"] {
-      width: calc(var(--spacing) * 72);
-    }
-    .lg\:data-\[state\=hover\]\:shadow-xl[data-state="hover"] {
-      --tw-shadow: 0 20px 25px -5px var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 8px 10px -6px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
-      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
   }
   @media (width >= 80rem) {
@@ -1576,14 +1442,6 @@
         background-color: color-mix(in oklab, var(--color-zinc-950) 50%, transparent);
       }
     }
-    .dark\:bg-zinc-950\/80 {
-      background-color: color-mix(in srgb, oklch(14.1% 0.005 285.823) 80%, transparent);
-    }
-    @supports (color: color-mix(in lab, red, red)) {
-      .dark\:bg-zinc-950\/80 {
-        background-color: color-mix(in oklab, var(--color-zinc-950) 80%, transparent);
-      }
-    }
     .dark\:text-amber-200 {
       color: var(--color-amber-200);
     }
@@ -1622,9 +1480,6 @@
     }
     .dark\:text-zinc-500 {
       color: var(--color-zinc-500);
-    }
-    .dark\:text-zinc-700 {
-      color: var(--color-zinc-700);
     }
     .dark\:text-zinc-900 {
       color: var(--color-zinc-900);
@@ -1696,16 +1551,6 @@
     }
     .dark\:focus-visible\:ring-offset-zinc-900:focus-visible {
       --tw-ring-offset-color: var(--color-zinc-900);
-    }
-    @supports (backdrop-filter: var(--tw)) {
-      .dark\:supports-\[backdrop-filter\]\:bg-zinc-950\/60 {
-        background-color: color-mix(in srgb, oklch(14.1% 0.005 285.823) 60%, transparent);
-      }
-      @supports (color: color-mix(in lab, red, red)) {
-        .dark\:supports-\[backdrop-filter\]\:bg-zinc-950\/60 {
-          background-color: color-mix(in oklab, var(--color-zinc-950) 60%, transparent);
-        }
-      }
     }
   }
 }
