@@ -306,3 +306,31 @@ test('138. odpowiedzi nie ujawniają SQL ani ścieżek, a log nie ma błędów P
     assert_true(is_string($logFile) && $logFile !== '', 'Brak ścieżki logu serwera testowego');
     assert_same([], server_log_errors($logFile), 'Log serwera nie powinien zawierać błędów PHP');
 });
+
+test('139. eksport użytkowników respektuje frazę wyszukiwania', function (): void {
+    $session = log_export_admin_session();
+    $page = http_request($session['cookies'], 'GET', '/uzytkownicy.php?szukaj=Kowalski');
+
+    assert_status(200, $page, 'Lista użytkowników z frazą powinna dać 200');
+    assert_true(strpos($page['body'], 'eksport?typ=uzytkownicy') !== false, 'Nagłówek powinien zawierać link eksportu');
+    assert_true(strpos($page['body'], 'szukaj=Kowalski') !== false, 'Link eksportu powinien zachować frazę');
+
+    $response = http_request($session['cookies'], 'GET', '/eksport.php?typ=uzytkownicy&szukaj=Kowalski');
+    assert_status(200, $response, 'Eksport z frazą powinien dać 200');
+    $rows = log_export_csv_rows($response['body']);
+    assert_same(2, count($rows), 'Eksport powinien zawierać nagłówek i jednego pasującego użytkownika');
+    assert_same('jan.kowalski@example.com', $rows[1][3] ?? null, 'Eksport powinien zawierać tylko pasujące konto');
+});
+
+test('140. eksport neutralizuje komentarz rozpoczynający się od LF', function (): void {
+    log_export_reset_reservations();
+    log_export_set_reservation(4, 'oczekujaca', null, "\n=SUM(1,1)");
+    $session = log_export_admin_session();
+    $response = http_request($session['cookies'], 'GET', '/eksport.php?typ=rezerwacje&uzytkownik_id=4');
+
+    assert_status(200, $response, 'Eksport z komentarzem LF powinien dać 200');
+    assert_true(
+        strpos($response['body'], "'\n=SUM(1,1)") !== false,
+        'Komentarz zaczynający się od LF powinien być poprzedzony apostrofem'
+    );
+});
