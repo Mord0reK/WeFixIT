@@ -85,6 +85,7 @@ const PANEL_TABLE_CLASS = 'w-full min-w-[40rem] border-collapse text-left text-s
 const PANEL_TH_CLASS = 'whitespace-nowrap border-b border-zinc-200 px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:text-zinc-400';
 const PANEL_TD_CLASS = 'border-b border-zinc-100 px-4 py-3 align-middle text-zinc-700 last:border-b-0 dark:border-zinc-800 dark:text-zinc-300';
 const PANEL_TR_CLASS = 'transition-colors hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40';
+const PANEL_TABLE_FILTER_SELECT_CLASS = 'mt-1.5 block h-8 w-full min-w-[8rem] rounded-md border border-zinc-200 bg-white px-2 text-xs font-normal normal-case tracking-normal text-zinc-700 shadow-xs focus-visible:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:focus-visible:border-zinc-600 dark:focus-visible:ring-zinc-800';
 
 // Pusty stan listy z ikoną, tytułem, opisem i opcjonalnym linkiem akcji.
 function panel_empty_state(string $title, string $description, array $action = []): void

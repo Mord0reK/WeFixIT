@@ -211,6 +211,7 @@ function panel_layout_head(array $user, string $title, string $active): void
     $menu = panel_menu_items((string) $user['rola']);
 
     $homeItem = null;
+    $profileItem = null;
     $menuGroups = [];
 
     foreach ($menu as $item) {
@@ -220,8 +221,18 @@ function panel_layout_head(array $user, string $title, string $active): void
             continue;
         }
 
+        if ($item['key'] === 'profil') {
+            $profileItem = $item;
+        }
+
         $menuGroups[$item['group']][] = $item;
     }
+
+    // Karta użytkownika na dole sidebaru prowadzi do sekcji profilu.
+    $profileHref = $profileItem !== null
+        ? htmlspecialchars($profileItem['href'], ENT_QUOTES, 'UTF-8')
+        : htmlspecialchars($basePath . '/profil', ENT_QUOTES, 'UTF-8');
+    $profileIsActive = $active === 'profil';
 
     $roleKey = htmlspecialchars((string) $user['rola'], ENT_QUOTES, 'UTF-8');
 
@@ -276,15 +287,19 @@ function panel_layout_head(array $user, string $title, string $active): void
             </nav>
 
             <div class="border-t border-zinc-200 p-3 dark:border-zinc-800">
-                <div class="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-2.5 dark:border-zinc-800 dark:bg-zinc-900/60">
-                    <span title="<?= $fullName ?>"
-                        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-                        <?= $initials ?>
-                    </span>
-                    <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm font-medium"><?= $fullName ?></p>
-                        <p class="truncate text-xs text-zinc-500 dark:text-zinc-400"><?= $email ?></p>
-                    </div>
+                <div class="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-1.5 dark:border-zinc-800 dark:bg-zinc-900/60">
+                    <a href="<?= $profileHref ?>" title="Przejdź do Mojego profilu"
+                        class="group/profile flex min-w-0 flex-1 items-center gap-3 rounded-md px-1.5 py-1 transition-colors hover:bg-zinc-200/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 dark:hover:bg-zinc-800 dark:focus-visible:ring-zinc-700"
+                        <?= $profileIsActive ? 'aria-current="page"' : '' ?>>
+                        <span title="<?= $fullName ?>"
+                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                            <?= $initials ?>
+                        </span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block truncate text-sm font-medium"><?= $fullName ?></span>
+                            <span class="block truncate text-xs text-zinc-500 dark:text-zinc-400"><?= $email ?></span>
+                        </span>
+                    </a>
                     <form id="logout-form" action="<?= $logoutUrl ?>" method="post" class="shrink-0">
                         <button type="submit" title="Wyloguj" aria-label="Wyloguj"
                             class="inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-wait disabled:opacity-60 dark:text-zinc-400 dark:hover:bg-red-950/30 dark:hover:text-red-400">
@@ -406,6 +421,15 @@ function panel_layout_foot(): void
                         window.localStorage.setItem(groupStorageKey, JSON.stringify(storedGroups));
                     } catch {
                         // Brak dostępu do localStorage nie może blokować nawigacji.
+                    }
+                });
+            }
+
+            // Filtry w nagłówkach tabel wysyłają formularz od razu po zmianie wyboru.
+            for (const filter of document.querySelectorAll('[data-filter-auto-submit]')) {
+                filter.addEventListener('change', function () {
+                    if (filter.form) {
+                        filter.form.requestSubmit();
                     }
                 });
             }

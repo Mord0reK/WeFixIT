@@ -95,6 +95,25 @@ test('Dodatkowo: administrator widzi w menu oba panele i profil', function (): v
     }
 });
 
+test('Dodatkowo: karta użytkownika w sidebarze prowadzi do profilu', function (): void {
+    $session = login_as('jan.kowalski@example.com');
+    assert_status(200, $session['response'], 'Logowanie klienta powinno się udać');
+
+    $panel = http_request($session['cookies'], 'GET', '/panel.php');
+    assert_status(200, $panel, 'Klient powinien zobaczyć panel');
+    assert_true(
+        preg_match('/<a href="\/profil"[^>]*title="Przejdź do Mojego profilu"/s', $panel['body']) === 1,
+        'Karta użytkownika w sidebarze powinna linkować do /profil'
+    );
+
+    $profile = http_request($session['cookies'], 'GET', '/profil.php');
+    assert_status(200, $profile, 'Klient powinien zobaczyć profil');
+    assert_true(
+        preg_match('/<a href="\/profil"[^>]*title="Przejdź do Mojego profilu"[^>]*aria-current="page"/s', $profile['body']) === 1,
+        'Na profilu karta użytkownika powinna być oznaczona jako aktywna'
+    );
+});
+
 test('Dodatkowo: administrator widzi właściwą aktywną pozycję menu na podglądach', function (): void {
     $session = login_as('admin@wefixit.pl');
     assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');

@@ -118,128 +118,118 @@ panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
     );
     ?>
 
-    <form id="reservations-filter-form" method="get"
-        action="<?= htmlspecialchars($reservationsUrl, ENT_QUOTES, 'UTF-8') ?>"
-        class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <input type="hidden" name="kierunek" value="<?= htmlspecialchars($sortDirection, ENT_QUOTES, 'UTF-8') ?>">
-        <input type="hidden" name="size" value="<?= $size ?>">
-
-        <div>
-            <label for="reservations-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
-            <input id="reservations-filter-search" name="szukaj" type="search" maxlength="100"
-                value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
-                placeholder="Nazwisko klienta lub pracownika" class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div>
-            <label for="reservations-filter-from" class="<?= LAYOUT_LABEL_CLASS ?>">Data od</label>
-            <input id="reservations-filter-from" name="data_od" type="date"
-                value="<?= $dateFrom !== null ? htmlspecialchars($dateFrom, ENT_QUOTES, 'UTF-8') : '' ?>"
-                class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div>
-            <label for="reservations-filter-to" class="<?= LAYOUT_LABEL_CLASS ?>">Data do</label>
-            <input id="reservations-filter-to" name="data_do" type="date"
-                value="<?= $dateTo !== null ? htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8') : '' ?>"
-                class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div>
-            <label for="reservations-filter-status" class="<?= LAYOUT_LABEL_CLASS ?>">Status</label>
-            <select id="reservations-filter-status" name="status" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="" <?= $statusFilter === '' ? 'selected' : '' ?>>Wszystkie statusy</option>
-                <?php foreach (REZERWACJA_STATUSES as $statusOption): ?>
-                    <option value="<?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?>"
-                        <?= $statusFilter === $statusOption ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($statusLabels[$statusOption] ?? $statusOption, ENT_QUOTES, 'UTF-8') ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div>
-            <label for="reservations-filter-employee" class="<?= LAYOUT_LABEL_CLASS ?>">Pracownik</label>
-            <select id="reservations-filter-employee" name="pracownik_id" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="0" <?= $employeeFilter === 0 ? 'selected' : '' ?>>Wszyscy pracownicy</option>
-                <?php foreach ($employees ?? [] as $employee): ?>
-                    <option value="<?= $employee['id'] ?>" <?= $employeeFilter === $employee['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($employee['imie'] . ' ' . $employee['nazwisko'], ENT_QUOTES, 'UTF-8') ?>
-                        <?= $employee['aktywny'] ? '' : '(nieaktywny)' ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div>
-            <label for="reservations-filter-service" class="<?= LAYOUT_LABEL_CLASS ?>">Usługa</label>
-            <select id="reservations-filter-service" name="usluga_id" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="0" <?= $serviceFilter === 0 ? 'selected' : '' ?>>Wszystkie usługi</option>
-                <?php foreach ($services ?? [] as $service): ?>
-                    <option value="<?= $service['id'] ?>" <?= $serviceFilter === $service['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($service['nazwa'], ENT_QUOTES, 'UTF-8') ?>
-                        <?= $service['aktywna'] ? '' : '(nieaktywna)' ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div>
-            <label for="reservations-filter-client" class="<?= LAYOUT_LABEL_CLASS ?>">Klient</label>
-            <select id="reservations-filter-client" name="uzytkownik_id" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="0" <?= $clientFilter === 0 ? 'selected' : '' ?>>Wszyscy klienci</option>
-                <?php foreach ($clients ?? [] as $client): ?>
-                    <option value="<?= $client['id'] ?>" <?= $clientFilter === $client['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($client['imie'] . ' ' . $client['nazwisko'], ENT_QUOTES, 'UTF-8') ?>
-                        <?= $client['aktywny'] ? '' : '(nieaktywny)' ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2 sm:items-end">
-            <button type="submit" class="<?= panel_button_classes('secondary') ?>">Filtruj</button>
-            <?php if ($filtersActive): ?>
-                <a href="<?= htmlspecialchars($reservationsUrl, ENT_QUOTES, 'UTF-8') ?>"
-                    class="<?= panel_button_classes('ghost') ?>">Wyczyść filtry</a>
-            <?php endif; ?>
-        </div>
-    </form>
-
     <?php if ($reservations === null): ?>
         <div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
             Nie udało się pobrać listy rezerwacji. Spróbuj ponownie później.
         </div>
-    <?php elseif ($reservations === []): ?>
-        <?php
-        if ($filtersActive) {
-            panel_empty_state(
-                'Brak rezerwacji dla wybranych filtrów',
-                'Zmień zakres dat, filtry lub frazę wyszukiwania, aby zobaczyć inne rezerwacje.',
-                ['label' => 'Wyczyść filtry', 'href' => $reservationsUrl]
-            );
-        } else {
-            panel_empty_state(
-                'Brak rezerwacji',
-                'Rezerwacje pojawią się tutaj, gdy klienci zaczną składać zamówienia.'
-            );
-        }
-        ?>
     <?php else: ?>
+        <form id="reservations-filter-form" method="get"
+            action="<?= htmlspecialchars($reservationsUrl, ENT_QUOTES, 'UTF-8') ?>"
+            class="hidden">
+            <input type="hidden" name="kierunek" value="<?= htmlspecialchars($sortDirection, ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="size" value="<?= $size ?>">
+            <?php if ($search !== ''): ?>
+                <input type="hidden" name="szukaj" value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>">
+            <?php endif; ?>
+        </form>
+
         <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">
             <table id="reservations-table" class="<?= PANEL_TABLE_CLASS ?>">
                 <thead>
                     <tr>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Termin</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Klient</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Pracownik</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Usługa</th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Termin
+                            <input form="reservations-filter-form" name="data_od" type="date"
+                                value="<?= $dateFrom !== null ? htmlspecialchars($dateFrom, ENT_QUOTES, 'UTF-8') : '' ?>"
+                                aria-label="Filtruj rezerwacje od daty"
+                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
+                                data-filter-auto-submit>
+                            <input form="reservations-filter-form" name="data_do" type="date"
+                                value="<?= $dateTo !== null ? htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8') : '' ?>"
+                                aria-label="Filtruj rezerwacje do daty"
+                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
+                                data-filter-auto-submit>
+                        </th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Klient
+                            <select form="reservations-filter-form" name="uzytkownik_id"
+                                aria-label="Filtruj rezerwacje według klienta"
+                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
+                                data-filter-auto-submit>
+                                <option value="0" <?= $clientFilter === 0 ? 'selected' : '' ?>>Wszyscy</option>
+                                <?php foreach ($clients ?? [] as $client): ?>
+                                    <option value="<?= $client['id'] ?>" <?= $clientFilter === $client['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($client['imie'] . ' ' . $client['nazwisko'], ENT_QUOTES, 'UTF-8') ?>
+                                        <?= $client['aktywny'] ? '' : '(nieaktywny)' ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Pracownik
+                            <select form="reservations-filter-form" name="pracownik_id"
+                                aria-label="Filtruj rezerwacje według pracownika"
+                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
+                                data-filter-auto-submit>
+                                <option value="0" <?= $employeeFilter === 0 ? 'selected' : '' ?>>Wszyscy</option>
+                                <?php foreach ($employees ?? [] as $employee): ?>
+                                    <option value="<?= $employee['id'] ?>" <?= $employeeFilter === $employee['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($employee['imie'] . ' ' . $employee['nazwisko'], ENT_QUOTES, 'UTF-8') ?>
+                                        <?= $employee['aktywny'] ? '' : '(nieaktywny)' ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Usługa
+                            <select form="reservations-filter-form" name="usluga_id"
+                                aria-label="Filtruj rezerwacje według usługi"
+                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
+                                data-filter-auto-submit>
+                                <option value="0" <?= $serviceFilter === 0 ? 'selected' : '' ?>>Wszystkie</option>
+                                <?php foreach ($services ?? [] as $service): ?>
+                                    <option value="<?= $service['id'] ?>" <?= $serviceFilter === $service['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($service['nazwa'], ENT_QUOTES, 'UTF-8') ?>
+                                        <?= $service['aktywna'] ? '' : '(nieaktywna)' ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Cena</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status</th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status
+                            <select form="reservations-filter-form" name="status"
+                                aria-label="Filtruj rezerwacje według statusu"
+                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
+                                data-filter-auto-submit>
+                                <option value="" <?= $statusFilter === '' ? 'selected' : '' ?>>Wszystkie</option>
+                                <?php foreach (REZERWACJA_STATUSES as $statusOption): ?>
+                                    <option value="<?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?>"
+                                        <?= $statusFilter === $statusOption ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($statusLabels[$statusOption] ?? $statusOption, ENT_QUOTES, 'UTF-8') ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?> text-right">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
+                    <?php if ($reservations === []): ?>
+                        <tr>
+                            <td colspan="7" class="p-4">
+                                <?php
+                                if ($filtersActive) {
+                                    panel_empty_state(
+                                        'Brak rezerwacji dla wybranych filtrów',
+                                        'Zmień zakres dat, filtry lub frazę wyszukiwania, aby zobaczyć inne rezerwacje.',
+                                        ['label' => 'Wyczyść filtry', 'href' => $reservationsUrl]
+                                    );
+                                } else {
+                                    panel_empty_state(
+                                        'Brak rezerwacji',
+                                        'Rezerwacje pojawią się tutaj, gdy klienci zaczną składać zamówienia.'
+                                    );
+                                }
+                                ?>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                     <?php foreach ($reservations as $reservation): ?>
                         <?php
                         $reservationId = (int) $reservation['id'];

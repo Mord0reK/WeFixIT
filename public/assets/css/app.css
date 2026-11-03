@@ -123,6 +123,7 @@
     --font-weight-bold: 700;
     --tracking-tighter: -0.05em;
     --tracking-tight: -0.025em;
+    --tracking-normal: 0em;
     --tracking-wide: 0.025em;
     --tracking-wider: 0.05em;
     --tracking-widest: 0.1em;
@@ -458,6 +459,9 @@
   .h-6 {
     height: calc(var(--spacing) * 6);
   }
+  .h-8 {
+    height: calc(var(--spacing) * 8);
+  }
   .h-9 {
     height: calc(var(--spacing) * 9);
   }
@@ -541,6 +545,9 @@
   }
   .min-w-0 {
     min-width: 0px;
+  }
+  .min-w-\[8rem\] {
+    min-width: 8rem;
   }
   .min-w-\[40rem\] {
     min-width: 40rem;
@@ -809,6 +816,12 @@
       background-color: color-mix(in oklab, var(--color-zinc-50) 60%, transparent);
     }
   }
+  .bg-zinc-50\/70 {
+    background-color: color-mix(in srgb, oklch(98.5% 0 none) 70%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-zinc-50) 70%, transparent);
+    }
+  }
   .bg-zinc-100 {
     background-color: var(--color-zinc-100);
   }
@@ -836,6 +849,9 @@
   .p-0 {
     padding: 0px;
   }
+  .p-1\.5 {
+    padding: calc(var(--spacing) * 1.5);
+  }
   .p-2\.5 {
     padding: calc(var(--spacing) * 2.5);
   }
@@ -853,6 +869,9 @@
   }
   .p-8 {
     padding: calc(var(--spacing) * 8);
+  }
+  .px-1\.5 {
+    padding-inline: calc(var(--spacing) * 1.5);
   }
   .px-2 {
     padding-inline: calc(var(--spacing) * 2);
@@ -947,9 +966,17 @@
     --tw-font-weight: var(--font-weight-medium);
     font-weight: var(--font-weight-medium);
   }
+  .font-normal {
+    --tw-font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-normal);
+  }
   .font-semibold {
     --tw-font-weight: var(--font-weight-semibold);
     font-weight: var(--font-weight-semibold);
+  }
+  .tracking-normal {
+    --tw-tracking: var(--tracking-normal);
+    letter-spacing: var(--tracking-normal);
   }
   .tracking-tight {
     --tw-tracking: var(--tracking-tight);
@@ -1040,6 +1067,9 @@
   }
   .text-zinc-950 {
     color: var(--color-zinc-950);
+  }
+  .normal-case {
+    text-transform: none;
   }
   .uppercase {
     text-transform: uppercase;
@@ -1191,6 +1221,14 @@
     @supports (color: color-mix(in lab, red, red)) {
       .hover\:bg-zinc-100\/70:hover {
         background-color: color-mix(in oklab, var(--color-zinc-100) 70%, transparent);
+      }
+    }
+    .hover\:bg-zinc-200\/60:hover {
+      background-color: color-mix(in srgb, oklch(92% 0.004 286.32) 60%, transparent);
+    }
+    @supports (color: color-mix(in lab, red, red)) {
+      .hover\:bg-zinc-200\/60:hover {
+        background-color: color-mix(in oklab, var(--color-zinc-200) 60%, transparent);
       }
     }
     .hover\:bg-zinc-800:hover {
@@ -1434,6 +1472,14 @@
         background-color: color-mix(in oklab, var(--color-zinc-950) 30%, transparent);
       }
     }
+    .dark\:bg-zinc-950\/40 {
+      background-color: color-mix(in srgb, oklch(14.1% 0.005 285.823) 40%, transparent);
+    }
+    @supports (color: color-mix(in lab, red, red)) {
+      .dark\:bg-zinc-950\/40 {
+        background-color: color-mix(in oklab, var(--color-zinc-950) 40%, transparent);
+      }
+    }
     .dark\:bg-zinc-950\/50 {
       background-color: color-mix(in srgb, oklch(14.1% 0.005 285.823) 50%, transparent);
     }
@@ -1545,6 +1591,9 @@
     }
     .dark\:focus-visible\:border-zinc-600:focus-visible {
       border-color: var(--color-zinc-600);
+    }
+    .dark\:focus-visible\:ring-zinc-700:focus-visible {
+      --tw-ring-color: var(--color-zinc-700);
     }
     .dark\:focus-visible\:ring-zinc-800:focus-visible {
       --tw-ring-color: var(--color-zinc-800);

@@ -53,84 +53,77 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
     );
     ?>
 
-    <form id="services-filter-form" method="get"
-        action="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>"
-        class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <input type="hidden" name="size" value="<?= $size ?>">
-
-        <div>
-            <label for="services-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
-            <input id="services-filter-search" name="szukaj" type="search" maxlength="100"
-                value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
-                placeholder="Nazwa usługi" class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div>
-            <label for="filter-kategoria" class="<?= LAYOUT_LABEL_CLASS ?>">Kategoria</label>
-            <select id="filter-kategoria" name="id_kategorii" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="0">Wszystkie kategorie</option>
-                <?php foreach ($categories ?? [] as $category): ?>
-                    <option value="<?= $category['id'] ?>" <?= $categoryFilter === $category['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($category['nazwa'], ENT_QUOTES, 'UTF-8') ?>
-                        <?= $category['aktywna'] ? '' : '(nieaktywna)' ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div>
-            <label for="filter-status" class="<?= LAYOUT_LABEL_CLASS ?>">Status</label>
-            <select id="filter-status" name="status" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="all" <?= $statusFilter === 'all' ? 'selected' : '' ?>>Wszystkie statusy</option>
-                <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Aktywne</option>
-                <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Nieaktywne</option>
-            </select>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-            <button type="submit" class="<?= panel_button_classes('secondary') ?>">Filtruj</button>
-            <?php if ($filtersActive): ?>
-                <a href="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>"
-                    class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
-            <?php endif; ?>
-        </div>
-    </form>
-
     <?php if ($services === null): ?>
         <div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
             Nie udało się pobrać listy usług. Spróbuj ponownie później.
         </div>
-    <?php elseif ($services === []): ?>
-        <?php
-        if ($filtersActive) {
-            panel_empty_state(
-                'Brak usług dla wybranych filtrów',
-                'Zmień kategorię, status lub frazę wyszukiwania, aby zobaczyć inne usługi.',
-                ['label' => 'Wyczyść filtry', 'href' => $servicesUrl]
-            );
-        } else {
-            panel_empty_state(
-                'Brak usług',
-                'Dodaj pierwszą usługę, aby przypisywać ją do pracowników.',
-                ['label' => 'Dodaj usługę', 'href' => '#service-form']
-            );
-        }
-        ?>
     <?php else: ?>
+        <form id="services-filter-form" method="get"
+            action="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>"
+            class="hidden">
+            <input type="hidden" name="size" value="<?= $size ?>">
+            <?php if ($search !== ''): ?>
+                <input type="hidden" name="szukaj" value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>">
+            <?php endif; ?>
+        </form>
+
         <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">
             <table id="services-table" class="<?= PANEL_TABLE_CLASS ?>">
                 <thead>
                     <tr>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Nazwa</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Kategoria</th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Kategoria
+                            <select form="services-filter-form" name="id_kategorii"
+                                aria-label="Filtruj usługi według kategorii"
+                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
+                                data-filter-auto-submit>
+                                <option value="0" <?= $categoryFilter === 0 ? 'selected' : '' ?>>Wszystkie</option>
+                                <?php foreach ($categories ?? [] as $category): ?>
+                                    <option value="<?= $category['id'] ?>" <?= $categoryFilter === $category['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($category['nazwa'], ENT_QUOTES, 'UTF-8') ?>
+                                        <?= $category['aktywna'] ? '' : '(nieaktywna)' ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Cena</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Czas trwania</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Pracownicy</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status</th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status
+                            <select form="services-filter-form" name="status"
+                                aria-label="Filtruj usługi według statusu"
+                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
+                                data-filter-auto-submit>
+                                <option value="all" <?= $statusFilter === 'all' ? 'selected' : '' ?>>Wszystkie</option>
+                                <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Aktywne</option>
+                                <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Nieaktywne</option>
+                            </select>
+                        </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?> text-right">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
+                    <?php if ($services === []): ?>
+                        <tr>
+                            <td colspan="7" class="p-4">
+                                <?php
+                                if ($filtersActive) {
+                                    panel_empty_state(
+                                        'Brak usług dla wybranych filtrów',
+                                        'Zmień kategorię, status lub frazę wyszukiwania, aby zobaczyć inne usługi.',
+                                        ['label' => 'Wyczyść filtry', 'href' => $servicesUrl]
+                                    );
+                                } else {
+                                    panel_empty_state(
+                                        'Brak usług',
+                                        'Dodaj pierwszą usługę, aby przypisywać ją do pracowników.',
+                                        ['label' => 'Dodaj usługę', 'href' => '#service-form']
+                                    );
+                                }
+                                ?>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                     <?php foreach ($services as $service): ?>
                         <tr class="<?= PANEL_TR_CLASS ?>">
                             <td class="<?= PANEL_TD_CLASS ?> font-medium text-zinc-900 dark:text-zinc-50">

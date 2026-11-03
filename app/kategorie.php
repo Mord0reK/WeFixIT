@@ -28,6 +28,14 @@ function kategorie_db(): ?PDO
     return $pdo;
 }
 
+// Status filtru pochodzi wyłącznie z allowlisty, nigdy z dowolnego stringa klienta.
+function kategoria_filter_status(mixed $value): string
+{
+    $allowed = ['all', 'active', 'inactive'];
+
+    return is_string($value) && in_array($value, $allowed, true) ? $value : 'all';
+}
+
 // Pola tekstowe przycinamy; brak wartości traktujemy jak pusty string.
 function kategoria_field(array $data, string $field): string
 {
@@ -175,7 +183,12 @@ function kategorie_list(): ?array
     filtrów nadal mogły pobierać pełną listę bez zmiany sygnatury funkcji.
     Wyszukiwanie po nazwie jest potrzebne stronom panelu i testom zadania 403.
 */
-function kategorie_list_paginated(int $page = 1, int $size = 25, string $search = ''): ?array
+function kategorie_list_paginated(
+    int $page = 1,
+    int $size = 25,
+    string $search = '',
+    string $status = 'all'
+): ?array
 {
     $pdo = kategorie_db();
 
@@ -186,12 +199,19 @@ function kategorie_list_paginated(int $page = 1, int $size = 25, string $search 
     $page = pagination_page($page);
     $size = pagination_size($size);
     $search = pagination_search_value($search);
+    $status = kategoria_filter_status($status);
     $conditions = [];
     $params = [];
 
     if ($search !== '') {
         $conditions[] = 'k.nazwa LIKE CONCAT(\'%\', :szukaj, \'%\')';
         $params['szukaj'] = pagination_like_pattern($search);
+    }
+
+    if ($status === 'active') {
+        $conditions[] = 'k.aktywna = TRUE';
+    } elseif ($status === 'inactive') {
+        $conditions[] = 'k.aktywna = FALSE';
     }
 
     $where = $conditions !== [] ? ' WHERE ' . implode(' AND ', $conditions) : '';

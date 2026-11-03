@@ -78,85 +78,78 @@ panel_layout_head($user, 'Użytkownicy — WeFixIT', 'users');
     );
     ?>
 
-    <form id="users-filter-form" method="get"
-        action="<?= htmlspecialchars($usersUrl, ENT_QUOTES, 'UTF-8') ?>"
-        class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <input type="hidden" name="size" value="<?= $size ?>">
-
-        <div>
-            <label for="users-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
-            <input id="users-filter-search" name="szukaj" type="search" maxlength="100"
-                value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
-                placeholder="Imię, nazwisko lub e-mail" class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div class="w-full sm:w-48">
-            <label for="users-filter-role" class="<?= LAYOUT_LABEL_CLASS ?>">Rola</label>
-            <select id="users-filter-role" name="rola" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="all" <?= $roleFilter === '' ? 'selected' : '' ?>>Wszystkie role</option>
-                <?php foreach (UZYTKOWNIK_ROLES as $roleOption): ?>
-                    <option value="<?= htmlspecialchars($roleOption, ENT_QUOTES, 'UTF-8') ?>"
-                        <?= $roleFilter === $roleOption ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($roleLabels[$roleOption] ?? $roleOption, ENT_QUOTES, 'UTF-8') ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div class="w-full sm:w-48">
-            <label for="users-filter-status" class="<?= LAYOUT_LABEL_CLASS ?>">Status</label>
-            <select id="users-filter-status" name="status" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <?php foreach (UZYTKOWNIK_STATUS_FILTERS as $statusOption): ?>
-                    <option value="<?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?>"
-                        <?= $statusFilter === $statusOption ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($statusLabels[$statusOption] ?? $statusOption, ENT_QUOTES, 'UTF-8') ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-            <button type="submit" class="<?= panel_button_classes('secondary') ?>">Filtruj</button>
-            <?php if ($hasFilters): ?>
-                <a href="<?= htmlspecialchars($usersUrl, ENT_QUOTES, 'UTF-8') ?>"
-                    class="<?= panel_button_classes('ghost') ?>">Wyczyść filtry</a>
-            <?php endif; ?>
-        </div>
-    </form>
-
     <?php if ($users === null): ?>
         <div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
             Nie udało się pobrać listy użytkowników. Spróbuj ponownie później.
         </div>
-    <?php elseif ($users === []): ?>
-        <?php
-        if ($hasFilters) {
-            panel_empty_state(
-                'Brak wyników',
-                'Żadne konto nie spełnia wybranych filtrów ani frazy wyszukiwania. Zmień kryteria i spróbuj ponownie.',
-                ['label' => 'Wyczyść filtry', 'href' => $usersUrl]
-            );
-        } else {
-            panel_empty_state(
-                'Brak użytkowników',
-                'W bazie nie ma jeszcze kont do wyświetlenia.'
-            );
-        }
-        ?>
     <?php else: ?>
+        <form id="users-filter-form" method="get"
+            action="<?= htmlspecialchars($usersUrl, ENT_QUOTES, 'UTF-8') ?>"
+            class="hidden">
+            <input type="hidden" name="size" value="<?= $size ?>">
+            <?php if ($search !== ''): ?>
+                <input type="hidden" name="szukaj" value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>">
+            <?php endif; ?>
+        </form>
+
         <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">
             <table id="users-table" class="<?= PANEL_TABLE_CLASS ?>">
                 <thead>
                     <tr>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Użytkownik</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">E-mail</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Rola</th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Rola
+                            <select form="users-filter-form" name="rola"
+                                aria-label="Filtruj użytkowników według roli"
+                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
+                                data-filter-auto-submit>
+                                <option value="all" <?= $roleFilter === '' ? 'selected' : '' ?>>Wszystkie</option>
+                                <?php foreach (UZYTKOWNIK_ROLES as $roleOption): ?>
+                                    <option value="<?= htmlspecialchars($roleOption, ENT_QUOTES, 'UTF-8') ?>"
+                                        <?= $roleFilter === $roleOption ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($roleLabels[$roleOption] ?? $roleOption, ENT_QUOTES, 'UTF-8') ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Profil pracownika</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status konta</th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status konta
+                            <select form="users-filter-form" name="status"
+                                aria-label="Filtruj użytkowników według statusu konta"
+                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
+                                data-filter-auto-submit>
+                                <?php foreach (UZYTKOWNIK_STATUS_FILTERS as $statusOption): ?>
+                                    <option value="<?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?>"
+                                        <?= $statusFilter === $statusOption ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($statusLabels[$statusOption] ?? $statusOption, ENT_QUOTES, 'UTF-8') ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?> text-right">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
+                    <?php if ($users === []): ?>
+                        <tr>
+                            <td colspan="6" class="p-4">
+                                <?php
+                                if ($hasFilters) {
+                                    panel_empty_state(
+                                        'Brak wyników',
+                                        'Żadne konto nie spełnia wybranych filtrów ani frazy wyszukiwania. Zmień kryteria i spróbuj ponownie.',
+                                        ['label' => 'Wyczyść filtry', 'href' => $usersUrl]
+                                    );
+                                } else {
+                                    panel_empty_state(
+                                        'Brak użytkowników',
+                                        'W bazie nie ma jeszcze kont do wyświetlenia.'
+                                    );
+                                }
+                                ?>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                     <?php foreach ($users as $managedUser): ?>
                         <?php
                         $managedUserId = (int) $managedUser['id'];

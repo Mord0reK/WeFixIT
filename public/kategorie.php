@@ -16,15 +16,20 @@ $basePath = auth_base_path();
 $categoriesUrl = $basePath . '/kategorie';
 $categoriesApi = $basePath . '/api/admin/categories';
 $search = pagination_search_value($_GET['szukaj'] ?? null);
+$statusFilter = kategoria_filter_status($_GET['status'] ?? null);
 $page = pagination_page($_GET['page'] ?? null);
 $size = pagination_size($_GET['size'] ?? null);
-$categoryPage = kategorie_list_paginated($page, $size, $search);
+$categoryPage = kategorie_list_paginated($page, $size, $search, $statusFilter);
 $categories = $categoryPage['items'] ?? null;
-$hasFilters = $search !== '';
+$hasFilters = $search !== '' || $statusFilter !== 'all';
 $paginationParams = ['size' => $size];
 
 if ($search !== '') {
     $paginationParams['szukaj'] = $search;
+}
+
+if ($statusFilter !== 'all') {
+    $paginationParams['status'] = $statusFilter;
 }
 
 $csrfToken = csrf_token();
@@ -42,48 +47,20 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
     );
     ?>
 
-    <form id="categories-filter-form" method="get"
-        action="<?= htmlspecialchars($categoriesUrl, ENT_QUOTES, 'UTF-8') ?>"
-        class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <input type="hidden" name="size" value="<?= $size ?>">
-
-        <div>
-            <label for="categories-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
-            <input id="categories-filter-search" name="szukaj" type="search" maxlength="100"
-                value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
-                placeholder="Nazwa kategorii" class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2 sm:items-end">
-            <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
-            <?php if ($hasFilters): ?>
-                <a href="<?= htmlspecialchars($categoriesUrl, ENT_QUOTES, 'UTF-8') ?>"
-                    class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
-            <?php endif; ?>
-        </div>
-    </form>
-
     <?php if ($categories === null): ?>
         <div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
             Nie udało się pobrać listy kategorii. Spróbuj ponownie później.
         </div>
-    <?php elseif ($categories === []): ?>
-        <?php
-        if ($hasFilters) {
-            panel_empty_state(
-                'Brak kategorii dla wybranej frazy',
-                'Zmień frazę wyszukiwania, aby zobaczyć inne kategorie.',
-                ['label' => 'Wyczyść wyszukiwanie', 'href' => $categoriesUrl]
-            );
-        } else {
-            panel_empty_state(
-                'Brak kategorii',
-                'Dodaj pierwszą kategorię, aby przypisywać do niej usługi.',
-                ['label' => 'Dodaj kategorię', 'href' => '#category-form']
-            );
-        }
-        ?>
     <?php else: ?>
+        <form id="categories-filter-form" method="get"
+            action="<?= htmlspecialchars($categoriesUrl, ENT_QUOTES, 'UTF-8') ?>"
+            class="hidden">
+            <input type="hidden" name="size" value="<?= $size ?>">
+            <?php if ($search !== ''): ?>
+                <input type="hidden" name="szukaj" value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>">
+            <?php endif; ?>
+        </form>
+
         <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">
             <table id="categories-table" class="<?= PANEL_TABLE_CLASS ?>">
                 <thead>
@@ -91,11 +68,41 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Nazwa</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Opis</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Usługi</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status</th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status
+                            <select form="categories-filter-form" name="status"
+                                aria-label="Filtruj kategorie według statusu"
+                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
+                                data-filter-auto-submit>
+                                <option value="all" <?= $statusFilter === 'all' ? 'selected' : '' ?>>Wszystkie</option>
+                                <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Aktywne</option>
+                                <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Nieaktywne</option>
+                            </select>
+                        </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?> text-right">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
+                    <?php if ($categories === []): ?>
+                        <tr>
+                            <td colspan="5" class="p-4">
+                                <?php
+                                if ($hasFilters) {
+                                    panel_empty_state(
+                                        'Brak kategorii dla wybranej frazy',
+                                        'Zmień frazę wyszukiwania, aby zobaczyć inne kategorie.',
+                                        ['label' => 'Wyczyść wyszukiwanie', 'href' => $categoriesUrl]
+                                    );
+                                } else {
+                                    panel_empty_state(
+                                        'Brak kategorii',
+                                        'Dodaj pierwszą kategorię, aby przypisywać do niej usługi.',
+                                        ['label' => 'Dodaj kategorię', 'href' => '#category-form']
+                                    );
+                                }
+                                ?>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                     <?php foreach ($categories as $category): ?>
                         <tr class="<?= PANEL_TR_CLASS ?>">
                             <td class="<?= PANEL_TD_CLASS ?> font-medium text-zinc-900 dark:text-zinc-50">

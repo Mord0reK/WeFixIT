@@ -77,92 +77,10 @@ panel_layout_head($user, 'Dziennik zdarzeń — WeFixIT', 'log');
     );
     ?>
 
-    <form id="log-filter-form" method="get"
-        action="<?= htmlspecialchars($logUrl, ENT_QUOTES, 'UTF-8') ?>"
-        class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <input type="hidden" name="size" value="<?= $size ?>">
-
-        <div>
-            <label for="log-filter-from" class="<?= LAYOUT_LABEL_CLASS ?>">Data od</label>
-            <input id="log-filter-from" name="data_od" type="date"
-                value="<?= $dateFrom !== null ? htmlspecialchars($dateFrom, ENT_QUOTES, 'UTF-8') : '' ?>"
-                class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div>
-            <label for="log-filter-to" class="<?= LAYOUT_LABEL_CLASS ?>">Data do</label>
-            <input id="log-filter-to" name="data_do" type="date"
-                value="<?= $dateTo !== null ? htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8') : '' ?>"
-                class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div>
-            <label for="log-filter-action" class="<?= LAYOUT_LABEL_CLASS ?>">Akcja</label>
-            <select id="log-filter-action" name="akcja" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="">Wszystkie akcje</option>
-                <?php foreach (LOG_VIEW_ACTIONS as $actionOption): ?>
-                    <option value="<?= htmlspecialchars($actionOption, ENT_QUOTES, 'UTF-8') ?>"
-                        <?= $actionFilter === $actionOption ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($actionOption, ENT_QUOTES, 'UTF-8') ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div>
-            <label for="log-filter-level" class="<?= LAYOUT_LABEL_CLASS ?>">Poziom</label>
-            <select id="log-filter-level" name="poziom" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="">Wszystkie poziomy</option>
-                <?php foreach (LOG_VIEW_LEVELS as $levelOption): ?>
-                    <option value="<?= htmlspecialchars($levelOption, ENT_QUOTES, 'UTF-8') ?>"
-                        <?= $levelFilter === $levelOption ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($levelLabels[$levelOption] ?? $levelOption, ENT_QUOTES, 'UTF-8') ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div>
-            <label for="log-filter-object" class="<?= LAYOUT_LABEL_CLASS ?>">Obiekt</label>
-            <select id="log-filter-object" name="obiekt_typ" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="">Wszystkie obiekty</option>
-                <?php foreach (LOG_VIEW_OBJECT_TYPES as $objectOption): ?>
-                    <option value="<?= htmlspecialchars($objectOption, ENT_QUOTES, 'UTF-8') ?>"
-                        <?= $objectTypeFilter === $objectOption ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($objectOption, ENT_QUOTES, 'UTF-8') ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2 sm:items-end">
-            <button type="submit" class="<?= panel_button_classes('secondary') ?>">Filtruj</button>
-            <?php if ($filtersActive): ?>
-                <a href="<?= htmlspecialchars($logUrl, ENT_QUOTES, 'UTF-8') ?>"
-                    class="<?= panel_button_classes('ghost') ?>">Wyczyść filtry</a>
-            <?php endif; ?>
-        </div>
-    </form>
-
     <?php if ($events === null): ?>
         <div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
             Nie udało się pobrać dziennika zdarzeń. Spróbuj ponownie później.
         </div>
-    <?php elseif ($events === []): ?>
-        <?php
-        if ($filtersActive) {
-            panel_empty_state(
-                'Brak zdarzeń dla wybranych filtrów',
-                'Zmień zakres dat lub pozostałe filtry, aby zobaczyć inne wpisy.',
-                ['label' => 'Wyczyść filtry', 'href' => $logUrl]
-            );
-        } else {
-            panel_empty_state(
-                'Brak zdarzeń',
-                'Dziennik jest pusty. Operacje administracyjne pojawią się tutaj automatycznie.'
-            );
-        }
-        ?>
     <?php else: ?>
         <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">
             <table id="log-table" class="<?= PANEL_TABLE_CLASS ?>">
@@ -175,8 +93,98 @@ panel_layout_head($user, 'Dziennik zdarzeń — WeFixIT', 'log');
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Poziom</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Opis</th>
                     </tr>
+                    <tr>
+                        <th colspan="6" class="<?= PANEL_TABLE_FILTER_ROW_CLASS ?>">
+                            <form id="log-filter-form" method="get"
+                                action="<?= htmlspecialchars($logUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                <input type="hidden" name="size" value="<?= $size ?>">
+
+                                <div>
+                                    <label for="log-filter-from" class="<?= LAYOUT_LABEL_CLASS ?>">Data od</label>
+                                    <input id="log-filter-from" name="data_od" type="date"
+                                        value="<?= $dateFrom !== null ? htmlspecialchars($dateFrom, ENT_QUOTES, 'UTF-8') : '' ?>"
+                                        class="<?= LAYOUT_INPUT_CLASS ?>">
+                                </div>
+
+                                <div>
+                                    <label for="log-filter-to" class="<?= LAYOUT_LABEL_CLASS ?>">Data do</label>
+                                    <input id="log-filter-to" name="data_do" type="date"
+                                        value="<?= $dateTo !== null ? htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8') : '' ?>"
+                                        class="<?= LAYOUT_INPUT_CLASS ?>">
+                                </div>
+
+                                <div>
+                                    <label for="log-filter-action" class="<?= LAYOUT_LABEL_CLASS ?>">Akcja</label>
+                                    <select id="log-filter-action" name="akcja" class="<?= LAYOUT_INPUT_CLASS ?>">
+                                        <option value="">Wszystkie akcje</option>
+                                        <?php foreach (LOG_VIEW_ACTIONS as $actionOption): ?>
+                                            <option value="<?= htmlspecialchars($actionOption, ENT_QUOTES, 'UTF-8') ?>"
+                                                <?= $actionFilter === $actionOption ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($actionOption, ENT_QUOTES, 'UTF-8') ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="log-filter-level" class="<?= LAYOUT_LABEL_CLASS ?>">Poziom</label>
+                                    <select id="log-filter-level" name="poziom" class="<?= LAYOUT_INPUT_CLASS ?>">
+                                        <option value="">Wszystkie poziomy</option>
+                                        <?php foreach (LOG_VIEW_LEVELS as $levelOption): ?>
+                                            <option value="<?= htmlspecialchars($levelOption, ENT_QUOTES, 'UTF-8') ?>"
+                                                <?= $levelFilter === $levelOption ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($levelLabels[$levelOption] ?? $levelOption, ENT_QUOTES, 'UTF-8') ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="log-filter-object" class="<?= LAYOUT_LABEL_CLASS ?>">Obiekt</label>
+                                    <select id="log-filter-object" name="obiekt_typ" class="<?= LAYOUT_INPUT_CLASS ?>">
+                                        <option value="">Wszystkie obiekty</option>
+                                        <?php foreach (LOG_VIEW_OBJECT_TYPES as $objectOption): ?>
+                                            <option value="<?= htmlspecialchars($objectOption, ENT_QUOTES, 'UTF-8') ?>"
+                                                <?= $objectTypeFilter === $objectOption ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($objectOption, ENT_QUOTES, 'UTF-8') ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+
+                                <div class="flex flex-wrap items-center gap-2 sm:items-end">
+                                    <button type="submit" class="<?= panel_button_classes('secondary') ?>">Filtruj</button>
+                                    <?php if ($filtersActive): ?>
+                                        <a href="<?= htmlspecialchars($logUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                            class="<?= panel_button_classes('ghost') ?>">Wyczyść filtry</a>
+                                    <?php endif; ?>
+                                </div>
+                            </form>
+                        </th>
+                    </tr>
                 </thead>
                 <tbody>
+                    <?php if ($events === []): ?>
+                        <tr>
+                            <td colspan="6" class="p-4">
+                                <?php
+                                if ($filtersActive) {
+                                    panel_empty_state(
+                                        'Brak zdarzeń dla wybranych filtrów',
+                                        'Zmień zakres dat lub pozostałe filtry, aby zobaczyć inne wpisy.',
+                                        ['label' => 'Wyczyść filtry', 'href' => $logUrl]
+                                    );
+                                } else {
+                                    panel_empty_state(
+                                        'Brak zdarzeń',
+                                        'Dziennik jest pusty. Operacje administracyjne pojawią się tutaj automatycznie.'
+                                    );
+                                }
+                                ?>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                     <?php foreach ($events as $event): ?>
                         <?php
                         $actorName = trim(($event['aktor_imie'] ?? '') . ' ' . ($event['aktor_nazwisko'] ?? ''));

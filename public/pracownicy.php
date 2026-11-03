@@ -17,19 +17,24 @@ $basePath = auth_base_path();
 $employeesUrl = $basePath . '/pracownicy';
 $employeesApi = $basePath . '/api/admin/employees';
 $search = pagination_search_value($_GET['szukaj'] ?? null);
+$statusFilter = pracownik_filter_status($_GET['status'] ?? null);
 $page = pagination_page($_GET['page'] ?? null);
 $size = pagination_size($_GET['size'] ?? null);
-$employeePage = pracownicy_list_paginated($search, $page, $size);
+$employeePage = pracownicy_list_paginated($search, $page, $size, $statusFilter);
 $employees = $employeePage['items'] ?? null;
 $availableAccounts = pracownicy_available_accounts();
 $csrfToken = csrf_token();
 $hasAvailableAccounts = $availableAccounts !== null && $availableAccounts !== [];
 $hasEmployees = $employeePage !== null && ($employeePage['total'] ?? 0) > 0;
-$hasFilters = $search !== '';
+$hasFilters = $search !== '' || $statusFilter !== 'all';
 $paginationParams = ['size' => $size];
 
 if ($search !== '') {
     $paginationParams['szukaj'] = $search;
+}
+
+if ($statusFilter !== 'all') {
+    $paginationParams['status'] = $statusFilter;
 }
 
 $headerActions = $hasAvailableAccounts
@@ -47,53 +52,20 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
     );
     ?>
 
-    <form id="employees-filter-form" method="get"
-        action="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
-        class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <input type="hidden" name="size" value="<?= $size ?>">
-
-        <div>
-            <label for="employees-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
-            <input id="employees-filter-search" name="szukaj" type="search" maxlength="100"
-                value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
-                placeholder="Imię lub nazwisko pracownika" class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2 sm:items-end">
-            <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
-            <?php if ($hasFilters): ?>
-                <a href="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
-                    class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
-            <?php endif; ?>
-        </div>
-    </form>
-
     <?php if ($employees === null): ?>
         <div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
             Nie udało się pobrać listy pracowników. Spróbuj ponownie później.
         </div>
-    <?php elseif ($employees === []): ?>
-        <?php
-        if ($hasFilters) {
-            panel_empty_state(
-                'Brak pracowników dla wybranej frazy',
-                'Zmień frazę wyszukiwania, aby zobaczyć inne profile.',
-                ['label' => 'Wyczyść wyszukiwanie', 'href' => $employeesUrl]
-            );
-        } elseif ($availableAccounts === []) {
-            panel_empty_state(
-                'Brak pracowników i kont do powiązania',
-                'Aby dodać pierwszego pracownika, najpierw utwórz konto z rolą pracownik. '
-                . 'Panel pracowników nie tworzy kont użytkowników.'
-            );
-        } else {
-            panel_empty_state(
-                'Brak pracowników',
-                'Utwórz profil pracownika powiązany z istniejącym kontem o roli pracownik.'
-            );
-        }
-        ?>
     <?php else: ?>
+        <form id="employees-filter-form" method="get"
+            action="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
+            class="hidden">
+            <input type="hidden" name="size" value="<?= $size ?>">
+            <?php if ($search !== ''): ?>
+                <input type="hidden" name="szukaj" value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>">
+            <?php endif; ?>
+        </form>
+
         <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">
             <table id="employees-table" class="<?= PANEL_TABLE_CLASS ?>">
                 <thead>
@@ -101,11 +73,46 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Pracownik</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">E-mail</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Usługi</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status</th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status
+                            <select form="employees-filter-form" name="status"
+                                aria-label="Filtruj pracowników według statusu"
+                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
+                                data-filter-auto-submit>
+                                <option value="all" <?= $statusFilter === 'all' ? 'selected' : '' ?>>Wszystkie</option>
+                                <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Aktywne</option>
+                                <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Nieaktywne</option>
+                            </select>
+                        </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?> text-right">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
+                    <?php if ($employees === []): ?>
+                        <tr>
+                            <td colspan="5" class="p-4">
+                                <?php
+                                if ($hasFilters) {
+                                    panel_empty_state(
+                                        'Brak pracowników dla wybranej frazy',
+                                        'Zmień frazę wyszukiwania, aby zobaczyć inne profile.',
+                                        ['label' => 'Wyczyść wyszukiwanie', 'href' => $employeesUrl]
+                                    );
+                                } elseif ($availableAccounts === []) {
+                                    panel_empty_state(
+                                        'Brak pracowników i kont do powiązania',
+                                        'Aby dodać pierwszego pracownika, najpierw utwórz konto z rolą pracownik. '
+                                        . 'Panel pracowników nie tworzy kont użytkowników.'
+                                    );
+                                } else {
+                                    panel_empty_state(
+                                        'Brak pracowników',
+                                        'Utwórz profil pracownika powiązany z istniejącym kontem o roli pracownik.'
+                                    );
+                                }
+                                ?>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                     <?php foreach ($employees as $employee): ?>
                         <?php
                         $description = $employee['opis'] ?? '';

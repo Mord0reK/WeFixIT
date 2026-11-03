@@ -149,23 +149,35 @@ function pracownik_errors(array $data, ?int $ignoreProfileId = null): array
     return $errors;
 }
 
-function pracownik_list_conditions(string $search): array
+// Status filtru pochodzi wyłącznie z allowlisty, nigdy z dowolnego stringa klienta.
+function pracownik_filter_status(mixed $value): string
+{
+    $allowed = ['all', 'active', 'inactive'];
+
+    return is_string($value) && in_array($value, $allowed, true) ? $value : 'all';
+}
+
+function pracownik_list_conditions(string $search, string $status = 'all'): array
 {
     $search = pagination_search_value($search);
+    $status = pracownik_filter_status($status);
+    $conditions = [];
+    $params = [];
 
-    if ($search === '') {
-        return [[], []];
+    if ($search !== '') {
+        $pattern = pagination_like_pattern($search);
+        $conditions[] = '(u.imie LIKE CONCAT(\'%\', :szukaj_imie, \'%\') OR u.nazwisko LIKE CONCAT(\'%\', :szukaj_nazwisko, \'%\'))';
+        $params['szukaj_imie'] = $pattern;
+        $params['szukaj_nazwisko'] = $pattern;
     }
 
-    $pattern = pagination_like_pattern($search);
+    if ($status === 'active') {
+        $conditions[] = 'p.aktywny = TRUE';
+    } elseif ($status === 'inactive') {
+        $conditions[] = 'p.aktywny = FALSE';
+    }
 
-    return [
-        ['(u.imie LIKE CONCAT(\'%\', :szukaj_imie, \'%\') OR u.nazwisko LIKE CONCAT(\'%\', :szukaj_nazwisko, \'%\'))'],
-        [
-            'szukaj_imie' => $pattern,
-            'szukaj_nazwisko' => $pattern,
-        ],
-    ];
+    return [$conditions, $params];
 }
 
 function pracownicy_list_select_sql(): string
@@ -252,7 +264,8 @@ function pracownicy_list(): ?array
 function pracownicy_list_paginated(
     string $search = '',
     int $page = 1,
-    int $size = 25
+    int $size = 25,
+    string $status = 'all'
 ): ?array
 {
     $pdo = pracownicy_db();
@@ -263,7 +276,7 @@ function pracownicy_list_paginated(
 
     $page = pagination_page($page);
     $size = pagination_size($size);
-    [$conditions, $params] = pracownik_list_conditions($search);
+    [$conditions, $params] = pracownik_list_conditions($search, $status);
     $where = $conditions !== [] ? ' WHERE ' . implode(' AND ', $conditions) : '';
     $countSql = 'SELECT COUNT(*) FROM pracownicy p';
 
