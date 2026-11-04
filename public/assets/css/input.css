@@ -109,6 +109,76 @@ dialog#app-confirm.app-confirm-closing::backdrop {
 }
 
 /*
+    Wysuwany panel edycji wjeżdża z prawej strony, a jego tło płynnie
+    przyciemnia widok. Przy zamykaniu animacja kończy się przed ukryciem
+    panelu, dlatego JavaScript czeka tyle samo, ile trwa animacja wyjścia.
+*/
+@keyframes drawer-in {
+    from {
+        opacity: 0;
+        transform: translateX(1.5rem);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes drawer-backdrop-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes drawer-out {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(1.5rem);
+    }
+}
+
+@keyframes drawer-backdrop-out {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+[data-drawer-panel] {
+    animation: drawer-in 200ms ease-out;
+}
+
+[data-drawer-overlay] {
+    animation: drawer-backdrop-in 200ms ease-out;
+}
+
+[data-drawer].app-drawer-closing [data-drawer-panel] {
+    animation: drawer-out 160ms ease-in forwards;
+}
+
+[data-drawer].app-drawer-closing [data-drawer-overlay] {
+    animation: drawer-backdrop-out 160ms ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-drawer-panel],
+    [data-drawer-overlay],
+    [data-drawer].app-drawer-closing [data-drawer-panel],
+    [data-drawer].app-drawer-closing [data-drawer-overlay] {
+        animation: none;
+    }
+}
+
+/*
     Minimalistyczny scrollbar rozwijanych menu filtrów: cienki, zaokrąglony
     pasek bez widocznego toru. Firefox dostaje scrollbar-width: thin, a reszta
     przeglądarek dostosowany pasek WebKit. Tryb ciemny działa na

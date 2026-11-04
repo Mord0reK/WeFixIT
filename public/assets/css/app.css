@@ -336,6 +336,9 @@
   .inset-y-0 {
     inset-block: 0px;
   }
+  .right-0 {
+    right: 0px;
+  }
   .right-4 {
     right: calc(var(--spacing) * 4);
   }
@@ -555,6 +558,9 @@
   .max-w-md {
     max-width: var(--container-md);
   }
+  .max-w-xl {
+    max-width: var(--container-xl);
+  }
   .max-w-xs {
     max-width: var(--container-xs);
   }
@@ -736,6 +742,10 @@
     border-bottom-style: var(--tw-border-style);
     border-bottom-width: 1px;
   }
+  .border-l {
+    border-left-style: var(--tw-border-style);
+    border-left-width: 1px;
+  }
   .border-dashed {
     --tw-border-style: dashed;
     border-style: dashed;
@@ -894,6 +904,9 @@
   .px-4 {
     padding-inline: calc(var(--spacing) * 4);
   }
+  .px-6 {
+    padding-inline: calc(var(--spacing) * 6);
+  }
   .py-1 {
     padding-block: var(--spacing);
   }
@@ -908,6 +921,9 @@
   }
   .py-4 {
     padding-block: calc(var(--spacing) * 4);
+  }
+  .py-5 {
+    padding-block: calc(var(--spacing) * 5);
   }
   .pe-2 {
     padding-inline-end: calc(var(--spacing) * 2);
@@ -1687,6 +1703,59 @@ dialog#app-confirm.app-confirm-closing::backdrop {
 }
 @media (prefers-reduced-motion: reduce) {
   dialog#app-confirm[open], dialog#app-confirm::backdrop, dialog#app-confirm.app-confirm-closing, dialog#app-confirm.app-confirm-closing::backdrop {
+    animation: none;
+  }
+}
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(1.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes drawer-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes drawer-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(1.5rem);
+  }
+}
+@keyframes drawer-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+[data-drawer-panel] {
+  animation: drawer-in 200ms ease-out;
+}
+[data-drawer-overlay] {
+  animation: drawer-backdrop-in 200ms ease-out;
+}
+[data-drawer].app-drawer-closing [data-drawer-panel] {
+  animation: drawer-out 160ms ease-in forwards;
+}
+[data-drawer].app-drawer-closing [data-drawer-overlay] {
+  animation: drawer-backdrop-out 160ms ease-in forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-drawer-panel], [data-drawer-overlay], [data-drawer].app-drawer-closing [data-drawer-panel], [data-drawer].app-drawer-closing [data-drawer-overlay] {
     animation: none;
   }
 }

@@ -38,7 +38,7 @@ if ($statusFilter !== 'all') {
 }
 
 $headerActions = $hasAvailableAccounts
-    ? [['label' => 'Dodaj pracownika', 'href' => '#employee-form']]
+    ? [['label' => 'Dodaj pracownika', 'drawer' => 'employee-drawer']]
     : [];
 
 panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
@@ -166,6 +166,7 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                                     </a>
                                     <button type="button" class="<?= panel_button_classes('ghost') ?>"
                                         data-employee-edit
+                                        data-drawer-open="employee-drawer"
                                         data-id="<?= $employee['id'] ?>"
                                         data-name="<?= htmlspecialchars($employee['imie'] . ' ' . $employee['nazwisko'], ENT_QUOTES, 'UTF-8') ?>"
                                         data-description="<?= htmlspecialchars($employee['opis'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
@@ -223,13 +224,16 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
 <?php endif; ?>
 
 <?php if ($hasEmployees || $hasAvailableAccounts): ?>
-    <section id="employee-form-card" class="<?= PANEL_CARD_WIDE_CLASS ?> mt-8 border-t border-zinc-200 pt-8 dark:border-zinc-800 <?= $hasAvailableAccounts ? '' : 'hidden' ?>">
-        <h2 id="employee-form-title" class="text-lg font-semibold tracking-tight">Dodaj pracownika</h2>
-        <p id="employee-form-hint" class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-            Profil zostanie powiązany z istniejącym kontem o roli pracownik.
-        </p>
-
-        <form id="employee-form" class="mt-5 max-w-2xl space-y-4" novalidate>
+    <?php
+    panel_drawer_start(
+        'employee-drawer',
+        'employee-form-title',
+        'Dodaj pracownika',
+        'Profil zostanie powiązany z istniejącym kontem o roli pracownik.',
+        'employee-form-hint'
+    );
+    ?>
+        <form id="employee-form" class="space-y-4" novalidate>
             <input type="hidden" id="employee-id" name="id" value="">
 
             <div id="employee-account-select-wrap">
@@ -280,22 +284,23 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                 <button type="submit" id="employee-submit" class="<?= panel_button_classes('primary') ?>">
                     Dodaj pracownika
                 </button>
-                <button type="button" id="employee-cancel" class="<?= panel_button_classes('secondary') ?> hidden">
+                <button type="button" id="employee-cancel" data-drawer-close
+                    class="<?= panel_button_classes('secondary') ?> hidden">
                     Anuluj edycję
                 </button>
             </div>
         </form>
+    <?php panel_drawer_end(); ?>
 
-        <noscript>
-            <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby zarządzać pracownikami.</p>
-        </noscript>
-    </section>
+    <noscript>
+        <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby zarządzać pracownikami.</p>
+    </noscript>
 <?php endif; ?>
 
 <script>
 (function () {
+    const employeeDrawer = document.getElementById('employee-drawer');
     const employeeForm = document.getElementById('employee-form');
-    const employeeFormCard = document.getElementById('employee-form-card');
     const employeeFormTitle = document.getElementById('employee-form-title');
     const employeeFormHint = document.getElementById('employee-form-hint');
     const employeeFormError = document.getElementById('employee-form-error');
@@ -310,7 +315,6 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
     const employeeAccountReadonly = document.getElementById('employee-account-readonly');
     const employeeApi = <?= json_encode($employeesApi, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     const csrfToken = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    const canAdd = <?= $hasAvailableAccounts ? 'true' : 'false' ?>;
     const employeeFieldErrors = {
         uzytkownik_id: document.getElementById('employee-error-uzytkownik_id'),
         opis: document.getElementById('employee-error-opis'),
@@ -360,10 +364,10 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
         employeeAccountSelectWrap.classList.remove('hidden');
         employeeAccountReadonlyWrap.classList.add('hidden');
         clearEmployeeMessages();
+    }
 
-        if (!canAdd) {
-            employeeFormCard.classList.add('hidden');
-        }
+    if (employeeDrawer) {
+        employeeDrawer.addEventListener('panel:drawer-close', resetEmployeeForm);
     }
 
     function reloadEmployees() {
@@ -458,7 +462,6 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
             employeeDescription.value = button.dataset.description || '';
             employeeActive.checked = button.dataset.active === '1';
             employeeAccountReadonly.textContent = button.dataset.account || '';
-            employeeFormCard.classList.remove('hidden');
             employeeFormTitle.textContent = 'Edytuj pracownika';
             employeeFormHint.textContent = 'Edytowalne są tylko opis i flaga aktywności.';
             employeeSubmit.textContent = 'Zapisz zmiany';
@@ -467,8 +470,6 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
             employeeAccountSelectWrap.classList.add('hidden');
             employeeAccountReadonlyWrap.classList.remove('hidden');
             clearEmployeeMessages();
-            employeeFormCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            employeeDescription.focus();
         });
     }
 

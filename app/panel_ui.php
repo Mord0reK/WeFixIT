@@ -24,6 +24,7 @@ function panel_icon(string $name, string $classes = 'h-4 w-4 shrink-0'): string
         'calendar' => '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
         'list' => '<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>',
         'chevron-down' => '<path d="m6 9 6 6 6-6"/>',
+        'x' => '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
         'trash' => '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
         'circle-slash' => '<circle cx="12" cy="12" r="10"/><line x1="9" x2="15" y1="15" y2="9"/>',
         'circle-check' => '<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>',
@@ -180,14 +181,18 @@ function panel_filter_date(string $formId, string $name, string $label, ?string 
     <?php
 }
 
-// Pusty stan listy z ikoną, tytułem, opisem i opcjonalnym linkiem akcji.
+// Pusty stan listy z ikoną, tytułem, opisem i opcjonalną akcją (link lub drawer).
 function panel_empty_state(string $title, string $description, array $action = []): void
 {
     $titleSafe = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
     $descriptionSafe = htmlspecialchars($description, ENT_QUOTES, 'UTF-8');
     $label = $action['label'] ?? '';
     $href = $action['href'] ?? '';
-    $hasAction = is_string($label) && is_string($href) && $label !== '' && $href !== '';
+    $drawer = $action['drawer'] ?? '';
+    $hasDrawer = is_string($drawer) && $drawer !== '';
+    $hasAction = is_string($label) && $label !== ''
+        && ($hasDrawer || (is_string($href) && $href !== ''));
+    $actionHref = $hasDrawer ? '#' . $drawer : $href;
     ?>
     <div class="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/60 p-8 text-center dark:border-zinc-800 dark:bg-zinc-950/50">
         <span class="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-300">
@@ -196,10 +201,63 @@ function panel_empty_state(string $title, string $description, array $action = [
         <p class="mt-3 text-sm font-medium text-zinc-900 dark:text-zinc-50"><?= $titleSafe ?></p>
         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400"><?= $descriptionSafe ?></p>
         <?php if ($hasAction): ?>
-            <a href="<?= htmlspecialchars($href, ENT_QUOTES, 'UTF-8') ?>" class="<?= panel_button_classes('secondary') ?> mt-4">
+            <a href="<?= htmlspecialchars($actionHref, ENT_QUOTES, 'UTF-8') ?>"
+                class="<?= panel_button_classes('secondary') ?> mt-4"
+                <?php if ($hasDrawer): ?>
+                    data-drawer-open="<?= htmlspecialchars($drawer, ENT_QUOTES, 'UTF-8') ?>"
+                    aria-haspopup="dialog" aria-controls="<?= htmlspecialchars($drawer, ENT_QUOTES, 'UTF-8') ?>"
+                <?php endif; ?>>
                 <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
             </a>
         <?php endif; ?>
+    </div>
+    <?php
+}
+
+// Wysuwany panel z prawej strony; treść formularza wstawia widok między start i end.
+function panel_drawer_start(
+    string $id,
+    string $titleId,
+    string $title,
+    string $description = '',
+    string $descriptionId = ''
+): void
+{
+    $idSafe = htmlspecialchars($id, ENT_QUOTES, 'UTF-8');
+    $titleIdSafe = htmlspecialchars($titleId, ENT_QUOTES, 'UTF-8');
+    $titleSafe = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+    $descriptionSafe = htmlspecialchars($description, ENT_QUOTES, 'UTF-8');
+    $descriptionIdSafe = htmlspecialchars($descriptionId, ENT_QUOTES, 'UTF-8');
+    ?>
+    <div id="<?= $idSafe ?>" class="fixed inset-0 z-50 hidden" data-drawer aria-hidden="true">
+        <div class="absolute inset-0 bg-zinc-950/50 backdrop-blur-sm" data-drawer-overlay></div>
+        <div class="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col border-l border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950"
+            role="dialog" aria-modal="true" aria-labelledby="<?= $titleIdSafe ?>" data-drawer-panel>
+            <div class="flex items-start justify-between gap-4 border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
+                <div class="min-w-0">
+                    <h2 id="<?= $titleIdSafe ?>" class="text-lg font-semibold tracking-tight"><?= $titleSafe ?></h2>
+                    <?php if ($descriptionSafe !== ''): ?>
+                        <p <?= $descriptionIdSafe !== '' ? 'id="' . $descriptionIdSafe . '"' : '' ?>
+                            class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+                            <?= $descriptionSafe ?>
+                        </p>
+                    <?php endif; ?>
+                </div>
+                <button type="button" data-drawer-close aria-label="Zamknij panel"
+                    class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 dark:focus-visible:ring-zinc-700">
+                    <?= panel_icon('x', 'h-4 w-4 shrink-0') ?>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-6 py-5">
+    <?php
+}
+
+// Zamknięcie markupu rozpoczętego przez panel_drawer_start().
+function panel_drawer_end(): void
+{
+    ?>
+            </div>
+        </div>
     </div>
     <?php
 }

@@ -42,7 +42,7 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
         'Kategorie',
         'Zarządzaj kategoriami usług dostępnych w serwisie.',
         [
-            ['label' => 'Dodaj kategorię', 'href' => '#category-form'],
+            ['label' => 'Dodaj kategorię', 'drawer' => 'category-drawer'],
         ]
     );
     ?>
@@ -101,7 +101,7 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
                                     panel_empty_state(
                                         'Brak kategorii',
                                         'Dodaj pierwszą kategorię, aby przypisywać do niej usługi.',
-                                        ['label' => 'Dodaj kategorię', 'href' => '#category-form']
+                                        ['label' => 'Dodaj kategorię', 'drawer' => 'category-drawer']
                                     );
                                 }
                                 ?>
@@ -138,6 +138,7 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
                                 <div class="flex flex-wrap justify-end gap-2">
                                     <button type="button" class="<?= panel_button_classes('ghost') ?>"
                                         data-category-edit
+                                        data-drawer-open="category-drawer"
                                         data-id="<?= $category['id'] ?>"
                                         data-name="<?= htmlspecialchars($category['nazwa'], ENT_QUOTES, 'UTF-8') ?>"
                                         data-description="<?= htmlspecialchars($category['opis'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
@@ -174,11 +175,15 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
     <?php endif; ?>
 </section>
 
-<section id="category-form-card" class="<?= PANEL_CARD_WIDE_CLASS ?> mt-8 border-t border-zinc-200 pt-8 dark:border-zinc-800">
-    <h2 id="category-form-title" class="text-lg font-semibold tracking-tight">Dodaj kategorię</h2>
-    <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">Nowa kategoria będzie od razu aktywna.</p>
-
-    <form id="category-form" class="mt-5 max-w-2xl space-y-4" novalidate>
+<?php
+panel_drawer_start(
+    'category-drawer',
+    'category-form-title',
+    'Dodaj kategorię',
+    'Nowa kategoria będzie od razu aktywna.'
+);
+?>
+    <form id="category-form" class="space-y-4" novalidate>
         <input type="hidden" id="category-id" name="id" value="">
 
         <div>
@@ -203,19 +208,21 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
             <button type="submit" id="category-submit" class="<?= panel_button_classes('primary') ?>">
                 Dodaj kategorię
             </button>
-            <button type="button" id="category-cancel" class="<?= panel_button_classes('secondary') ?> hidden">
+            <button type="button" id="category-cancel" data-drawer-close
+                class="<?= panel_button_classes('secondary') ?> hidden">
                 Anuluj edycję
             </button>
         </div>
     </form>
+<?php panel_drawer_end(); ?>
 
-    <noscript>
-        <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby zarządzać kategoriami.</p>
-    </noscript>
-</section>
+<noscript>
+    <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby zarządzać kategoriami.</p>
+</noscript>
 
 <script>
 (function () {
+    const categoryDrawer = document.getElementById('category-drawer');
     const categoryForm = document.getElementById('category-form');
     const categoryFormTitle = document.getElementById('category-form-title');
     const categoryFormError = document.getElementById('category-form-error');
@@ -270,6 +277,10 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
         categorySubmit.textContent = 'Dodaj kategorię';
         categoryCancel.classList.add('hidden');
         clearCategoryMessages();
+    }
+
+    if (categoryDrawer) {
+        categoryDrawer.addEventListener('panel:drawer-close', resetCategoryForm);
     }
 
     function reloadCategories() {
@@ -360,8 +371,6 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
             categorySubmit.textContent = 'Zapisz zmiany';
             categoryCancel.classList.remove('hidden');
             clearCategoryMessages();
-            categoryForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            categoryName.focus();
         });
     }
 

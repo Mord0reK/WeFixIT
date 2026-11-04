@@ -114,6 +114,39 @@ test('Dodatkowo: karta użytkownika w sidebarze prowadzi do profilu', function (
     );
 });
 
+test('Dodatkowo: formularze administracyjne są osadzone w panelach bocznych', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $pages = [
+        '/uslugi.php' => ['service-drawer', 'service-form'],
+        '/kategorie.php' => ['category-drawer', 'category-form'],
+        '/pracownicy.php' => ['employee-drawer', 'employee-form'],
+    ];
+
+    foreach ($pages as $path => [$drawerId, $formId]) {
+        $page = http_request($session['cookies'], 'GET', $path);
+        assert_status(200, $page, $path . ' powinno zwrócić 200');
+
+        assert_true(
+            strpos($page['body'], 'id="' . $drawerId . '"') !== false,
+            $path . ' powinno zawierać panel boczny formularza'
+        );
+        assert_true(
+            strpos($page['body'], 'data-drawer aria-hidden="true"') !== false,
+            $path . ' powinno ukrywać panel do czasu otwarcia'
+        );
+        assert_true(
+            strpos($page['body'], 'id="' . $formId . '"') !== false,
+            $path . ' powinno zawierać formularz wewnątrz panelu'
+        );
+        assert_true(
+            strpos($page['body'], 'data-drawer-open="' . $drawerId . '"') !== false,
+            $path . ' powinno mieć akcję otwierającą panel'
+        );
+    }
+});
+
 test('Dodatkowo: administrator widzi właściwą aktywną pozycję menu na podglądach', function (): void {
     $session = login_as('admin@wefixit.pl');
     assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');

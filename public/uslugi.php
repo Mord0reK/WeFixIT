@@ -57,7 +57,7 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
         'Usługi',
         'Zarządzaj usługami dostępnymi w serwisie.',
         [
-            ['label' => 'Dodaj usługę', 'href' => '#service-form'],
+            ['label' => 'Dodaj usługę', 'drawer' => 'service-drawer'],
         ]
     );
     ?>
@@ -128,7 +128,7 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
                                     panel_empty_state(
                                         'Brak usług',
                                         'Dodaj pierwszą usługę, aby przypisywać ją do pracowników.',
-                                        ['label' => 'Dodaj usługę', 'href' => '#service-form']
+                                        ['label' => 'Dodaj usługę', 'drawer' => 'service-drawer']
                                     );
                                 }
                                 ?>
@@ -170,6 +170,7 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
                                 <div class="flex flex-wrap justify-end gap-2">
                                     <button type="button" class="<?= panel_button_classes('ghost') ?>"
                                         data-service-edit
+                                        data-drawer-open="service-drawer"
                                         data-id="<?= $service['id'] ?>"
                                         data-name="<?= htmlspecialchars($service['nazwa'], ENT_QUOTES, 'UTF-8') ?>"
                                         data-description="<?= htmlspecialchars($service['opis'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
@@ -209,11 +210,15 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
     <?php endif; ?>
 </section>
 
-<section id="service-form-card" class="<?= PANEL_CARD_WIDE_CLASS ?> mt-8 border-t border-zinc-200 pt-8 dark:border-zinc-800">
-    <h2 id="service-form-title" class="text-lg font-semibold tracking-tight">Dodaj usługę</h2>
-    <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">Nowa usługa będzie od razu aktywna.</p>
-
-    <form id="service-form" class="mt-5 max-w-2xl space-y-4" novalidate>
+<?php
+panel_drawer_start(
+    'service-drawer',
+    'service-form-title',
+    'Dodaj usługę',
+    'Nowa usługa będzie od razu aktywna.'
+);
+?>
+    <form id="service-form" class="space-y-4" novalidate>
         <input type="hidden" id="service-id" name="id" value="">
 
         <div>
@@ -272,19 +277,21 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
             <button type="submit" id="service-submit" class="<?= panel_button_classes('primary') ?>">
                 Dodaj usługę
             </button>
-            <button type="button" id="service-cancel" class="<?= panel_button_classes('secondary') ?> hidden">
+            <button type="button" id="service-cancel" data-drawer-close
+                class="<?= panel_button_classes('secondary') ?> hidden">
                 Anuluj edycję
             </button>
         </div>
     </form>
+<?php panel_drawer_end(); ?>
 
-    <noscript>
-        <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby zarządzać usługami.</p>
-    </noscript>
-</section>
+<noscript>
+    <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby zarządzać usługami.</p>
+</noscript>
 
 <script>
 (function () {
+    const serviceDrawer = document.getElementById('service-drawer');
     const serviceForm = document.getElementById('service-form');
     const serviceFormTitle = document.getElementById('service-form-title');
     const serviceFormError = document.getElementById('service-form-error');
@@ -354,6 +361,10 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
         serviceSubmit.textContent = 'Dodaj usługę';
         serviceCancel.classList.add('hidden');
         clearServiceMessages();
+    }
+
+    if (serviceDrawer) {
+        serviceDrawer.addEventListener('panel:drawer-close', resetServiceForm);
     }
 
     function reloadServices() {
@@ -459,8 +470,6 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
             serviceSubmit.textContent = 'Zapisz zmiany';
             serviceCancel.classList.remove('hidden');
             clearServiceMessages();
-            serviceForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            serviceName.focus();
         });
     }
 

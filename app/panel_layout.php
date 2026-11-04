@@ -161,13 +161,22 @@ function panel_section_header(string $title, string $description = '', array $ac
 
                     $label = $action['label'] ?? '';
                     $href = $action['href'] ?? '';
+                    $drawer = $action['drawer'] ?? '';
+                    $hasDrawer = is_string($drawer) && $drawer !== '';
 
-                    if (!is_string($label) || !is_string($href) || $label === '' || $href === '') {
+                    if (!is_string($label) || $label === ''
+                        || (!$hasDrawer && (!is_string($href) || $href === ''))) {
                         continue;
                     }
+
+                    $actionHref = $hasDrawer ? '#' . $drawer : $href;
                     ?>
-                    <a href="<?= htmlspecialchars($href, ENT_QUOTES, 'UTF-8') ?>"
-                        class="<?= panel_button_classes('primary') ?>">
+                    <a href="<?= htmlspecialchars($actionHref, ENT_QUOTES, 'UTF-8') ?>"
+                        class="<?= panel_button_classes('primary') ?>"
+                        <?php if ($hasDrawer): ?>
+                            data-drawer-open="<?= htmlspecialchars($drawer, ENT_QUOTES, 'UTF-8') ?>"
+                            aria-haspopup="dialog" aria-controls="<?= htmlspecialchars($drawer, ENT_QUOTES, 'UTF-8') ?>"
+                        <?php endif; ?>>
                         <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
                     </a>
                 <?php endforeach; ?>
@@ -541,6 +550,110 @@ function panel_layout_foot(): void
 
                 closeFilterDropdown(openFilterDropdown, false);
             }, true);
+
+            /*
+                Wysuwane panele edycji. Stan trzymamy w jednym miejscu, żeby
+                widoki nie powielały obsługi overlaya, Escape i blokady scrolla.
+            */
+            let openDrawer = null;
+            let drawerTrigger = null;
+
+            // Musi odpowiadać czasowi animacji wyjścia z app.css.
+            const drawerCloseDelay = 180;
+
+            function openPanelDrawer(drawer) {
+                if (!(drawer instanceof HTMLElement)) return;
+
+                if (openDrawer !== null && openDrawer !== drawer) {
+                    closePanelDrawer(openDrawer, false);
+                }
+
+                if (drawer.closeTimer) {
+                    window.clearTimeout(drawer.closeTimer);
+                    drawer.closeTimer = null;
+                }
+
+                drawerTrigger = document.activeElement;
+                drawer.classList.remove('hidden', 'app-drawer-closing');
+                drawer.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('overflow-hidden');
+                openDrawer = drawer;
+
+                const focusTarget = drawer.querySelector(
+                    'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
+                );
+
+                if (focusTarget) {
+                    focusTarget.focus();
+                    return;
+                }
+
+                const closeButton = drawer.querySelector('[data-drawer-close]');
+                if (closeButton) closeButton.focus();
+            }
+
+            function closePanelDrawer(drawer, restoreFocus) {
+                if (!(drawer instanceof HTMLElement) || drawer.classList.contains('hidden')) return;
+                if (drawer.classList.contains('app-drawer-closing')) return;
+
+                drawer.classList.add('app-drawer-closing');
+                drawer.setAttribute('aria-hidden', 'true');
+
+                drawer.closeTimer = window.setTimeout(function () {
+                    drawer.classList.add('hidden');
+                    drawer.classList.remove('app-drawer-closing');
+                    drawer.closeTimer = null;
+
+                    if (openDrawer === drawer) {
+                        openDrawer = null;
+                        document.body.classList.remove('overflow-hidden');
+                    }
+
+                    drawer.dispatchEvent(new CustomEvent('panel:drawer-close'));
+
+                    if (restoreFocus && drawerTrigger) {
+                        drawerTrigger.focus();
+                        drawerTrigger = null;
+                    }
+                }, drawerCloseDelay);
+            }
+
+            window.panelOpenDrawer = openPanelDrawer;
+            window.panelCloseDrawer = closePanelDrawer;
+
+            for (const trigger of document.querySelectorAll('[data-drawer-open]')) {
+                trigger.addEventListener('click', function (event) {
+                    const drawerId = trigger.getAttribute('data-drawer-open');
+                    const drawer = drawerId ? document.getElementById(drawerId) : null;
+
+                    if (!drawer) return;
+
+                    event.preventDefault();
+                    openPanelDrawer(drawer);
+                });
+            }
+
+            for (const closeButton of document.querySelectorAll('[data-drawer-close]')) {
+                closeButton.addEventListener('click', function () {
+                    const drawer = closeButton.closest('[data-drawer]');
+
+                    if (drawer) closePanelDrawer(drawer, true);
+                });
+            }
+
+            for (const overlay of document.querySelectorAll('[data-drawer-overlay]')) {
+                overlay.addEventListener('click', function () {
+                    const drawer = overlay.closest('[data-drawer]');
+
+                    if (drawer) closePanelDrawer(drawer, true);
+                });
+            }
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && openDrawer !== null) {
+                    closePanelDrawer(openDrawer, true);
+                }
+            });
 
             const confirmDialog = document.getElementById('app-confirm');
             const confirmTitle = document.getElementById('app-confirm-title');
