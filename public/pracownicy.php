@@ -73,15 +73,20 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Pracownik</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">E-mail</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Usługi</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status
-                            <select form="employees-filter-form" name="status"
-                                aria-label="Filtruj pracowników według statusu"
-                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
-                                data-filter-auto-submit>
-                                <option value="all" <?= $statusFilter === 'all' ? 'selected' : '' ?>>Wszystkie</option>
-                                <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Aktywne</option>
-                                <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Nieaktywne</option>
-                            </select>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">
+                            <?php panel_filter_start('employees-status', 'Status', $statusFilter !== 'all'); ?>
+                                <?php panel_filter_options(
+                                    'employees-filter-form',
+                                    'status',
+                                    'Filtruj według statusu',
+                                    [
+                                        ['value' => 'all', 'label' => 'Wszystkie'],
+                                        ['value' => 'active', 'label' => 'Aktywne'],
+                                        ['value' => 'inactive', 'label' => 'Nieaktywne'],
+                                    ],
+                                    $statusFilter
+                                ); ?>
+                            <?php panel_filter_end(); ?>
                         </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?> text-right">Akcje</th>
                     </tr>

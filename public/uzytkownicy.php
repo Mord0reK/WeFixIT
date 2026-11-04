@@ -64,6 +64,23 @@ $statusLabels = [
     'active' => 'Aktywne',
     'inactive' => 'Nieaktywne',
 ];
+$roleFilterOptions = [['value' => 'all', 'label' => 'Wszystkie']];
+
+foreach (UZYTKOWNIK_ROLES as $roleOption) {
+    $roleFilterOptions[] = [
+        'value' => $roleOption,
+        'label' => $roleLabels[$roleOption] ?? $roleOption,
+    ];
+}
+
+$statusFilterOptions = [];
+
+foreach (UZYTKOWNIK_STATUS_FILTERS as $statusOption) {
+    $statusFilterOptions[] = [
+        'value' => $statusOption,
+        'label' => $statusLabels[$statusOption] ?? $statusOption,
+    ];
+}
 
 panel_layout_head($user, 'Użytkownicy — WeFixIT', 'users');
 ?>
@@ -98,33 +115,28 @@ panel_layout_head($user, 'Użytkownicy — WeFixIT', 'users');
                     <tr>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Użytkownik</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">E-mail</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Rola
-                            <select form="users-filter-form" name="rola"
-                                aria-label="Filtruj użytkowników według roli"
-                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
-                                data-filter-auto-submit>
-                                <option value="all" <?= $roleFilter === '' ? 'selected' : '' ?>>Wszystkie</option>
-                                <?php foreach (UZYTKOWNIK_ROLES as $roleOption): ?>
-                                    <option value="<?= htmlspecialchars($roleOption, ENT_QUOTES, 'UTF-8') ?>"
-                                        <?= $roleFilter === $roleOption ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($roleLabels[$roleOption] ?? $roleOption, ENT_QUOTES, 'UTF-8') ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">
+                            <?php panel_filter_start('users-role', 'Rola', $roleFilter !== ''); ?>
+                                <?php panel_filter_options(
+                                    'users-filter-form',
+                                    'rola',
+                                    'Filtruj według roli',
+                                    $roleFilterOptions,
+                                    $roleFilter === '' ? 'all' : $roleFilter
+                                ); ?>
+                            <?php panel_filter_end(); ?>
                         </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Profil pracownika</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status konta
-                            <select form="users-filter-form" name="status"
-                                aria-label="Filtruj użytkowników według statusu konta"
-                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
-                                data-filter-auto-submit>
-                                <?php foreach (UZYTKOWNIK_STATUS_FILTERS as $statusOption): ?>
-                                    <option value="<?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?>"
-                                        <?= $statusFilter === $statusOption ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($statusLabels[$statusOption] ?? $statusOption, ENT_QUOTES, 'UTF-8') ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">
+                            <?php panel_filter_start('users-status', 'Status konta', $statusFilter !== 'all'); ?>
+                                <?php panel_filter_options(
+                                    'users-filter-form',
+                                    'status',
+                                    'Filtruj według statusu konta',
+                                    $statusFilterOptions,
+                                    $statusFilter
+                                ); ?>
+                            <?php panel_filter_end(); ?>
                         </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?> text-right">Akcje</th>
                     </tr>

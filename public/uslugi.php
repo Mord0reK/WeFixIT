@@ -25,6 +25,15 @@ $servicePage = uslugi_list_paginated($categoryFilter, $statusFilter, $search, $p
 $services = $servicePage['items'] ?? null;
 $categories = kategorie_list();
 $csrfToken = csrf_token();
+$categoryFilterOptions = [['value' => '0', 'label' => 'Wszystkie']];
+
+foreach ($categories ?? [] as $category) {
+    $categoryFilterOptions[] = [
+        'value' => (string) $category['id'],
+        'label' => $category['nazwa'] . ($category['aktywna'] ? '' : ' (nieaktywna)'),
+    ];
+}
+
 $filtersActive = $categoryFilter > 0 || $statusFilter !== 'all' || $search !== '';
 $paginationParams = ['size' => $size];
 
@@ -72,32 +81,34 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
                 <thead>
                     <tr>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Nazwa</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Kategoria
-                            <select form="services-filter-form" name="id_kategorii"
-                                aria-label="Filtruj usługi według kategorii"
-                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
-                                data-filter-auto-submit>
-                                <option value="0" <?= $categoryFilter === 0 ? 'selected' : '' ?>>Wszystkie</option>
-                                <?php foreach ($categories ?? [] as $category): ?>
-                                    <option value="<?= $category['id'] ?>" <?= $categoryFilter === $category['id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($category['nazwa'], ENT_QUOTES, 'UTF-8') ?>
-                                        <?= $category['aktywna'] ? '' : '(nieaktywna)' ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">
+                            <?php panel_filter_start('services-category', 'Kategoria', $categoryFilter > 0); ?>
+                                <?php panel_filter_options(
+                                    'services-filter-form',
+                                    'id_kategorii',
+                                    'Filtruj według kategorii',
+                                    $categoryFilterOptions,
+                                    (string) $categoryFilter
+                                ); ?>
+                            <?php panel_filter_end(); ?>
                         </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Cena</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Czas trwania</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Pracownicy</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status
-                            <select form="services-filter-form" name="status"
-                                aria-label="Filtruj usługi według statusu"
-                                class="<?= PANEL_TABLE_FILTER_SELECT_CLASS ?>"
-                                data-filter-auto-submit>
-                                <option value="all" <?= $statusFilter === 'all' ? 'selected' : '' ?>>Wszystkie</option>
-                                <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Aktywne</option>
-                                <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Nieaktywne</option>
-                            </select>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">
+                            <?php panel_filter_start('services-status', 'Status', $statusFilter !== 'all'); ?>
+                                <?php panel_filter_options(
+                                    'services-filter-form',
+                                    'status',
+                                    'Filtruj według statusu',
+                                    [
+                                        ['value' => 'all', 'label' => 'Wszystkie'],
+                                        ['value' => 'active', 'label' => 'Aktywne'],
+                                        ['value' => 'inactive', 'label' => 'Nieaktywne'],
+                                    ],
+                                    $statusFilter
+                                ); ?>
+                            <?php panel_filter_end(); ?>
                         </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?> text-right">Akcje</th>
                     </tr>

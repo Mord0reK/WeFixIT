@@ -83,10 +83,102 @@ function panel_badge(string $label, string $variant): string
 const PANEL_TABLE_WRAP_CLASS = 'overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900';
 const PANEL_TABLE_CLASS = 'w-full min-w-[40rem] border-collapse text-left text-sm';
 const PANEL_TH_CLASS = 'whitespace-nowrap border-b border-zinc-200 px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:text-zinc-400';
-const PANEL_TD_CLASS = 'border-b border-zinc-100 px-4 py-3 align-middle text-zinc-700 last:border-b-0 dark:border-zinc-800 dark:text-zinc-300';
+const PANEL_TD_CLASS = 'border-b border-zinc-100 px-4 py-3 align-middle text-zinc-700 dark:border-zinc-800 dark:text-zinc-300';
 const PANEL_TR_CLASS = 'transition-colors hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40';
-const PANEL_TABLE_FILTER_ROW_CLASS = 'border-b border-zinc-200 bg-zinc-50/70 px-4 py-3 text-left font-normal normal-case tracking-normal dark:border-zinc-800 dark:bg-zinc-950/40';
-const PANEL_TABLE_FILTER_SELECT_CLASS = 'mt-1.5 block h-8 w-full min-w-[8rem] rounded-md border border-zinc-200 bg-white px-2 text-xs font-normal normal-case tracking-normal text-zinc-700 shadow-xs focus-visible:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:focus-visible:border-zinc-600 dark:focus-visible:ring-zinc-800';
+
+/*
+    Filtr kolumny jest przyciskiem w nagłówku tabeli. Menu jest pozycjonowane
+    przez JavaScript jako fixed, żeby nie ucinał go poziomy scroll tabeli.
+*/
+const PANEL_FILTER_TRIGGER_CLASS = '-mx-2 flex w-full items-center justify-between gap-1.5 rounded-md px-2 py-1 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50';
+const PANEL_FILTER_MENU_CLASS = 'panel-filter-scrollbar fixed z-50 hidden max-h-[18.5rem] w-max min-w-56 max-w-[min(24rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain whitespace-normal rounded-lg border border-zinc-200 bg-white p-1.5 shadow-lg dark:border-zinc-800 dark:bg-zinc-900';
+const PANEL_FILTER_MENU_TITLE_CLASS = 'px-2 pb-1 pt-1 text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500';
+const PANEL_FILTER_OPTION_CLASS = 'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm font-normal normal-case tracking-normal text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800';
+const PANEL_FILTER_RADIO_CLASS = 'h-4 w-4 shrink-0 accent-zinc-900 dark:accent-zinc-50';
+const PANEL_FILTER_ACTIVE_DOT_CLASS = 'h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-900 dark:bg-zinc-50';
+const PANEL_FILTER_DATE_FIELD_CLASS = 'block px-2 py-1';
+const PANEL_FILTER_DATE_LABEL_CLASS = 'mb-1 block text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500';
+const PANEL_FILTER_DATE_INPUT_CLASS = 'block h-9 w-full rounded-md border border-zinc-200 bg-white px-2 text-sm text-zinc-700 shadow-xs focus-visible:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:focus-visible:border-zinc-600 dark:focus-visible:ring-zinc-800';
+
+// Początek komórki nagłówka z przyciskiem otwierającym menu filtra.
+function panel_filter_start(string $id, string $label, bool $active = false): void
+{
+    $idSafe = htmlspecialchars($id, ENT_QUOTES, 'UTF-8');
+    $labelSafe = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+    ?>
+    <div class="relative" data-filter-dropdown>
+        <button type="button" class="<?= PANEL_FILTER_TRIGGER_CLASS ?>" data-filter-toggle
+            aria-expanded="false" aria-haspopup="true" aria-controls="<?= $idSafe ?>-menu">
+            <span class="flex items-center gap-1.5">
+                <span><?= $labelSafe ?></span>
+                <?php if ($active): ?>
+                    <span class="<?= PANEL_FILTER_ACTIVE_DOT_CLASS ?>" aria-hidden="true"></span>
+                    <span class="sr-only">Filtr aktywny</span>
+                <?php endif; ?>
+            </span>
+            <?= panel_icon('chevron-down', 'h-3.5 w-3.5 shrink-0') ?>
+        </button>
+        <div id="<?= $idSafe ?>-menu" class="<?= PANEL_FILTER_MENU_CLASS ?>" data-filter-menu>
+    <?php
+}
+
+// Zamknięcie markupu rozpoczętego przez panel_filter_start().
+function panel_filter_end(): void
+{
+    ?>
+        </div>
+    </div>
+    <?php
+}
+
+/*
+    Opcje filtra renderujemy jako radios powiązane z ukrytym formularzem przez
+    atrybut form. Zmiana zaznaczenia od razu wysyła formularz (data-filter-auto-submit).
+*/
+function panel_filter_options(string $formId, string $name, string $legend, array $options, string $selected): void
+{
+    $formIdSafe = htmlspecialchars($formId, ENT_QUOTES, 'UTF-8');
+    $nameSafe = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
+    $legendSafe = htmlspecialchars($legend, ENT_QUOTES, 'UTF-8');
+    ?>
+    <p class="<?= PANEL_FILTER_MENU_TITLE_CLASS ?>" aria-hidden="true"><?= $legendSafe ?></p>
+    <fieldset>
+        <legend class="sr-only"><?= $legendSafe ?></legend>
+        <?php foreach ($options as $option): ?>
+            <?php
+            $value = (string) ($option['value'] ?? '');
+            $optionLabel = (string) ($option['label'] ?? $value);
+            ?>
+            <label class="<?= PANEL_FILTER_OPTION_CLASS ?>">
+                <input type="radio" form="<?= $formIdSafe ?>" name="<?= $nameSafe ?>"
+                    value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>"
+                    class="<?= PANEL_FILTER_RADIO_CLASS ?>"
+                    <?= $value === $selected ? 'checked' : '' ?>
+                    data-filter-auto-submit>
+                <span class="min-w-0 break-words"><?= htmlspecialchars($optionLabel, ENT_QUOTES, 'UTF-8') ?></span>
+            </label>
+        <?php endforeach; ?>
+    </fieldset>
+    <?php
+}
+
+// Pole daty w menu filtra; używane przez kolumny z zakresem terminów.
+function panel_filter_date(string $formId, string $name, string $label, ?string $value, string $ariaLabel): void
+{
+    $formIdSafe = htmlspecialchars($formId, ENT_QUOTES, 'UTF-8');
+    $nameSafe = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
+    $labelSafe = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+    $ariaLabelSafe = htmlspecialchars($ariaLabel, ENT_QUOTES, 'UTF-8');
+    $valueSafe = $value !== null ? htmlspecialchars($value, ENT_QUOTES, 'UTF-8') : '';
+    ?>
+    <label class="<?= PANEL_FILTER_DATE_FIELD_CLASS ?>">
+        <span class="<?= PANEL_FILTER_DATE_LABEL_CLASS ?>"><?= $labelSafe ?></span>
+        <input form="<?= $formIdSafe ?>" name="<?= $nameSafe ?>" type="date" value="<?= $valueSafe ?>"
+            aria-label="<?= $ariaLabelSafe ?>" class="<?= PANEL_FILTER_DATE_INPUT_CLASS ?>"
+            data-filter-auto-submit>
+    </label>
+    <?php
+}
 
 // Pusty stan listy z ikoną, tytułem, opisem i opcjonalnym linkiem akcji.
 function panel_empty_state(string $title, string $description, array $action = []): void

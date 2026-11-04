@@ -490,8 +490,12 @@ test('117. strona rezerwacji zawiera tabelę i filtry oraz respektuje filtr', fu
     assert_status(200, $filtered, 'Strona z filtrem statusu powinna dać 200');
     assert_same(1, substr_count($filtered['body'], 'data-reservation-row'), 'Filtr powinien pozostawić jeden wiersz');
     assert_true(
-        preg_match('/<option value="anulowana"[^>]*selected/', $filtered['body']) === 1,
+        preg_match('/name="status"[^>]*value="anulowana"[^>]*checked/', $filtered['body']) === 1,
         'Filtr statusu powinien zachować wybraną wartość'
+    );
+    assert_true(
+        strpos($page['body'], 'data-filter-toggle') !== false,
+        'Filtry powinny być rozwijane z nagłówków tabeli'
     );
 });
 

@@ -34,3 +34,48 @@
         width: 0;
     }
 }
+
+/*
+    Minimalistyczny scrollbar rozwijanych menu filtrów: cienki, zaokrąglony
+    pasek bez widocznego toru. Firefox dostaje scrollbar-width: thin, a reszta
+    przeglądarek dostosowany pasek WebKit. Tryb ciemny działa na
+    prefers-color-scheme, tak jak wariant dark: w Tailwindzie.
+*/
+.panel-filter-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #d4d4d8 transparent;
+}
+
+.panel-filter-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.panel-filter-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.panel-filter-scrollbar::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-color: #d4d4d8;
+    background-clip: content-box;
+}
+
+.panel-filter-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #a1a1aa;
+}
+
+@media (prefers-color-scheme: dark) {
+    .panel-filter-scrollbar {
+        scrollbar-color: #52525b transparent;
+    }
+
+    .panel-filter-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #52525b;
+    }
+
+    .panel-filter-scrollbar::-webkit-scrollbar-thumb:hover {
+        background-color: #71717a;
+    }
+}

@@ -384,8 +384,12 @@ test('104. lista filtruje role i status, a błędny filtr nie powoduje błędu',
         'Lista nie powinna zawierać nieaktywnego klienta'
     );
     assert_true(
-        preg_match('/<option value="klient"[^>]*selected/', $activeClients['body']) === 1,
+        preg_match('/name="rola"[^>]*value="klient"[^>]*checked/', $activeClients['body']) === 1,
         'Filtr roli powinien zachować wybraną wartość'
+    );
+    assert_true(
+        strpos($activeClients['body'], 'data-filter-toggle') !== false,
+        'Filtr powinien być rozwijany z nagłówka tabeli'
     );
     assert_true(
         strpos($activeClients['body'], 'href="/uzytkownicy"') !== false,

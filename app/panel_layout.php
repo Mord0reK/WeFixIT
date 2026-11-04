@@ -434,6 +434,114 @@ function panel_layout_foot(): void
                 });
             }
 
+            /*
+                Menu filtra jest pozycjonowane jako fixed względem przycisku.
+                Dzięki temu nie ucina go kontener tabeli z overflow-x-auto.
+            */
+            let openFilterDropdown = null;
+
+            function closeFilterDropdown(dropdown, focusToggle) {
+                const toggle = dropdown.querySelector('[data-filter-toggle]');
+                const menu = dropdown.querySelector('[data-filter-menu]');
+
+                if (!toggle || !menu) return;
+
+                menu.classList.add('hidden');
+                menu.style.top = '';
+                menu.style.left = '';
+                toggle.setAttribute('aria-expanded', 'false');
+
+                if (openFilterDropdown === dropdown) {
+                    openFilterDropdown = null;
+                }
+
+                if (focusToggle) {
+                    toggle.focus();
+                }
+            }
+
+            function openFilterDropdownMenu(dropdown) {
+                const toggle = dropdown.querySelector('[data-filter-toggle]');
+                const menu = dropdown.querySelector('[data-filter-menu]');
+
+                if (!toggle || !menu) return;
+
+                if (openFilterDropdown !== null && openFilterDropdown !== dropdown) {
+                    closeFilterDropdown(openFilterDropdown, false);
+                }
+
+                menu.classList.remove('hidden');
+
+                const rect = toggle.getBoundingClientRect();
+                const menuWidth = menu.offsetWidth;
+                const menuHeight = menu.offsetHeight;
+                const left = Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8));
+                let top = rect.bottom + 4;
+
+                // Brak miejsca pod nagłówkiem odwraca menu nad przycisk.
+                if (top + menuHeight > window.innerHeight - 8) {
+                    top = Math.max(8, rect.top - menuHeight - 4);
+                }
+
+                menu.style.top = top + 'px';
+                menu.style.left = left + 'px';
+                toggle.setAttribute('aria-expanded', 'true');
+                openFilterDropdown = dropdown;
+            }
+
+            for (const dropdown of document.querySelectorAll('[data-filter-dropdown]')) {
+                const toggle = dropdown.querySelector('[data-filter-toggle]');
+                const menu = dropdown.querySelector('[data-filter-menu]');
+
+                if (!toggle || !menu) continue;
+
+                toggle.addEventListener('click', function (event) {
+                    event.stopPropagation();
+
+                    if (openFilterDropdown === dropdown) {
+                        closeFilterDropdown(dropdown, false);
+                        return;
+                    }
+
+                    openFilterDropdownMenu(dropdown);
+                });
+
+                menu.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                });
+            }
+
+            document.addEventListener('click', function () {
+                if (openFilterDropdown !== null) {
+                    closeFilterDropdown(openFilterDropdown, false);
+                }
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && openFilterDropdown !== null) {
+                    closeFilterDropdown(openFilterDropdown, true);
+                }
+            });
+
+            window.addEventListener('resize', function () {
+                if (openFilterDropdown !== null) {
+                    closeFilterDropdown(openFilterDropdown, false);
+                }
+            });
+
+            window.addEventListener('scroll', function (event) {
+                if (openFilterDropdown === null) return;
+
+                // Przewijanie samego menu nie może go zamykać.
+                const menu = openFilterDropdown.querySelector('[data-filter-menu]');
+
+                if (menu !== null && event.target instanceof Node && menu.contains(event.target)) {
+                    return;
+                }
+
+                closeFilterDropdown(openFilterDropdown, false);
+            }, true);
+
             const confirmDialog = document.getElementById('app-confirm');
             const confirmTitle = document.getElementById('app-confirm-title');
             const confirmMessage = document.getElementById('app-confirm-message');
