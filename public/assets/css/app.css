@@ -372,6 +372,9 @@
       max-width: 96rem;
     }
   }
+  .m-auto {
+    margin: auto;
+  }
   .-mx-2 {
     margin-inline: calc(var(--spacing) * -2);
   }
@@ -1632,6 +1635,59 @@
   }
   to {
     width: 0;
+  }
+}
+@keyframes confirm-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes confirm-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes confirm-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.97);
+  }
+}
+@keyframes confirm-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+dialog#app-confirm[open] {
+  animation: confirm-in 160ms ease-out;
+}
+dialog#app-confirm::backdrop {
+  animation: confirm-backdrop-in 160ms ease-out;
+}
+dialog#app-confirm.app-confirm-closing {
+  animation: confirm-out 160ms ease-in forwards;
+}
+dialog#app-confirm.app-confirm-closing::backdrop {
+  animation: confirm-backdrop-out 160ms ease-in forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog#app-confirm[open], dialog#app-confirm::backdrop, dialog#app-confirm.app-confirm-closing, dialog#app-confirm.app-confirm-closing::backdrop {
+    animation: none;
   }
 }
 .panel-filter-scrollbar {

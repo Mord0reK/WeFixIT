@@ -36,6 +36,79 @@
 }
 
 /*
+    Delikatne pojawienie się okna potwierdzenia: panel lekko się powiększa
+    i unosi, a przyciemnione tło płynnie przechodzi z przezroczystości.
+*/
+@keyframes confirm-in {
+    from {
+        opacity: 0;
+        transform: translateY(0.75rem) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes confirm-backdrop-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/*
+    Wyjście okna potwierdzenia: panel wraca do mniejszej skali i opada,
+    a tło płynnie zanika, zanim dialog zostanie faktycznie zamknięty.
+*/
+@keyframes confirm-out {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(0.75rem) scale(0.97);
+    }
+}
+
+@keyframes confirm-backdrop-out {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+dialog#app-confirm[open] {
+    animation: confirm-in 160ms ease-out;
+}
+
+dialog#app-confirm::backdrop {
+    animation: confirm-backdrop-in 160ms ease-out;
+}
+
+dialog#app-confirm.app-confirm-closing {
+    animation: confirm-out 160ms ease-in forwards;
+}
+
+dialog#app-confirm.app-confirm-closing::backdrop {
+    animation: confirm-backdrop-out 160ms ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    dialog#app-confirm[open],
+    dialog#app-confirm::backdrop,
+    dialog#app-confirm.app-confirm-closing,
+    dialog#app-confirm.app-confirm-closing::backdrop {
+        animation: none;
+    }
+}
+
+/*
     Minimalistyczny scrollbar rozwijanych menu filtrów: cienki, zaokrąglony
     pasek bez widocznego toru. Firefox dostaje scrollbar-width: thin, a reszta
     przeglądarek dostosowany pasek WebKit. Tryb ciemny działa na

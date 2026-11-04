@@ -346,7 +346,7 @@ function panel_layout_foot(): void
         </div>
     </div>
     <dialog id="app-confirm" aria-labelledby="app-confirm-title" aria-describedby="app-confirm-message"
-        class="w-[calc(100%-2rem)] max-w-md rounded-xl border border-zinc-200 bg-white p-0 text-zinc-950 shadow-xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50">
+        class="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-zinc-200 bg-white p-0 text-zinc-950 shadow-xl backdrop:bg-zinc-950/50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50">
         <form method="dialog" class="p-6">
             <h2 id="app-confirm-title" class="text-lg font-semibold tracking-tight">Potwierdź operację</h2>
             <p id="app-confirm-message" class="mt-2 text-sm text-zinc-600 dark:text-zinc-400"></p>
@@ -550,9 +550,25 @@ function panel_layout_foot(): void
             const confirmDangerClasses = {$confirmDangerClassJson};
             const confirmPrimaryClasses = {$confirmPrimaryClassJson};
             let confirmResolve = null;
+            let confirmClosing = false;
+
+            // Musi odpowiadać czasowi animacji wyjścia z app.css.
+            const confirmCloseDelay = 160;
 
             function setConfirmVariant(danger) {
                 confirmOk.className = danger ? confirmDangerClasses : confirmPrimaryClasses;
+            }
+
+            function closeConfirm(returnValue) {
+                if (confirmClosing || !confirmDialog.open) return;
+
+                confirmClosing = true;
+                confirmDialog.classList.add('app-confirm-closing');
+
+                // Zamykamy dialog dopiero po animacji, inaczej zniknąłby natychmiast.
+                window.setTimeout(function () {
+                    confirmDialog.close(returnValue);
+                }, confirmCloseDelay);
             }
 
             window.panelConfirm = function (options) {
@@ -572,6 +588,8 @@ function panel_layout_foot(): void
                     : 'Potwierdź';
                 setConfirmVariant(settings.danger === true);
                 confirmDialog.returnValue = '';
+                confirmClosing = false;
+                confirmDialog.classList.remove('app-confirm-closing');
 
                 return new Promise(function (resolve) {
                     confirmResolve = resolve;
@@ -581,10 +599,33 @@ function panel_layout_foot(): void
             };
 
             confirmCancel.addEventListener('click', function () {
-                confirmDialog.close('cancel');
+                closeConfirm('cancel');
+            });
+
+            confirmDialog.querySelector('form').addEventListener('submit', function (event) {
+                // Przechwytujemy domyślne zamknięcie formularza, żeby również
+                // potwierdzenie miało animację wyjścia.
+                event.preventDefault();
+                closeConfirm('confirm');
+            });
+
+            confirmDialog.addEventListener('cancel', function (event) {
+                // Escape zamyka dialog natywnie, więc wymuszamy własne zamknięcie.
+                event.preventDefault();
+                closeConfirm('cancel');
+            });
+
+            confirmDialog.addEventListener('click', function (event) {
+                // Kliknięcie poza panelem trafia bezpośrednio w element dialogu.
+                if (event.target !== confirmDialog) return;
+
+                closeConfirm('cancel');
             });
 
             confirmDialog.addEventListener('close', function () {
+                confirmClosing = false;
+                confirmDialog.classList.remove('app-confirm-closing');
+
                 if (confirmResolve === null) return;
 
                 const resolve = confirmResolve;
