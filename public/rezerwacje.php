@@ -109,8 +109,6 @@ foreach ($clients ?? [] as $client) {
     $clientFilterOptions[] = [
         'value' => (string) $client['id'],
         'label' => $client['imie'] . ' ' . $client['nazwisko'] . ($client['aktywny'] ? '' : ' (nieaktywny)'),
-        'disabled' => !$client['aktywny'],
-        'inactive' => !$client['aktywny'],
     ];
 }
 
@@ -120,8 +118,6 @@ foreach ($employees ?? [] as $employee) {
     $employeeFilterOptions[] = [
         'value' => (string) $employee['id'],
         'label' => $employee['imie'] . ' ' . $employee['nazwisko'] . ($employee['aktywny'] ? '' : ' (nieaktywny)'),
-        'disabled' => !$employee['aktywny'],
-        'inactive' => !$employee['aktywny'],
     ];
 }
 
@@ -131,8 +127,6 @@ foreach ($services ?? [] as $service) {
     $serviceFilterOptions[] = [
         'value' => (string) $service['id'],
         'label' => $service['nazwa'] . ($service['aktywna'] ? '' : ' (nieaktywna)'),
-        'disabled' => !$service['aktywna'],
-        'inactive' => !$service['aktywna'],
     ];
 }
 

@@ -31,8 +31,6 @@ foreach ($categories ?? [] as $category) {
     $categoryFilterOptions[] = [
         'value' => (string) $category['id'],
         'label' => $category['nazwa'] . ($category['aktywna'] ? '' : ' (nieaktywna)'),
-        'disabled' => !$category['aktywna'],
-        'inactive' => !$category['aktywna'],
     ];
     $serviceCategoryOptions[] = [
         'value' => (string) $category['id'],
