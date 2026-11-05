@@ -4,9 +4,9 @@ declare(strict_types=1);
 /*
     Strona dostępności pracownika w panelu administratora.
 
-    Sekcja grafiku pokazuje siedem dni tygodnia, przedziały i formularz dodania
+    Sekcja grafiku pokazuje siedem dni tygodnia, przedziały i panel dodawania
     przedziału. Sekcja nieobecności pokazuje wnioski, historię rozpatrzenia
-    i formularz nowego wniosku. Zmiany wysyłają fetch() do dwóch endpointów.
+    i panel nowego wniosku. Zmiany wysyłają fetch() do dwóch endpointów.
     Widok nie wykonuje SQL ani operacji zapisu — korzysta wyłącznie z modułów.
 */
 require_once dirname(__DIR__) . '/app/panel_layout.php';
@@ -79,7 +79,23 @@ $statusVariants = [
     'odrzucona' => 'danger',
     'anulowana' => 'neutral',
 ];
+$timeOptions = [];
+
+for ($minutes = 0; $minutes < 24 * 60; $minutes += 15) {
+    $time = sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+    $timeOptions[] = ['value' => $time, 'label' => $time];
+}
+
+$reasonOptions = [
+    ['value' => 'Urlop wypoczynkowy', 'label' => 'Urlop wypoczynkowy'],
+    ['value' => 'Choroba', 'label' => 'Choroba'],
+    ['value' => 'Sprawy rodzinne', 'label' => 'Sprawy rodzinne'],
+    ['value' => 'Szkolenie', 'label' => 'Szkolenie'],
+    ['value' => 'Badania lekarskie', 'label' => 'Badania lekarskie'],
+    ['value' => '__custom__', 'label' => 'Inne (wpisz poniżej)'],
+];
 $scheduleTotal = 0;
+$defaultDay = (int) date('N');
 
 foreach ($schedule ?? [] as $dayEntries) {
     $scheduleTotal += count($dayEntries);
@@ -106,12 +122,24 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
     <?php endif; ?>
 
     <section aria-labelledby="schedule-heading">
-        <div class="flex flex-col gap-1">
-            <h2 id="schedule-heading" class="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Grafik tygodniowy</h2>
-            <p class="text-sm text-zinc-500 dark:text-zinc-400">
-                Przedziały są grupowane od poniedziałku do niedzieli. Nowy przedział jest aktywny od razu.
-            </p>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex flex-col gap-1">
+                <h2 id="schedule-heading" class="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Grafik tygodniowy</h2>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400">
+                    Przedziały są grupowane od poniedziałku do niedzieli. Nowy przedział jest aktywny od razu.
+                </p>
+            </div>
+            <button type="button" class="<?= panel_button_classes('primary') ?>"
+                data-schedule-add
+                data-drawer-open="schedule-drawer"
+                aria-haspopup="dialog"
+                aria-controls="schedule-drawer">
+                Dodaj przedział
+            </button>
         </div>
+
+        <p id="schedule-action-error" role="alert"
+            class="mt-3 hidden text-sm text-red-600 dark:text-red-400"></p>
 
         <?php if ($schedule === null): ?>
             <div role="alert" class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
@@ -123,7 +151,8 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
                     <?php
                     panel_empty_state(
                         'Brak godzin pracy',
-                        'Dodaj pierwszy przedział w formularzu wybranego dnia poniżej.'
+                        'Dodaj pierwszy przedział grafiku, aby pracownik był dostępny.',
+                        ['label' => 'Dodaj przedział', 'drawer' => 'schedule-drawer']
                     );
                     ?>
                 </div>
@@ -133,9 +162,20 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
                 <?php foreach ($dayNames as $day => $dayName): ?>
                     <?php $dayEntries = $schedule[$day] ?? []; ?>
                     <div class="rounded-xl border border-zinc-200 bg-zinc-50/50 p-4 dark:border-zinc-800 dark:bg-zinc-950/30">
-                        <h3 class="text-sm font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
-                            <?= htmlspecialchars($dayName, ENT_QUOTES, 'UTF-8') ?>
-                        </h3>
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 class="text-sm font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
+                                <?= htmlspecialchars($dayName, ENT_QUOTES, 'UTF-8') ?>
+                            </h3>
+                            <button type="button" class="<?= panel_button_classes('ghost') ?>"
+                                data-schedule-add
+                                data-day="<?= $day ?>"
+                                data-drawer-open="schedule-drawer"
+                                aria-haspopup="dialog"
+                                aria-controls="schedule-drawer"
+                                aria-label="Dodaj przedział w dniu <?= htmlspecialchars($dayName, ENT_QUOTES, 'UTF-8') ?>">
+                                Dodaj
+                            </button>
+                        </div>
 
                         <?php if ($dayEntries === []): ?>
                             <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">brak godzin pracy</p>
@@ -178,58 +218,47 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
                                 <?php endforeach; ?>
                             </ul>
                         <?php endif; ?>
-
-                        <form class="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start"
-                            data-schedule-form
-                            data-day="<?= $day ?>"
-                            method="post"
-                            action="<?= htmlspecialchars($scheduleApi, ENT_QUOTES, 'UTF-8') ?>"
-                            novalidate>
-                            <div>
-                                <label for="schedule-<?= $day ?>-start" class="<?= LAYOUT_LABEL_CLASS ?>">Od</label>
-                                <input id="schedule-<?= $day ?>-start" name="czas_rozpoczecia" type="time" step="60"
-                                    class="<?= LAYOUT_INPUT_CLASS ?>" required>
-                                <div data-schedule-field="czas_rozpoczecia">
-                                    <?= panel_field_error('schedule-error-' . $day . '-czas_rozpoczecia') ?>
-                                </div>
-                            </div>
-                            <div>
-                                <label for="schedule-<?= $day ?>-end" class="<?= LAYOUT_LABEL_CLASS ?>">Do</label>
-                                <input id="schedule-<?= $day ?>-end" name="czas_zakonczenia" type="time" step="60"
-                                    class="<?= LAYOUT_INPUT_CLASS ?>" required>
-                                <div data-schedule-field="czas_zakonczenia">
-                                    <?= panel_field_error('schedule-error-' . $day . '-czas_zakonczenia') ?>
-                                </div>
-                            </div>
-                            <div class="sm:pt-6">
-                                <button type="submit" class="<?= panel_button_classes('secondary') ?>">
-                                    Dodaj przedział
-                                </button>
-                            </div>
-                        </form>
                     </div>
                 <?php endforeach; ?>
             </div>
-
-            <p id="schedule-form-error" role="alert"
-                class="mt-3 hidden text-sm text-red-600 dark:text-red-400"></p>
         <?php endif; ?>
     </section>
 
     <section aria-labelledby="absences-heading" class="mt-10">
-        <div class="flex flex-col gap-1">
-            <h2 id="absences-heading" class="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Nieobecności</h2>
-            <p class="text-sm text-zinc-500 dark:text-zinc-400">
-                Wniosek powstaje jako oczekujący. Zatwierdzenie i odrzucenie zapisują osobę oraz czas rozpatrzenia.
-            </p>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex flex-col gap-1">
+                <h2 id="absences-heading" class="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Nieobecności</h2>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400">
+                    Wniosek powstaje jako oczekujący. Zatwierdzenie i odrzucenie zapisują osobę oraz czas rozpatrzenia.
+                </p>
+            </div>
+            <button type="button" class="<?= panel_button_classes('primary') ?>"
+                data-drawer-open="absence-drawer"
+                aria-haspopup="dialog"
+                aria-controls="absence-drawer">
+                Dodaj nieobecność
+            </button>
         </div>
+
+        <p id="absence-action-error" role="alert"
+            class="mt-3 hidden text-sm text-red-600 dark:text-red-400"></p>
+        <p id="absence-action-warning" role="alert"
+            class="mt-3 hidden rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200"></p>
 
         <?php if ($absences === null): ?>
             <div role="alert" class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
                 Nie udało się pobrać nieobecności pracownika. Spróbuj ponownie później.
             </div>
         <?php elseif ($absences === []): ?>
-            <p class="mt-4 text-sm text-zinc-500 dark:text-zinc-400">Brak nieobecności.</p>
+            <div class="mt-4">
+                <?php
+                panel_empty_state(
+                    'Brak nieobecności',
+                    'Dodaj wniosek, aby zaplanować urlop, chorobę lub inną nieobecność.',
+                    ['label' => 'Dodaj nieobecność', 'drawer' => 'absence-drawer']
+                );
+                ?>
+            </div>
         <?php else: ?>
             <div class="mt-4 space-y-3">
                 <?php foreach ($absences as $absence): ?>
@@ -327,57 +356,6 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
-
-        <form id="absence-form" class="mt-6 rounded-xl border border-zinc-200 bg-zinc-50/50 p-4 dark:border-zinc-800 dark:bg-zinc-950/30"
-            method="post"
-            action="<?= htmlspecialchars($absencesApi, ENT_QUOTES, 'UTF-8') ?>"
-            novalidate>
-            <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Nowy wniosek o nieobecność</h3>
-
-            <div class="mt-3 grid gap-4 sm:grid-cols-3">
-                <div>
-                    <label for="absence-data-od" class="<?= LAYOUT_LABEL_CLASS ?>">Data od</label>
-                    <input id="absence-data-od" name="data_od" type="date" class="<?= LAYOUT_INPUT_CLASS ?>" required>
-                    <?= panel_field_error('absence-error-data_od') ?>
-                </div>
-                <div>
-                    <label for="absence-data-do" class="<?= LAYOUT_LABEL_CLASS ?>">Data do</label>
-                    <input id="absence-data-do" name="data_do" type="date" class="<?= LAYOUT_INPUT_CLASS ?>" required>
-                    <?= panel_field_error('absence-error-data_do') ?>
-                </div>
-                <div>
-                    <label for="absence-rodzaj" class="<?= LAYOUT_LABEL_CLASS ?>">Rodzaj</label>
-                    <select id="absence-rodzaj" name="rodzaj" class="<?= LAYOUT_INPUT_CLASS ?>" required>
-                        <option value="">Wybierz rodzaj</option>
-                        <?php foreach ($typeLabels as $typeValue => $typeLabel): ?>
-                            <option value="<?= htmlspecialchars($typeValue, ENT_QUOTES, 'UTF-8') ?>">
-                                <?= htmlspecialchars($typeLabel, ENT_QUOTES, 'UTF-8') ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <?= panel_field_error('absence-error-rodzaj') ?>
-                </div>
-            </div>
-
-            <div class="mt-4">
-                <label for="absence-powod" class="<?= LAYOUT_LABEL_CLASS ?>">Powód</label>
-                <textarea id="absence-powod" name="powod" rows="3" maxlength="500"
-                    class="<?= LAYOUT_TEXTAREA_CLASS ?>"></textarea>
-                <p class="<?= LAYOUT_HINT_CLASS ?>">Opcjonalnie, maksymalnie 500 znaków.</p>
-                <?= panel_field_error('absence-error-powod') ?>
-            </div>
-
-            <p id="absence-form-error" role="alert"
-                class="mt-3 hidden text-sm text-red-600 dark:text-red-400"></p>
-            <p id="absence-action-warning" role="alert"
-                class="mt-3 hidden rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200"></p>
-
-            <div class="mt-3">
-                <button type="submit" id="absence-submit" class="<?= panel_button_classes('primary') ?>">
-                    Dodaj wniosek
-                </button>
-            </div>
-        </form>
     </section>
 
     <noscript>
@@ -385,43 +363,460 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
     </noscript>
 </section>
 
+<?php
+panel_drawer_start(
+    'schedule-drawer',
+    'schedule-drawer-title',
+    'Dodaj przedział grafiku',
+    'Nowy przedział będzie aktywny od razu.'
+);
+?>
+    <form id="schedule-form" class="space-y-4" novalidate>
+        <div>
+            <label for="schedule-dzien" class="<?= LAYOUT_LABEL_CLASS ?>">Dzień tygodnia</label>
+            <select id="schedule-dzien" name="dzien_tygodnia" class="<?= LAYOUT_INPUT_CLASS ?>" required>
+                <?php foreach ($dayNames as $day => $dayName): ?>
+                    <option value="<?= $day ?>" <?= $day === $defaultDay ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($dayName, ENT_QUOTES, 'UTF-8') ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <?= panel_field_error('schedule-error-dzien_tygodnia') ?>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+                <span id="schedule-start-label" class="<?= LAYOUT_LABEL_CLASS ?>">Od</span>
+                <div class="relative" data-picker-field data-filter-dropdown>
+                    <button type="button"
+                        class="<?= LAYOUT_INPUT_CLASS ?> items-center justify-between gap-2 text-left"
+                        data-filter-toggle aria-expanded="false" aria-haspopup="true"
+                        aria-labelledby="schedule-start-label schedule-start-value">
+                        <span id="schedule-start-value"
+                            class="truncate text-zinc-400 dark:text-zinc-500"
+                            data-picker-value data-placeholder="Wybierz godzinę">Wybierz godzinę</span>
+                        <?= panel_icon('chevron-down', 'h-4 w-4 shrink-0 text-zinc-500') ?>
+                    </button>
+                    <div class="<?= PANEL_FILTER_MENU_CLASS ?>" data-filter-menu>
+                        <?php panel_filter_options(
+                            'schedule-form',
+                            'czas_rozpoczecia',
+                            'Godzina rozpoczęcia',
+                            $timeOptions,
+                            '',
+                            false
+                        ); ?>
+                    </div>
+                </div>
+                <?= panel_field_error('schedule-error-czas_rozpoczecia') ?>
+            </div>
+            <div>
+                <span id="schedule-end-label" class="<?= LAYOUT_LABEL_CLASS ?>">Do</span>
+                <div class="relative" data-picker-field data-filter-dropdown>
+                    <button type="button"
+                        class="<?= LAYOUT_INPUT_CLASS ?> items-center justify-between gap-2 text-left"
+                        data-filter-toggle aria-expanded="false" aria-haspopup="true"
+                        aria-labelledby="schedule-end-label schedule-end-value">
+                        <span id="schedule-end-value"
+                            class="truncate text-zinc-400 dark:text-zinc-500"
+                            data-picker-value data-placeholder="Wybierz godzinę">Wybierz godzinę</span>
+                        <?= panel_icon('chevron-down', 'h-4 w-4 shrink-0 text-zinc-500') ?>
+                    </button>
+                    <div class="<?= PANEL_FILTER_MENU_CLASS ?>" data-filter-menu>
+                        <?php panel_filter_options(
+                            'schedule-form',
+                            'czas_zakonczenia',
+                            'Godzina zakończenia',
+                            $timeOptions,
+                            '',
+                            false
+                        ); ?>
+                    </div>
+                </div>
+                <?= panel_field_error('schedule-error-czas_zakonczenia') ?>
+            </div>
+        </div>
+
+        <p id="schedule-form-error" role="alert" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="submit" id="schedule-submit" class="<?= panel_button_classes('primary') ?>">
+                Dodaj przedział
+            </button>
+            <button type="button" data-drawer-close class="<?= panel_button_classes('secondary') ?>">
+                Anuluj
+            </button>
+        </div>
+    </form>
+<?php panel_drawer_end(); ?>
+
+<?php
+panel_drawer_start(
+    'absence-drawer',
+    'absence-drawer-title',
+    'Dodaj wniosek o nieobecność',
+    'Wniosek powstanie jako oczekujący na rozpatrzenie.'
+);
+?>
+    <form id="absence-form" class="space-y-4" novalidate>
+        <div class="grid gap-4 sm:grid-cols-2">
+            <?php foreach ([
+                ['id' => 'absence-data-od', 'name' => 'data_od', 'label' => 'Data od'],
+                ['id' => 'absence-data-do', 'name' => 'data_do', 'label' => 'Data do'],
+            ] as $dateField): ?>
+                <?php
+                $dateFieldId = $dateField['id'];
+                $dateFieldName = $dateField['name'];
+                $dateFieldLabelId = $dateFieldId . '-label';
+                $dateFieldValueId = $dateFieldId . '-value';
+                ?>
+                <div>
+                    <span id="<?= $dateFieldLabelId ?>" class="<?= LAYOUT_LABEL_CLASS ?>">
+                        <?= htmlspecialchars($dateField['label'], ENT_QUOTES, 'UTF-8') ?>
+                    </span>
+                    <div class="relative" data-picker-field data-date-picker data-filter-dropdown>
+                        <button type="button"
+                            class="<?= LAYOUT_INPUT_CLASS ?> items-center justify-between gap-2 text-left"
+                            data-filter-toggle aria-expanded="false" aria-haspopup="true"
+                            aria-labelledby="<?= $dateFieldLabelId . ' ' . $dateFieldValueId ?>">
+                            <span id="<?= $dateFieldValueId ?>"
+                                class="truncate text-zinc-400 dark:text-zinc-500"
+                                data-picker-value data-placeholder="Wybierz datę">Wybierz datę</span>
+                            <?= panel_icon('chevron-down', 'h-4 w-4 shrink-0 text-zinc-500') ?>
+                        </button>
+                        <div class="<?= PANEL_FILTER_MENU_CLASS ?>" data-filter-menu>
+                            <input type="hidden" id="<?= $dateFieldId ?>" name="<?= $dateFieldName ?>" value="">
+                            <div class="p-1" data-date-calendar>
+                                <div class="mb-2 flex items-center justify-between gap-2">
+                                    <button type="button" data-date-prev aria-label="Poprzedni miesiąc"
+                                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50">
+                                        <?= panel_icon('chevron-left', 'h-4 w-4 shrink-0') ?>
+                                    </button>
+                                    <span data-date-month class="text-sm font-medium text-zinc-900 dark:text-zinc-50"></span>
+                                    <button type="button" data-date-next aria-label="Następny miesiąc"
+                                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50">
+                                        <?= panel_icon('chevron-right', 'h-4 w-4 shrink-0') ?>
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-7 gap-1 text-center">
+                                    <?php foreach (['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'] as $weekday): ?>
+                                        <span class="text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                                            <?= $weekday ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="mt-1 grid grid-cols-7 gap-1" data-date-days></div>
+                            </div>
+                        </div>
+                    </div>
+                    <?= panel_field_error('absence-error-' . $dateFieldName) ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <div>
+            <label for="absence-rodzaj" class="<?= LAYOUT_LABEL_CLASS ?>">Rodzaj</label>
+            <select id="absence-rodzaj" name="rodzaj" class="<?= LAYOUT_INPUT_CLASS ?>" required>
+                <option value="">Wybierz rodzaj</option>
+                <?php foreach ($typeLabels as $typeValue => $typeLabel): ?>
+                    <option value="<?= htmlspecialchars($typeValue, ENT_QUOTES, 'UTF-8') ?>">
+                        <?= htmlspecialchars($typeLabel, ENT_QUOTES, 'UTF-8') ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <?= panel_field_error('absence-error-rodzaj') ?>
+        </div>
+
+        <div data-reason-picker>
+            <span id="absence-powod-label" class="<?= LAYOUT_LABEL_CLASS ?>">Powód</span>
+            <div class="relative" data-picker-field data-filter-dropdown>
+                <button type="button"
+                    class="<?= LAYOUT_INPUT_CLASS ?> items-center justify-between gap-2 text-left"
+                    data-filter-toggle aria-expanded="false" aria-haspopup="true"
+                    aria-labelledby="absence-powod-label absence-powod-value">
+                    <span id="absence-powod-value"
+                        class="truncate text-zinc-400 dark:text-zinc-500"
+                        data-picker-value data-placeholder="Wybierz powód">Wybierz powód</span>
+                    <?= panel_icon('chevron-down', 'h-4 w-4 shrink-0 text-zinc-500') ?>
+                </button>
+                <div class="<?= PANEL_FILTER_MENU_CLASS ?>" data-filter-menu>
+                    <?php panel_filter_options(
+                        'absence-form',
+                        'powod',
+                        'Powód nieobecności',
+                        $reasonOptions,
+                        '',
+                        false
+                    ); ?>
+                </div>
+            </div>
+            <div class="mt-3 hidden" data-reason-custom>
+                <label for="absence-powod-inne" class="<?= LAYOUT_LABEL_CLASS ?>">Opis powodu</label>
+                <textarea id="absence-powod-inne" name="powod_inne" rows="3" maxlength="500"
+                    class="<?= LAYOUT_TEXTAREA_CLASS ?>"></textarea>
+                <p class="<?= LAYOUT_HINT_CLASS ?>">Opcjonalnie, maksymalnie 500 znaków.</p>
+            </div>
+            <p class="<?= LAYOUT_HINT_CLASS ?>">Opcjonalnie wybierz powód z listy.</p>
+            <?= panel_field_error('absence-error-powod') ?>
+        </div>
+
+        <p id="absence-form-error" role="alert" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="submit" id="absence-submit" class="<?= panel_button_classes('primary') ?>">
+                Dodaj wniosek
+            </button>
+            <button type="button" data-drawer-close class="<?= panel_button_classes('secondary') ?>">
+                Anuluj
+            </button>
+        </div>
+    </form>
+<?php panel_drawer_end(); ?>
+
 <script>
+(function () {
+    const monthNames = [
+        'styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec',
+        'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'
+    ];
+
+    function padNumber(value) {
+        return String(value).padStart(2, '0');
+    }
+
+    function dateIso(date) {
+        return date.getFullYear() + '-' + padNumber(date.getMonth() + 1) + '-' + padNumber(date.getDate());
+    }
+
+    function dateLabel(date) {
+        return padNumber(date.getDate()) + '.' + padNumber(date.getMonth() + 1) + '.' + date.getFullYear();
+    }
+
+    function syncPickerDisplay(field) {
+        const display = field.querySelector('[data-picker-value]');
+
+        if (!display) return;
+
+        const placeholder = display.dataset.placeholder || '';
+
+        if (field.hasAttribute('data-date-picker')) {
+            const input = field.querySelector('input[type="hidden"]');
+
+            if (input && input.value !== '') {
+                const selected = new Date(input.value + 'T00:00:00');
+
+                if (!Number.isNaN(selected.getTime())) {
+                    display.textContent = dateLabel(selected);
+                    display.classList.remove('text-zinc-400', 'dark:text-zinc-500');
+                    return;
+                }
+            }
+
+            display.textContent = placeholder;
+            display.classList.add('text-zinc-400', 'dark:text-zinc-500');
+            return;
+        }
+
+        const checked = field.querySelector('input[type="radio"]:checked');
+
+        if (!checked) {
+            display.textContent = placeholder;
+            display.classList.add('text-zinc-400', 'dark:text-zinc-500');
+            return;
+        }
+
+        const optionLabel = checked.closest('label');
+        const optionText = optionLabel ? optionLabel.querySelector('span') : null;
+        display.textContent = optionText ? optionText.textContent.trim() : checked.value;
+        display.classList.remove('text-zinc-400', 'dark:text-zinc-500');
+    }
+
+    function resetPickers(form) {
+        if (!form) return;
+
+        for (const field of form.querySelectorAll('[data-picker-field]')) {
+            syncPickerDisplay(field);
+
+            if (typeof field.resetDatePicker === 'function') {
+                field.resetDatePicker();
+            }
+        }
+    }
+
+    window.panelResetPickers = resetPickers;
+
+    for (const field of document.querySelectorAll('[data-picker-field]')) {
+        for (const radio of field.querySelectorAll('input[type="radio"]')) {
+            radio.addEventListener('change', function () {
+                syncPickerDisplay(field);
+            });
+        }
+
+        syncPickerDisplay(field);
+    }
+
+    function attachDatePicker(field) {
+        const input = field.querySelector('input[type="hidden"]');
+        const calendar = field.querySelector('[data-date-calendar]');
+        const display = field.querySelector('[data-picker-value]');
+        const monthLabel = calendar ? calendar.querySelector('[data-date-month]') : null;
+        const days = calendar ? calendar.querySelector('[data-date-days]') : null;
+        const previous = calendar ? calendar.querySelector('[data-date-prev]') : null;
+        const next = calendar ? calendar.querySelector('[data-date-next]') : null;
+
+        if (!input || !calendar || !display || !monthLabel || !days || !previous || !next) return;
+
+        const today = dateIso(new Date());
+        let view = new Date();
+        view = new Date(view.getFullYear(), view.getMonth(), 1);
+
+        function selectedDate() {
+            if (input.value === '') return null;
+
+            const selected = new Date(input.value + 'T00:00:00');
+
+            return Number.isNaN(selected.getTime()) ? null : selected;
+        }
+
+        function setDisplay(date) {
+            if (date === null) {
+                display.textContent = display.dataset.placeholder || 'Wybierz datę';
+                display.classList.add('text-zinc-400', 'dark:text-zinc-500');
+                return;
+            }
+
+            display.textContent = dateLabel(date);
+            display.classList.remove('text-zinc-400', 'dark:text-zinc-500');
+        }
+
+        function render() {
+            monthLabel.textContent = monthNames[view.getMonth()] + ' ' + view.getFullYear();
+            days.replaceChildren();
+
+            const firstDay = new Date(view.getFullYear(), view.getMonth(), 1);
+            const offset = (firstDay.getDay() + 6) % 7;
+
+            for (let index = 0; index < offset; index += 1) {
+                days.appendChild(document.createElement('span'));
+            }
+
+            const daysInMonth = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+            const selected = selectedDate();
+            const selectedIso = selected === null ? '' : dateIso(selected);
+
+            for (let day = 1; day <= daysInMonth; day += 1) {
+                const date = new Date(view.getFullYear(), view.getMonth(), day);
+                const iso = dateIso(date);
+                const button = document.createElement('button');
+
+                button.type = 'button';
+                button.textContent = String(day);
+                button.className = 'inline-flex h-8 w-8 items-center justify-center rounded-md text-sm text-zinc-700 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 dark:text-zinc-200 dark:hover:bg-zinc-800';
+
+                if (iso === selectedIso) {
+                    button.classList.add(
+                        'bg-zinc-900', 'text-white', 'hover:bg-zinc-800',
+                        'dark:bg-zinc-50', 'dark:text-zinc-900', 'dark:hover:bg-zinc-200'
+                    );
+                } else if (iso === today) {
+                    button.classList.add('ring-1', 'ring-inset', 'ring-zinc-300', 'dark:ring-zinc-600');
+                }
+
+                button.addEventListener('click', function () {
+                    input.value = iso;
+                    setDisplay(date);
+                    render();
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+
+                days.appendChild(button);
+            }
+        }
+
+        function reset() {
+            input.value = '';
+            const now = new Date();
+            view = new Date(now.getFullYear(), now.getMonth(), 1);
+            setDisplay(null);
+            render();
+        }
+
+        field.resetDatePicker = reset;
+
+        previous.addEventListener('click', function () {
+            view = new Date(view.getFullYear(), view.getMonth() - 1, 1);
+            render();
+        });
+
+        next.addEventListener('click', function () {
+            view = new Date(view.getFullYear(), view.getMonth() + 1, 1);
+            render();
+        });
+
+        const selected = selectedDate();
+
+        if (selected !== null) {
+            view = new Date(selected.getFullYear(), selected.getMonth(), 1);
+        }
+
+        setDisplay(selected);
+        render();
+    }
+
+    for (const field of document.querySelectorAll('[data-date-picker]')) {
+        attachDatePicker(field);
+    }
+})();
+
 (function () {
     const scheduleApi = <?= json_encode($scheduleApi, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     const csrfToken = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     const employeeId = <?= $employee['id'] ?>;
+    const drawer = document.getElementById('schedule-drawer');
+    const form = document.getElementById('schedule-form');
     const formError = document.getElementById('schedule-form-error');
+    const actionError = document.getElementById('schedule-action-error');
+    const daySelect = document.getElementById('schedule-dzien');
+    const submitButton = document.getElementById('schedule-submit');
+    const defaultDay = <?= $defaultDay ?>;
+    const fieldErrors = {
+        dzien_tygodnia: document.getElementById('schedule-error-dzien_tygodnia'),
+        czas_rozpoczecia: document.getElementById('schedule-error-czas_rozpoczecia'),
+        czas_zakonczenia: document.getElementById('schedule-error-czas_zakonczenia')
+    };
     let busy = false;
 
-    function clearMessages() {
-        if (!formError) return;
-        formError.textContent = '';
-        formError.classList.add('hidden');
+    function hideMessage(element) {
+        if (!element) return;
+        element.textContent = '';
+        element.classList.add('hidden');
     }
 
-    function showMessage(message) {
-        if (!formError) return;
-        formError.textContent = message;
-        formError.classList.remove('hidden');
+    function showMessage(element, message) {
+        if (!element) return;
+        element.textContent = message;
+        element.classList.remove('hidden');
     }
 
-    function clearFieldErrors(form) {
-        form.querySelectorAll('[data-schedule-field] p').forEach(function (element) {
-            element.textContent = '';
-            element.classList.add('hidden');
-        });
+    function clearFormMessages() {
+        hideMessage(formError);
+
+        for (const element of Object.values(fieldErrors)) {
+            hideMessage(element);
+        }
     }
 
-    function showFieldErrors(form, errors) {
+    function clearActionMessage() {
+        hideMessage(actionError);
+    }
+
+    function showFieldErrors(errors) {
         let shown = false;
 
         for (const [field, message] of Object.entries(errors || {})) {
-            const element = form.querySelector('[data-schedule-field="' + field + '"] p');
+            if (!fieldErrors[field] || typeof message !== 'string') continue;
 
-            if (!element || typeof message !== 'string') continue;
-
-            element.textContent = message;
-            element.classList.remove('hidden');
+            showMessage(fieldErrors[field], message);
             shown = true;
         }
 
@@ -447,36 +842,57 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
     }
 
     function showRequestError(data) {
-        showMessage(typeof data.error === 'string' && data.error !== ''
+        showMessage(actionError, typeof data.error === 'string' && data.error !== ''
             ? data.error
             : 'Nie udało się zapisać grafiku.');
     }
 
-    document.querySelectorAll('[data-schedule-form]').forEach(function (form) {
+    function resetScheduleForm() {
+        if (!form) return;
+
+        form.reset();
+
+        if (window.panelResetPickers) {
+            window.panelResetPickers(form);
+        }
+
+        if (daySelect) {
+            daySelect.value = String(defaultDay);
+        }
+
+        clearFormMessages();
+    }
+
+    if (drawer) {
+        drawer.addEventListener('panel:drawer-close', resetScheduleForm);
+    }
+
+    if (form) {
         form.addEventListener('submit', async function (event) {
             event.preventDefault();
 
             if (busy) return;
 
-            clearMessages();
-            clearFieldErrors(form);
-            const button = form.querySelector('button[type="submit"]');
-            const label = button ? button.textContent : '';
+            clearFormMessages();
             busy = true;
-            if (button) button.disabled = true;
+            if (submitButton) submitButton.disabled = true;
             let completed = false;
+            const startInput = form.querySelector('input[name="czas_rozpoczecia"]:checked');
+            const endInput = form.querySelector('input[name="czas_zakonczenia"]:checked');
 
             try {
                 const result = await send('POST', {
                     pracownik_id: employeeId,
-                    dzien_tygodnia: Number(form.dataset.day),
-                    czas_rozpoczecia: form.elements.czas_rozpoczecia.value,
-                    czas_zakonczenia: form.elements.czas_zakonczenia.value
+                    dzien_tygodnia: Number(daySelect ? daySelect.value : 0),
+                    czas_rozpoczecia: startInput === null ? '' : startInput.value,
+                    czas_zakonczenia: endInput === null ? '' : endInput.value
                 });
 
                 if (!result.response.ok || result.data.success !== true) {
-                    if (!showFieldErrors(form, result.data.errors)) {
-                        showRequestError(result.data);
+                    if (!showFieldErrors(result.data.errors)) {
+                        showMessage(formError, typeof result.data.error === 'string' && result.data.error !== ''
+                            ? result.data.error
+                            : 'Nie udało się zapisać grafiku.');
                     }
                     return;
                 }
@@ -487,24 +903,31 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
                     window.location.reload();
                 }, 600);
             } catch {
-                showMessage('Nie udało się połączyć z serwerem. Spróbuj ponownie.');
+                showMessage(formError, 'Nie udało się połączyć z serwerem. Spróbuj ponownie.');
             } finally {
                 if (!completed) {
                     busy = false;
-                    if (button) {
-                        button.disabled = false;
-                        button.textContent = label;
-                    }
+                    if (submitButton) submitButton.disabled = false;
                 }
             }
         });
-    });
+    }
+
+    for (const button of document.querySelectorAll('[data-schedule-add]')) {
+        button.addEventListener('click', function () {
+            clearFormMessages();
+
+            if (daySelect && button.dataset.day) {
+                daySelect.value = button.dataset.day;
+            }
+        });
+    }
 
     document.querySelectorAll('[data-schedule-toggle]').forEach(function (button) {
         button.addEventListener('click', async function () {
             if (busy) return;
 
-            clearMessages();
+            clearActionMessage();
             busy = true;
             button.disabled = true;
             const active = button.dataset.active === '1';
@@ -528,7 +951,7 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
                     window.location.reload();
                 }, 600);
             } catch {
-                showMessage('Nie udało się połączyć z serwerem. Spróbuj ponownie.');
+                showMessage(actionError, 'Nie udało się połączyć z serwerem. Spróbuj ponownie.');
             } finally {
                 if (!completed) {
                     busy = false;
@@ -551,7 +974,7 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
 
             if (!confirmed) return;
 
-            clearMessages();
+            clearActionMessage();
             busy = true;
             button.disabled = true;
             let completed = false;
@@ -573,7 +996,7 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
                     window.location.reload();
                 }, 600);
             } catch {
-                showMessage('Nie udało się połączyć z serwerem. Spróbuj ponownie.');
+                showMessage(actionError, 'Nie udało się połączyć z serwerem. Spróbuj ponownie.');
             } finally {
                 if (!completed) {
                     busy = false;
@@ -588,9 +1011,15 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
     const absencesApi = <?= json_encode($absencesApi, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     const csrfToken = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     const employeeId = <?= $employee['id'] ?>;
+    const drawer = document.getElementById('absence-drawer');
     const form = document.getElementById('absence-form');
     const formError = document.getElementById('absence-form-error');
+    const actionError = document.getElementById('absence-action-error');
     const actionWarning = document.getElementById('absence-action-warning');
+    const submitButton = document.getElementById('absence-submit');
+    const reasonPicker = document.querySelector('[data-reason-picker]');
+    const customReasonWrap = reasonPicker ? reasonPicker.querySelector('[data-reason-custom]') : null;
+    const customReason = document.getElementById('absence-powod-inne');
     const fieldErrors = {
         data_od: document.getElementById('absence-error-data_od'),
         data_do: document.getElementById('absence-error-data_do'),
@@ -599,21 +1028,42 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
     };
     let busy = false;
 
-    function clearMessages() {
-        formError.textContent = '';
-        formError.classList.add('hidden');
-        actionWarning.textContent = '';
-        actionWarning.classList.add('hidden');
+    function hideMessage(element) {
+        if (!element) return;
+        element.textContent = '';
+        element.classList.add('hidden');
+    }
+
+    function showMessage(element, message) {
+        if (!element) return;
+        element.textContent = message;
+        element.classList.remove('hidden');
+    }
+
+    function clearFormMessages() {
+        hideMessage(formError);
 
         for (const element of Object.values(fieldErrors)) {
-            element.textContent = '';
-            element.classList.add('hidden');
+            hideMessage(element);
         }
     }
 
+    function clearActionMessages() {
+        hideMessage(actionError);
+        hideMessage(actionWarning);
+    }
+
+    function clearMessages() {
+        clearFormMessages();
+        clearActionMessages();
+    }
+
     function showFormError(message) {
-        formError.textContent = message;
-        formError.classList.remove('hidden');
+        showMessage(formError, message);
+    }
+
+    function showActionError(message) {
+        showMessage(actionError, message);
     }
 
     function showErrors(data) {
@@ -622,8 +1072,7 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
         for (const [field, message] of Object.entries(data.errors || {})) {
             if (!fieldErrors[field] || typeof message !== 'string') continue;
 
-            fieldErrors[field].textContent = message;
-            fieldErrors[field].classList.remove('hidden');
+            showMessage(fieldErrors[field], message);
             shown = true;
         }
 
@@ -632,6 +1081,44 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
                 ? data.error
                 : 'Nie udało się zapisać nieobecności.');
         }
+    }
+
+    function syncCustomReason() {
+        if (!reasonPicker || !customReasonWrap) return;
+
+        const selected = reasonPicker.querySelector('input[name="powod"]:checked');
+        const isCustom = selected !== null && selected.value === '__custom__';
+
+        customReasonWrap.classList.toggle('hidden', !isCustom);
+
+        if (!isCustom && customReason) {
+            customReason.value = '';
+        }
+    }
+
+    if (reasonPicker) {
+        for (const radio of reasonPicker.querySelectorAll('input[name="powod"]')) {
+            radio.addEventListener('change', syncCustomReason);
+        }
+
+        syncCustomReason();
+    }
+
+    function resetAbsenceForm() {
+        if (!form) return;
+
+        form.reset();
+
+        if (window.panelResetPickers) {
+            window.panelResetPickers(form);
+        }
+
+        syncCustomReason();
+        clearFormMessages();
+    }
+
+    if (drawer) {
+        drawer.addEventListener('panel:drawer-close', resetAbsenceForm);
     }
 
     async function send(method, payload) {
@@ -652,45 +1139,51 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
         return { response: response, data: data };
     }
 
-    form.addEventListener('submit', async function (event) {
-        event.preventDefault();
+    if (form) {
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
 
-        if (busy) return;
+            if (busy) return;
 
-        clearMessages();
-        const button = document.getElementById('absence-submit');
-        busy = true;
-        button.disabled = true;
-        let completed = false;
+            clearMessages();
+            busy = true;
+            if (submitButton) submitButton.disabled = true;
+            let completed = false;
+            const selectedReasonInput = form.querySelector('input[name="powod"]:checked');
+            const selectedReason = selectedReasonInput === null ? '' : selectedReasonInput.value;
+            const reason = selectedReason === '__custom__'
+                ? (customReason ? customReason.value.trim() : '')
+                : selectedReason;
 
-        try {
-            const result = await send('POST', {
-                pracownik_id: employeeId,
-                data_od: form.elements.data_od.value,
-                data_do: form.elements.data_do.value,
-                rodzaj: form.elements.rodzaj.value,
-                powod: form.elements.powod.value
-            });
+            try {
+                const result = await send('POST', {
+                    pracownik_id: employeeId,
+                    data_od: form.elements.data_od.value,
+                    data_do: form.elements.data_do.value,
+                    rodzaj: form.elements.rodzaj.value,
+                    powod: reason
+                });
 
-            if (!result.response.ok || result.data.success !== true) {
-                showErrors(result.data);
-                return;
+                if (!result.response.ok || result.data.success !== true) {
+                    showErrors(result.data);
+                    return;
+                }
+
+                completed = true;
+                window.showToast('Wniosek o nieobecność został utworzony.', 'success');
+                window.setTimeout(function () {
+                    window.location.reload();
+                }, 600);
+            } catch {
+                showFormError('Nie udało się połączyć z serwerem. Spróbuj ponownie.');
+            } finally {
+                if (!completed) {
+                    busy = false;
+                    if (submitButton) submitButton.disabled = false;
+                }
             }
-
-            completed = true;
-            window.showToast('Wniosek o nieobecność został utworzony.', 'success');
-            window.setTimeout(function () {
-                window.location.reload();
-            }, 600);
-        } catch {
-            showFormError('Nie udało się połączyć z serwerem. Spróbuj ponownie.');
-        } finally {
-            if (!completed) {
-                busy = false;
-                button.disabled = false;
-            }
-        }
-    });
+        });
+    }
 
     document.querySelectorAll('[data-absence-status]').forEach(function (button) {
         button.addEventListener('click', async function () {
@@ -731,7 +1224,12 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
                 });
 
                 if (!result.response.ok || result.data.success !== true) {
-                    showErrors(result.data);
+                    const statusError = result.data.errors && typeof result.data.errors.status === 'string'
+                        ? result.data.errors.status
+                        : (typeof result.data.error === 'string' && result.data.error !== ''
+                            ? result.data.error
+                            : 'Nie udało się zmienić statusu nieobecności.');
+                    showActionError(statusError);
                     return;
                 }
 
@@ -751,7 +1249,7 @@ panel_layout_head($user, 'Dostępność pracownika — WeFixIT', 'employees');
                     window.location.reload();
                 }, 600);
             } catch {
-                showFormError('Nie udało się połączyć z serwerem. Spróbuj ponownie.');
+                showActionError('Nie udało się połączyć z serwerem. Spróbuj ponownie.');
             } finally {
                 if (!completed) {
                     busy = false;
