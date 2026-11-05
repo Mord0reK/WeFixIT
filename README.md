@@ -16,7 +16,7 @@ System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników 
 - [Wymagania](#wymagania)
 - [Uruchomienie przez Docker](#uruchomienie-przez-docker)
 - [Uruchomienie przez XAMPP](#uruchomienie-przez-xampp)
-- [Testy integracyjne](#testy-integracyjne)
+- [Testy integracyjne i CI](#testy-integracyjne-i-ci)
 - [Autorzy](#autorzy)
 
 ## Technologie
@@ -149,6 +149,12 @@ erDiagram
     }
 ```
 
+Diagram pokazuje logiczne typy i relacje. W schemacie wszystkie typy całkowite
+(`INT`, `SMALLINT`, `TINYINT`) są `UNSIGNED`, a `log_zdarzen.id` to
+`BIGINT UNSIGNED`; kolumny `VARCHAR` i `DECIMAL` mają długości i precyzję z
+[database-czysta.sql](database/database-czysta.sql). Pełne ograniczenia
+`NOT NULL`, `CHECK`, `UNIQUE` i indeksy również opisuje plik SQL.
+
 ### Opis tabel nieobecnosci i log_zdarzen
 
 - `nieobecnosci` przechowuje urlopy, choroby i inne nieobecności pracowników w zakresie dat. Status `oczekujaca` oznacza wniosek przed decyzją, a `zatwierdzona`, `odrzucona` lub `anulowana` — jego rozstrzygnięcie. Pełny workflow (wniosek, zatwierdzenie, odrzucenie, anulowanie) obsługuje panel: `POST` tworzy zawsze status `oczekujaca`, a `PATCH` wykonuje wyłącznie dozwolone przejścia. Przy zatwierdzeniu lub odrzuceniu `rozpatrzyl_id` pochodzi z sesji administratora i jest zapisywany razem z `rozpatrzono`; przy anulowaniu oba pola są zerowane. `CHECK chk_nieobecnosci_rozpatrzenie` wymaga obu pól dla `zatwierdzona`/`odrzucona` i obu pustych dla `oczekujaca`/`anulowana`. Anulowanie nie usuwa wniosku.
@@ -173,6 +179,9 @@ Daty rezerwacji w wersji testowej są liczone względem `CURDATE()` i dopasowane
 | Klient | Jan Kowalski | `jan.kowalski@example.com` | `haslo123` |
 | Klient | Anna Nowak | `anna.nowak@example.com` | `haslo123` |
 | Klient | Piotr Wiśniewski | `piotr.wisniewski@example.com` | `haslo123` |
+
+Łącznie jest 7 kont: 1 administrator, 3 pracowników i 3 klientów. Kamil Testowy
+jest kontem pracownika bez profilu w tabeli `pracownicy`.
 
 Wszystkie konta testowe mają identyczny `haslo_hash`, ponieważ korzystają ze wspólnego hasła testowego `haslo123`. To zamierzone ułatwienie środowiska testowego — hashy nie należy zmieniać pojedynczo ani używać tego hasła poza testami.
 
@@ -489,15 +498,17 @@ Do uruchomienia aplikacji należy wybrać jedną z poniższych metod:
 
 ### Konfiguracja środowiska
 
-Plik `.env` jest jedynym źródłem konfiguracji aplikacji, w szczególności
-połączenia z bazą danych. Należy utworzyć go na podstawie `.env.example` i
-dostosować do wybranego środowiska. Plik `.env` znajduje się w katalogu
-głównym projektu, poza katalogiem `public/`, i jest ignorowany przez Git — nie
-trafia do repozytorium.
+Podstawowym źródłem konfiguracji jest plik `.env`, w szczególności dla
+połączenia z bazą danych. [`public/config.php`](public/config.php) najpierw
+czyta zmienne środowiskowe, a brakujące wartości uzupełnia z `.env`; dlatego
+testy i CI mogą przekazywać `DB_*` bezpośrednio w środowisku. Plik `.env` należy
+utworzyć na podstawie `.env.example` i dostosować do wybranego środowiska.
+Znajduje się w katalogu głównym projektu, poza katalogiem `public/`, i jest
+ignorowany przez Git — nie trafia do repozytorium.
 
 ## Uruchomienie przez Docker
 
-Docker uruchamia aplikację razem z serwerem MariaDB oraz automatycznie ładuje testową bazę danych.
+Docker uruchamia aplikację razem z serwerem MariaDB i przy pierwszym utworzeniu wolumenu importuje `database/database.sql`. Plik [`docker/docker-compose.dev.yml`](docker/docker-compose.dev.yml) definiuje usługi `wefixit-dev`, `mariadb` i `tailwind-watcher`; konfiguracja pochodzi z [`.env.example`](.env.example) i kopiowanego `.env`.
 
 1. Sklonuj repozytorium i przejdź do jego katalogu:
 
@@ -511,6 +522,11 @@ Docker uruchamia aplikację razem z serwerem MariaDB oraz automatycznie ładuje 
    ```bash
    cp .env.example .env
    ```
+
+   W pliku `.env` dla Dockera `DB_HOST` musi mieć wartość `mariadb`, bo tak
+   nazywa się usługa bazy w `docker/docker-compose.dev.yml`. Zmienna
+   `DB_ROOT_PASSWORD` jest używana wyłącznie przez kontener MariaDB; aplikacja
+   łączy się przez `DB_USER` i `DB_PASSWORD`.
 
 3. Zbuduj obrazy i uruchom kontenery:
 
@@ -553,17 +569,41 @@ Uruchomienie przez XAMPP:
    DB_PASSWORD=
    ```
 
-   Jeśli konto MySQL `root` ma ustawione hasło, wpisz je w `DB_PASSWORD`. Nie należy edytować plików PHP — konfigurację zmienia się wyłącznie w `.env`.
+   Jeśli konto MySQL `root` ma ustawione hasło, wpisz je w `DB_PASSWORD`. Nie należy edytować plików PHP — konfigurację zmienia się wyłącznie w `.env`. `DB_ROOT_PASSWORD` z `.env.example` nie jest potrzebny aplikacji w XAMPP; używa go tylko kontener MariaDB w Dockerze.
 
-5. Otworzyć aplikację pod adresem [http://localhost/WeFixIT/public/](http://localhost/WeFixIT/public/). Alternatywnie można skonfigurować VirtualHost z `DocumentRoot` wskazującym na katalog `public/` i używać adresu ustawionego dla tego VirtualHosta.
+5. Otworzyć aplikację pod adresem [http://localhost/WeFixIT/public/](http://localhost/WeFixIT/public/). Publiczne adresy nie mają rozszerzenia `.php`; mapowanie zapewnia [`public/.htaccess`](public/.htaccess). Alternatywnie można skonfigurować VirtualHost z `DocumentRoot` wskazującym na katalog `public/` i używać adresu ustawionego dla tego VirtualHosta.
 
 W środowisku Docker wartość `DB_HOST` musi wynosić `mariadb`; w środowisku XAMPP — `localhost`.
 
-## Testy integracyjne
+## Testy integracyjne i CI
 
-Testy Etapu 2 znajdują się w katalogu [`tests/`](tests/) i sprawdzają aplikację
-przez HTTP na izolowanej bazie testowej (domyślnie `wefixit_test`). Nie korzystają
-z bazy deweloperskiej ani z wolumenu Dockera.
+Testy znajdują się w katalogu [`tests/`](tests/) i obejmują Etapy 1–3. Sprawdzają
+aplikację przez HTTP na izolowanej bazie testowej (domyślnie `wefixit_test`).
+Nie korzystają z bazy deweloperskiej ani z wolumenu Dockera.
+
+W uruchomieniu, na podstawie którego zaktualizowano ten opis, wynik był
+następujący: `Wynik: 148 poprawnych, 0 niepoprawnych.` Log serwera nie zawierał
+błędów PHP.
+
+### Zakres plików testowych
+
+| Plik | Zakres |
+|------|--------|
+| [`tests/cases_registration.php`](tests/cases_registration.php) | Rejestracja klienta, odpowiedź 201, zajęty e-mail 409, walidacja 422 i ignorowanie pola `rola`. |
+| [`tests/cases_endpoints.php`](tests/cases_endpoints.php) | Kontrakt JSON: 405 z `Allow`, 415 dla złego `Content-Type` i 400 dla uszkodzonego body. |
+| [`tests/cases_auth.php`](tests/cases_auth.php) | Logowanie i wylogowanie, rotacja identyfikatora sesji, konto nieaktywne oraz cookie `HttpOnly` i `SameSite=Lax`. |
+| [`tests/cases_pages.php`](tests/cases_pages.php) | Ochrona stron, role, przekierowania i widoczność pozycji menu. |
+| [`tests/cases_profile.php`](tests/cases_profile.php) | Edycja profilu, CSRF, zajęty e-mail 409 oraz ignorowanie `id` i `roli` z body. |
+| [`tests/cases_admin.php`](tests/cases_admin.php) | Statystyki dashboardu, dostęp tylko dla administratora i brak ujawniania hashy. |
+| [`tests/cases_admin_categories.php`](tests/cases_admin_categories.php) | Kategorie: dodawanie, edycja, aktywacja, usuwanie, CSRF, 405 i 415. |
+| [`tests/cases_admin_services.php`](tests/cases_admin_services.php) | Usługi: CRUD, filtry, ceny, duplikaty nazw, zależności i kontrakt metod. |
+| [`tests/cases_admin_employees.php`](tests/cases_admin_employees.php) | Profile pracowników: wybór konta, niezmienny `uzytkownik_id`, zależności i usuwanie. |
+| [`tests/cases_admin_employee_services.php`](tests/cases_admin_employee_services.php) | Zastępowanie całego zbioru przypisań, idempotencja, usługi nieaktywne i zachowanie historii. |
+| [`tests/cases_admin_availability.php`](tests/cases_admin_availability.php) | Grafik i nieobecności: nakładanie, maszyna stanów, właściciel wpisu, CSRF i 405. |
+| [`tests/cases_admin_users.php`](tests/cases_admin_users.php) | Zmiana roli i statusu, ochrona własnego konta, ostatni administrator i tylko PATCH. |
+| [`tests/cases_admin_reservations.php`](tests/cases_admin_reservations.php) | Lista rezerwacji, filtry, maszyna stanów, anulowanie w jednym `UPDATE` i tylko GET/PATCH. |
+| [`tests/cases_admin_pagination.php`](tests/cases_admin_pagination.php) | Allowlista `page`/`size`, metadane paginacji, wyszukiwanie i linki zachowujące filtry. |
+| [`tests/cases_admin_log_export.php`](tests/cases_admin_log_export.php) | Filtry dziennika, prywatność aktora, BOM i filtry CSV oraz neutralizacja formuł. |
 
 ### Wymagania
 
@@ -612,8 +652,17 @@ DB_HOST=127.0.0.1 DB_PORT=13306 DB_NAME=wefixit_test DB_USER=root DB_PASSWORD=te
   php tests/run.php
 ```
 
-Analogiczne testy uruchamia CI w zadaniu `http_tests`
-([.github/workflows/check.yml](.github/workflows/check.yml)) na MariaDB 11.4.
+CI w pliku [.github/workflows/check.yml](.github/workflows/check.yml) uruchamia
+pięć jobów:
+
+- `php_lint` — sprawdza składnię wszystkich plików PHP przez `php -l`;
+- `sql_import` — w macierzy importuje oba pliki SQL:
+  `database/database-czysta.sql` i `database/database.sql` do MariaDB 11.4;
+- `tailwind` — buduje CSS z `public/assets/css/input.css` i porównuje wynik
+  przez `cmp` z commitowanym `public/assets/css/app.css`;
+- `http_tests` — uruchamia `php tests/run.php` na MariaDB 11.4 z rozszerzeniami
+  `curl`, `mbstring` i `pdo_mysql`;
+- `ci_result` — bramka wymagająca sukcesu wszystkich czterech poprzednich jobów.
 
 ## Autorzy
 
