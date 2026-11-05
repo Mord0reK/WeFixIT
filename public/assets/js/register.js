@@ -32,7 +32,7 @@
     function showErrors(data) {
         let shownFieldError = false;
 
-        for (const [field, message] of data.errors || {}) {
+        for (const [field, message] of Object.entries(data.errors || {})) {
             if (!fieldMessages[field]) continue;
 
             fieldMessages[field].textContent = message;
