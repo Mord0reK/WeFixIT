@@ -31,6 +31,8 @@ foreach ($categories ?? [] as $category) {
     $categoryFilterOptions[] = [
         'value' => (string) $category['id'],
         'label' => $category['nazwa'] . ($category['aktywna'] ? '' : ' (nieaktywna)'),
+        'disabled' => !$category['aktywna'],
+        'inactive' => !$category['aktywna'],
     ];
     $serviceCategoryOptions[] = [
         'value' => (string) $category['id'],
@@ -75,11 +77,23 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
     <?php else: ?>
         <form id="services-filter-form" method="get"
             action="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>"
-            class="hidden">
+            class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2">
             <input type="hidden" name="size" value="<?= $size ?>">
-            <?php if ($search !== ''): ?>
-                <input type="hidden" name="szukaj" value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>">
-            <?php endif; ?>
+
+            <div>
+                <label for="services-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
+                <input id="services-filter-search" name="szukaj" type="search" maxlength="100"
+                    value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
+                    placeholder="Nazwa usługi" class="<?= LAYOUT_INPUT_CLASS ?>">
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 sm:items-end">
+                <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
+                <?php if ($filtersActive): ?>
+                    <a href="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>"
+                        class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
+                <?php endif; ?>
+            </div>
         </form>
 
         <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">

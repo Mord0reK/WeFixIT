@@ -58,11 +58,23 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
     <?php else: ?>
         <form id="employees-filter-form" method="get"
             action="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
-            class="hidden">
+            class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2">
             <input type="hidden" name="size" value="<?= $size ?>">
-            <?php if ($search !== ''): ?>
-                <input type="hidden" name="szukaj" value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>">
-            <?php endif; ?>
+
+            <div>
+                <label for="employees-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
+                <input id="employees-filter-search" name="szukaj" type="search" maxlength="100"
+                    value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
+                    placeholder="Imię lub nazwisko" class="<?= LAYOUT_INPUT_CLASS ?>">
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 sm:items-end">
+                <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
+                <?php if ($hasFilters): ?>
+                    <a href="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
+                        class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
+                <?php endif; ?>
+            </div>
         </form>
 
         <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">

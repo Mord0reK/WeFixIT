@@ -35,6 +35,7 @@ function layout_logo(string $classes = 'h-5 w-5'): string
 function layout_head(string $title, string $bodyClass = LAYOUT_PAGE_BODY_CLASS): void
 {
     $cssHref = htmlspecialchars(auth_base_path() . '/assets/css/app.css', ENT_QUOTES, 'UTF-8');
+    $faviconHref = htmlspecialchars(auth_base_path() . '/favicon.svg', ENT_QUOTES, 'UTF-8');
     $toastJsHref = htmlspecialchars(auth_base_path() . '/assets/js/toast.js', ENT_QUOTES, 'UTF-8');
     $titleSafe = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
     $bodyClassSafe = htmlspecialchars($bodyClass, ENT_QUOTES, 'UTF-8');
@@ -49,11 +50,12 @@ function layout_head(string $title, string $bodyClass = LAYOUT_PAGE_BODY_CLASS):
             <meta name="color-scheme" content="light dark">
             <meta name="csrf-token" content="{$csrfTokenSafe}">
             <title>{$titleSafe}</title>
+            <link rel="icon" type="image/svg+xml" href="{$faviconHref}" sizes="any">
             <link rel="stylesheet" href="{$cssHref}">
             <script src="{$toastJsHref}" defer></script>
         </head>
         <body class="{$bodyClassSafe}">
-            <div id="toast-container" class="pointer-events-none fixed bottom-4 right-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2"></div>
+            <div id="toast-container" class="pointer-events-none fixed bottom-4 right-4 z-[60] flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2"></div>
         HTML;
 }
 

@@ -146,6 +146,8 @@
 
         menu.classList.remove('hidden');
         menu.classList.remove('panel-dropdown-in', 'panel-dropdown-out');
+        menu.style.maxHeight = 'min(18.5rem, ' + (window.innerHeight - 16) + 'px)';
+
 
         const rect = toggle.getBoundingClientRect();
         const menuWidth = menu.offsetWidth;
@@ -190,7 +192,7 @@
 
         // Po wybraniu opcji menu zamyka się; filtry dodatkowo wysyłają formularz.
         menu.addEventListener('change', function () {
-            closeFilterDropdown(dropdown, false);
+            closeFilterDropdown(dropdown, true);
         });
     }
 
@@ -203,6 +205,7 @@
     document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape' && openFilterDropdown !== null) {
             closeFilterDropdown(openFilterDropdown, true);
+            event.stopImmediatePropagation();
         }
     });
 
