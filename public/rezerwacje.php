@@ -82,7 +82,6 @@ if ($search !== '') {
 
 $exportParams = ['typ' => 'rezerwacje'] + array_diff_key($paginationParams, ['size' => true]);
 $exportUrl = $basePath . '/eksport?' . http_build_query($exportParams);
-$csrfToken = csrf_token();
 $statusLabels = [
     'oczekujaca' => 'Oczekująca',
     'potwierdzona' => 'Potwierdzona',
@@ -104,10 +103,46 @@ $targetLabels = [
     'zrealizowana' => 'Zrealizuj',
     'anulowana' => 'Anuluj',
 ];
+$clientFilterOptions = [['value' => '0', 'label' => 'Wszyscy']];
+
+foreach ($clients ?? [] as $client) {
+    $clientFilterOptions[] = [
+        'value' => (string) $client['id'],
+        'label' => $client['imie'] . ' ' . $client['nazwisko'] . ($client['aktywny'] ? '' : ' (nieaktywny)'),
+    ];
+}
+
+$employeeFilterOptions = [['value' => '0', 'label' => 'Wszyscy']];
+
+foreach ($employees ?? [] as $employee) {
+    $employeeFilterOptions[] = [
+        'value' => (string) $employee['id'],
+        'label' => $employee['imie'] . ' ' . $employee['nazwisko'] . ($employee['aktywny'] ? '' : ' (nieaktywny)'),
+    ];
+}
+
+$serviceFilterOptions = [['value' => '0', 'label' => 'Wszystkie']];
+
+foreach ($services ?? [] as $service) {
+    $serviceFilterOptions[] = [
+        'value' => (string) $service['id'],
+        'label' => $service['nazwa'] . ($service['aktywna'] ? '' : ' (nieaktywna)'),
+    ];
+}
+
+$statusFilterOptions = [['value' => '', 'label' => 'Wszystkie']];
+
+foreach (REZERWACJA_STATUSES as $statusOption) {
+    $statusFilterOptions[] = [
+        'value' => $statusOption,
+        'label' => $statusLabels[$statusOption] ?? $statusOption,
+    ];
+}
 
 panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
 ?>
-<section class="<?= PANEL_CARD_WIDE_CLASS ?>">
+<section id="reservations-page" class="<?= PANEL_CARD_WIDE_CLASS ?>"
+    data-api="<?= htmlspecialchars($reservationsApi, ENT_QUOTES, 'UTF-8') ?>">
     <?php
     panel_section_header(
         'Rezerwacje',
@@ -118,128 +153,124 @@ panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
     );
     ?>
 
-    <form id="reservations-filter-form" method="get"
-        action="<?= htmlspecialchars($reservationsUrl, ENT_QUOTES, 'UTF-8') ?>"
-        class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2 xl:grid-cols-3">
-        <input type="hidden" name="kierunek" value="<?= htmlspecialchars($sortDirection, ENT_QUOTES, 'UTF-8') ?>">
-        <input type="hidden" name="size" value="<?= $size ?>">
-
-        <div>
-            <label for="reservations-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
-            <input id="reservations-filter-search" name="szukaj" type="search" maxlength="100"
-                value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
-                placeholder="Nazwisko klienta lub pracownika" class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div>
-            <label for="reservations-filter-from" class="<?= LAYOUT_LABEL_CLASS ?>">Data od</label>
-            <input id="reservations-filter-from" name="data_od" type="date"
-                value="<?= $dateFrom !== null ? htmlspecialchars($dateFrom, ENT_QUOTES, 'UTF-8') : '' ?>"
-                class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div>
-            <label for="reservations-filter-to" class="<?= LAYOUT_LABEL_CLASS ?>">Data do</label>
-            <input id="reservations-filter-to" name="data_do" type="date"
-                value="<?= $dateTo !== null ? htmlspecialchars($dateTo, ENT_QUOTES, 'UTF-8') : '' ?>"
-                class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div>
-            <label for="reservations-filter-status" class="<?= LAYOUT_LABEL_CLASS ?>">Status</label>
-            <select id="reservations-filter-status" name="status" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="" <?= $statusFilter === '' ? 'selected' : '' ?>>Wszystkie statusy</option>
-                <?php foreach (REZERWACJA_STATUSES as $statusOption): ?>
-                    <option value="<?= htmlspecialchars($statusOption, ENT_QUOTES, 'UTF-8') ?>"
-                        <?= $statusFilter === $statusOption ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($statusLabels[$statusOption] ?? $statusOption, ENT_QUOTES, 'UTF-8') ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div>
-            <label for="reservations-filter-employee" class="<?= LAYOUT_LABEL_CLASS ?>">Pracownik</label>
-            <select id="reservations-filter-employee" name="pracownik_id" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="0" <?= $employeeFilter === 0 ? 'selected' : '' ?>>Wszyscy pracownicy</option>
-                <?php foreach ($employees ?? [] as $employee): ?>
-                    <option value="<?= $employee['id'] ?>" <?= $employeeFilter === $employee['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($employee['imie'] . ' ' . $employee['nazwisko'], ENT_QUOTES, 'UTF-8') ?>
-                        <?= $employee['aktywny'] ? '' : '(nieaktywny)' ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div>
-            <label for="reservations-filter-service" class="<?= LAYOUT_LABEL_CLASS ?>">Usługa</label>
-            <select id="reservations-filter-service" name="usluga_id" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="0" <?= $serviceFilter === 0 ? 'selected' : '' ?>>Wszystkie usługi</option>
-                <?php foreach ($services ?? [] as $service): ?>
-                    <option value="<?= $service['id'] ?>" <?= $serviceFilter === $service['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($service['nazwa'], ENT_QUOTES, 'UTF-8') ?>
-                        <?= $service['aktywna'] ? '' : '(nieaktywna)' ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div>
-            <label for="reservations-filter-client" class="<?= LAYOUT_LABEL_CLASS ?>">Klient</label>
-            <select id="reservations-filter-client" name="uzytkownik_id" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="0" <?= $clientFilter === 0 ? 'selected' : '' ?>>Wszyscy klienci</option>
-                <?php foreach ($clients ?? [] as $client): ?>
-                    <option value="<?= $client['id'] ?>" <?= $clientFilter === $client['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($client['imie'] . ' ' . $client['nazwisko'], ENT_QUOTES, 'UTF-8') ?>
-                        <?= $client['aktywny'] ? '' : '(nieaktywny)' ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2 sm:items-end">
-            <button type="submit" class="<?= panel_button_classes('secondary') ?>">Filtruj</button>
-            <?php if ($filtersActive): ?>
-                <a href="<?= htmlspecialchars($reservationsUrl, ENT_QUOTES, 'UTF-8') ?>"
-                    class="<?= panel_button_classes('ghost') ?>">Wyczyść filtry</a>
-            <?php endif; ?>
-        </div>
-    </form>
-
     <?php if ($reservations === null): ?>
         <div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
             Nie udało się pobrać listy rezerwacji. Spróbuj ponownie później.
         </div>
-    <?php elseif ($reservations === []): ?>
-        <?php
-        if ($filtersActive) {
-            panel_empty_state(
-                'Brak rezerwacji dla wybranych filtrów',
-                'Zmień zakres dat, filtry lub frazę wyszukiwania, aby zobaczyć inne rezerwacje.',
-                ['label' => 'Wyczyść filtry', 'href' => $reservationsUrl]
-            );
-        } else {
-            panel_empty_state(
-                'Brak rezerwacji',
-                'Rezerwacje pojawią się tutaj, gdy klienci zaczną składać zamówienia.'
-            );
-        }
-        ?>
     <?php else: ?>
+        <form id="reservations-filter-form" method="get"
+            action="<?= htmlspecialchars($reservationsUrl, ENT_QUOTES, 'UTF-8') ?>"
+            class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2">
+            <input type="hidden" name="kierunek" value="<?= htmlspecialchars($sortDirection, ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="size" value="<?= $size ?>">
+
+            <div>
+                <label for="reservations-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
+                <input id="reservations-filter-search" name="szukaj" type="search" maxlength="100"
+                    value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
+                    placeholder="Nazwisko klienta lub pracownika" class="<?= LAYOUT_INPUT_CLASS ?>">
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 sm:items-end">
+                <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
+                <?php if ($filtersActive): ?>
+                    <a href="<?= htmlspecialchars($reservationsUrl, ENT_QUOTES, 'UTF-8') ?>"
+                        class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
+                <?php endif; ?>
+            </div>
+        </form>
+
         <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">
             <table id="reservations-table" class="<?= PANEL_TABLE_CLASS ?>">
                 <thead>
                     <tr>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Termin</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Klient</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Pracownik</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Usługa</th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">
+                            <?php panel_filter_start('reservations-date', 'Termin', $dateFrom !== null || $dateTo !== null); ?>
+                                <?php panel_filter_date(
+                                    'reservations-filter-form',
+                                    'data_od',
+                                    'Data od',
+                                    $dateFrom,
+                                    'Filtruj rezerwacje od daty'
+                                ); ?>
+                                <?php panel_filter_date(
+                                    'reservations-filter-form',
+                                    'data_do',
+                                    'Data do',
+                                    $dateTo,
+                                    'Filtruj rezerwacje do daty'
+                                ); ?>
+                            <?php panel_filter_end(); ?>
+                        </th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">
+                            <?php panel_filter_start('reservations-client', 'Klient', $clientFilter > 0); ?>
+                                <?php panel_filter_options(
+                                    'reservations-filter-form',
+                                    'uzytkownik_id',
+                                    'Filtruj według klienta',
+                                    $clientFilterOptions,
+                                    (string) $clientFilter
+                                ); ?>
+                            <?php panel_filter_end(); ?>
+                        </th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">
+                            <?php panel_filter_start('reservations-employee', 'Pracownik', $employeeFilter > 0); ?>
+                                <?php panel_filter_options(
+                                    'reservations-filter-form',
+                                    'pracownik_id',
+                                    'Filtruj według pracownika',
+                                    $employeeFilterOptions,
+                                    (string) $employeeFilter
+                                ); ?>
+                            <?php panel_filter_end(); ?>
+                        </th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">
+                            <?php panel_filter_start('reservations-service', 'Usługa', $serviceFilter > 0); ?>
+                                <?php panel_filter_options(
+                                    'reservations-filter-form',
+                                    'usluga_id',
+                                    'Filtruj według usługi',
+                                    $serviceFilterOptions,
+                                    (string) $serviceFilter
+                                ); ?>
+                            <?php panel_filter_end(); ?>
+                        </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Cena</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status</th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">
+                            <?php panel_filter_start('reservations-status', 'Status', $statusFilter !== ''); ?>
+                                <?php panel_filter_options(
+                                    'reservations-filter-form',
+                                    'status',
+                                    'Filtruj według statusu',
+                                    $statusFilterOptions,
+                                    $statusFilter
+                                ); ?>
+                            <?php panel_filter_end(); ?>
+                        </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?> text-right">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
+                    <?php if ($reservations === []): ?>
+                        <tr>
+                            <td colspan="7" class="p-4">
+                                <?php
+                                if ($filtersActive) {
+                                    panel_empty_state(
+                                        'Brak rezerwacji dla wybranych filtrów',
+                                        'Zmień zakres dat, filtry lub frazę wyszukiwania, aby zobaczyć inne rezerwacje.',
+                                        ['label' => 'Wyczyść filtry', 'href' => $reservationsUrl]
+                                    );
+                                } else {
+                                    panel_empty_state(
+                                        'Brak rezerwacji',
+                                        'Rezerwacje pojawią się tutaj, gdy klienci zaczną składać zamówienia.'
+                                    );
+                                }
+                                ?>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                     <?php foreach ($reservations as $reservation): ?>
                         <?php
                         $reservationId = (int) $reservation['id'];
@@ -334,141 +365,4 @@ panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
     </noscript>
 </section>
 
-<script>
-(function () {
-    const reservationsApi = <?= json_encode($reservationsApi, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    const csrfToken = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    const generalError = document.getElementById('reservations-error');
-    let busy = false;
-
-    function clearErrors() {
-        if (generalError) {
-            generalError.textContent = '';
-            generalError.classList.add('hidden');
-        }
-
-        document.querySelectorAll('[id^="reservation-error-"]').forEach(function (element) {
-            element.textContent = '';
-            element.classList.add('hidden');
-        });
-    }
-
-    function showGeneralError(message) {
-        if (!generalError) return;
-
-        generalError.textContent = message;
-        generalError.classList.remove('hidden');
-    }
-
-    function showRowError(id, data) {
-        const element = document.getElementById('reservation-error-' + id);
-        const message = data.errors && typeof data.errors.status === 'string' ? data.errors.status : '';
-
-        if (element && message !== '') {
-            element.textContent = message;
-            element.classList.remove('hidden');
-            return;
-        }
-
-        showGeneralError(typeof data.error === 'string' && data.error !== ''
-            ? data.error
-            : 'Nie udało się zmienić statusu rezerwacji.');
-    }
-
-    async function sendStatus(id, status) {
-        const response = await fetch(reservationsApi, {
-            method: 'PATCH',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-            body: JSON.stringify({ id: id, status: status })
-        });
-        let data = {};
-
-        try {
-            data = await response.json();
-        } catch {
-            data = {};
-        }
-
-        return { response: response, data: data };
-    }
-
-    document.querySelectorAll('[data-reservation-status]').forEach(function (button) {
-        button.addEventListener('click', async function () {
-            if (busy) return;
-
-            const id = Number(button.dataset.id);
-            const current = button.dataset.current || '';
-            const target = button.dataset.target || '';
-            const currentLabel = button.dataset.currentLabel || current;
-            const targetLabel = button.dataset.targetLabel || target;
-
-            if (id <= 0 || target === '') return;
-
-            let title = 'Zmienić status rezerwacji?';
-            let message = 'Status rezerwacji zmieni się z „' + currentLabel + '” na „' + targetLabel + '”.';
-            let confirmLabel = 'Zmień status';
-            let danger = false;
-
-            if (target === 'anulowana') {
-                title = 'Anulować rezerwację?';
-                message = 'Rezerwacja pozostanie w bazie jako anulowana. Nie zostanie usunięta.';
-                confirmLabel = 'Anuluj rezerwację';
-                danger = true;
-            } else if (current === 'anulowana') {
-                title = 'Cofnąć anulowanie?';
-                message = 'Rezerwacja wróci do statusu „Oczekująca”.';
-                confirmLabel = 'Cofnij anulowanie';
-            }
-
-            const confirmed = await window.panelConfirm({
-                title: title,
-                message: message,
-                confirmLabel: confirmLabel,
-                danger: danger
-            });
-
-            if (!confirmed) return;
-
-            clearErrors();
-            busy = true;
-            button.disabled = true;
-            const submitLabel = button.textContent;
-            let completed = false;
-            button.textContent = 'Zapisywanie…';
-
-            try {
-                const result = await sendStatus(id, target);
-
-                if (!result.response.ok || result.data.success !== true) {
-                    showRowError(id, result.data);
-                    return;
-                }
-
-                completed = true;
-                let toastMessage = 'Status rezerwacji został zmieniony.';
-
-                if (target === 'anulowana') {
-                    toastMessage = 'Rezerwacja została anulowana.';
-                } else if (current === 'anulowana') {
-                    toastMessage = 'Anulowanie rezerwacji zostało cofnięte.';
-                }
-
-                window.showToast(toastMessage, 'success');
-                window.setTimeout(function () {
-                    window.location.reload();
-                }, 600);
-            } catch {
-                showGeneralError('Nie udało się połączyć z serwerem. Spróbuj ponownie.');
-            } finally {
-                if (!completed) {
-                    busy = false;
-                    button.disabled = false;
-                    button.textContent = submitLabel;
-                }
-            }
-        });
-    });
-})();
-</script>
-<?php panel_layout_foot(); ?>
+<?php panel_layout_foot('reservations.js'); ?>

@@ -428,15 +428,15 @@ test('Dodatkowo: edycja usługi w nieaktywnej kategorii nie wymaga zmiany katego
     $page = http_request($session['cookies'], 'GET', '/uslugi.php');
     assert_status(200, $page, 'Strona usług powinna zwrócić 200');
     assert_true(
-        preg_match('/<select id="service-kategoria".*?<\/select>/s', $page['body'], $matches) === 1,
-        'Formularz powinien zawierać select kategorii'
+        strpos($page['body'], 'name="kategoria_id"') !== false,
+        'Formularz powinien zawierać opcje kategorii'
     );
     assert_true(
-        strpos($matches[0], 'data-inactive="1"') !== false,
-        'Select powinien zawierać nieaktywną kategorię oznaczoną dla JS'
+        preg_match('/<input[^>]*name="kategoria_id"[^>]*data-inactive="1"[^>]*>/', $page['body']) === 1,
+        'Dropdown powinien zawierać nieaktywną kategorię oznaczoną dla JS'
     );
     assert_true(
-        strpos($matches[0], '(nieaktywna)') !== false,
+        strpos($page['body'], '(nieaktywna)') !== false,
         'Nieaktywna kategoria powinna mieć czytelne oznaczenie'
     );
 });

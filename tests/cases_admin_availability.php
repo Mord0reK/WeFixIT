@@ -666,6 +666,30 @@ test('91. strona dostępności zawiera obie sekcje i osadza 404 w szklelecie pan
         strpos($page['body'], 'brak godzin pracy') !== false,
         'Puste dni grafiku powinny wprost pokazywać brak godzin pracy'
     );
+    assert_true(
+        strpos($page['body'], 'id="schedule-drawer"') !== false
+        && strpos($page['body'], 'id="schedule-form"') !== false,
+        'Formularz przedziału grafiku powinien być osadzony w panelu bocznym'
+    );
+    assert_true(
+        strpos($page['body'], 'id="absence-drawer"') !== false
+        && strpos($page['body'], 'id="absence-form"') !== false,
+        'Formularz nieobecności powinien być osadzony w panelu bocznym'
+    );
+    assert_true(
+        strpos($page['body'], 'data-drawer-open="schedule-drawer"') !== false
+        && strpos($page['body'], 'data-drawer-open="absence-drawer"') !== false,
+        'Oba panele powinny mieć akcje otwierające'
+    );
+    assert_true(
+        strpos($page['body'], 'data-date-picker') !== false
+        && strpos($page['body'], 'data-picker-value') !== false,
+        'Daty i godziny powinny używać własnych list wyboru'
+    );
+    assert_true(
+        strpos($page['body'], 'Wybierz powód') !== false,
+        'Powód nieobecności powinien być wybierany z listy'
+    );
 
     $employeesPage = http_request($session['cookies'], 'GET', '/pracownicy.php');
     assert_status(200, $employeesPage, 'Lista pracowników powinna zwrócić 200');

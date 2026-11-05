@@ -1,77 +1,84 @@
-# WeFixIT — instrukcje implementacji i code review
+# WeFixIT — instrukcje dla agenta implementującego kod
 
-Instrukcje dotyczą całego repozytorium. Wspólne standardy obowiązują
-zarówno agenta implementującego kod, jak i narzędzia wykonujące review.
+## Zakazy bezwzględne
+
+Bez wyraźnego polecenia użytkownika nie wolno:
+
+1. commitować, pushować, mergować ani deployować;
+2. resetować bazy, usuwać volume'ów ani uruchamiać `docker compose down -v`;
+3. wykonywać destrukcyjnych poleceń Git (`reset --hard`, `clean -fdx`, `push --force`);
+4. dodawać zależności, frameworków ani narzędzi (npm, Bun, ORM, MySQLi, JWT);
+5. budować `public/assets/css/app.css` samodzielnie ani edytować go ręcznie;
+6. implementować funkcji spoza zakresu polecenia;
+7. refaktoryzować kodu ani formatować plików poza zakresem zadania;
+8. zmieniać zadań w zewnętrznym narzędziu do zarządzania zadaniami.
+
+Nie nadpisuj niezwiązanych zmian użytkownika. Jeśli polecenie jest sprzeczne
+z tymi zasadami, powiedz o konflikcie i ustal decyzję przed kodowaniem.
 
 ## Cel i zakres
 
-WeFixIT jest projektem semestralnym: systemem rezerwacji usług serwisu
-komputerowego z rolami klienta, pracownika i administratora.
+Projekt semestralny: system rezerwacji usług serwisu komputerowego z rolami
+klienta, pracownika i administratora.
 
 - Pisz prosty, czytelny kod możliwy do wyjaśnienia podczas obrony.
 - Realizuj zakres bieżącego polecenia, nie przyszłe funkcje na zapas.
 - Przed zmianą przeczytaj odpowiednie pliki, README i istniejące testy.
 - Nie zakładaj, że istniejący kod jest poprawny lub kompletny.
-- Nie przeprowadzaj niezwiązanych refactorów i masowego formatowania.
-- Jeśli polecenie jest sprzeczne z tymi instrukcjami, wyjaśnij konflikt
-  i ustal decyzję przed implementacją.
 
 ## Stack
 
-- PHP zgodny z PHP 8.2, bez frameworków.
+- PHP zgodny z 8.2, bez frameworków.
 - Apache.
 - PDO z driverem MySQL i prepared statements.
 - MariaDB 11.4.
 - HTML5, Tailwind CSS 4.3.3 standalone CLI, vanilla JavaScript.
-- Docker Compose do developmentu; kompatybilność z XAMPP.
-- Skompilowany public/assets/css/app.css jest commitowany.
+- Docker Compose v2 do developmentu; zgodność z XAMPP, także w podkatalogu.
+- Skompilowany `public/assets/css/app.css` jest commitowany.
 
-Nie wprowadzaj MySQLi, ORM, Laravel, Symfony, React, Vue, npm, Bun ani
-dodatkowych serwisów bez wyraźnej decyzji użytkownika.
-
-PDO ma API obiektowe, ale kod aplikacji organizujemy jako proste moduły
-funkcji. Nie twórz własnych klas do opakowywania PDO bez realnej potrzeby.
+PDO ma API obiektowe, ale kod organizuj jako proste moduły funkcji.
+Nie opakowuj PDO we własne klasy bez realnej potrzeby.
 
 ## Architektura i katalogi
 
-Aplikacja jest jednym modularnym monolitem PHP/Apache.
+Jedna aplikacja monolityczna PHP/Apache.
 
 - PHP renderuje strony, layouty, formularze i początkowy HTML.
-- JavaScript wykonuje operacje przez fetch() i wewnętrzne JSON API.
-- Formularze operacji wymagają JavaScriptu.
-- Nie dodawaj fallbacku formularzy bez JS, osobnych actions ani obsługi
-  POST w stronach renderujących formularze.
+- JavaScript wykonuje operacje przez `fetch()` i wewnętrzne JSON API.
+- Formularze operacji wymagają JavaScriptu. Nie dodawaj fallbacku bez JS,
+  osobnych actions ani obsługi POST w stronach renderujących formularze.
 - API nie jest osobną aplikacją, kontenerem ani deploymentem.
-- Authentication wykorzystuje sesję PHP i cookies, nie JWT.
+- Authentication opiera się o sesję PHP i cookies, nigdy o JWT.
 
-W public/ umieszczaj punkty wejścia HTTP i publiczne assets.
-Wspólne funkcje, konfigurację, połączenie DB, kontrolę dostępu oraz
-reużywalne widoki umieszczaj poza public/, np. w app/.
+- `public/` — punkty wejścia HTTP i publiczne assety.
+- `app/` — wspólne moduły poza docrootem: DB, sesja, auth, CSRF, walidacja,
+  layout.
+- `database/`, `tests/`, `docker/`, `.github/workflows/`.
 
 - Twórz katalogi razem z rzeczywistym kodem, nie pustą architekturę.
-- Współdziel DB, sesje, auth, authorization, CSRF i walidację.
 - Nie wymagaj osobnego repository lub service dla każdego zapytania.
 - Prosta logika używana tylko w jednym endpointcie może pozostać w nim.
 - Wydzielaj logikę, gdy jest współdzielona, złożona lub utrudnia czytanie
   endpointu. Nie duplikuj reguł biznesowych.
 - Widoki i komponenty renderujące nie wykonują SQL ani operacji zapisu.
-- config.php może pełnić rolę pliku startowego. Nie dodawaj drugiego
-  bootstrap.php wykonującego te same czynności.
-- Ścieżki do plików buduj względem __DIR__, nie katalogu roboczego.
+- `config.php` pełni rolę pliku startowego. Nie dodawaj drugiego
+  `bootstrap.php` robiącego to samo.
+- Ścieżki do plików buduj względem `__DIR__`, nie katalogu roboczego.
+- Kod, `.env` i pliki SQL poza `public/` nie mogą być dostępne przez HTTP.
 
 ## Styl kodu
 
-- Nazwy nowych funkcji i zmiennych pisz po angielsku.
-- PHP: snake_case dla własnych funkcji i zmiennych.
-- JavaScript: camelCase dla funkcji i zmiennych.
+- Nazwy nowych funkcji i zmiennych po angielsku: PHP `snake_case`,
+  JavaScript `camelCase`.
 - Zachowuj istniejące polskie nazwy tabel i kolumn DB.
 - Komunikaty UI, komentarze i dokumentację pisz po polsku.
-- Używaj czterech spacji zamiast tabulatorów.
-- W PHP klamrę funkcji umieszczaj w następnej linii.
-- Preferuj guard clauses zamiast głębokich zagnieżdżeń.
+- Cztery spacje, nie tabulatory.
+- Klamra funkcji w PHP w następnej linii.
+- Guard clauses zamiast głębokich zagnieżdżeń.
 - Deklaruj typy parametrów i wyników własnych funkcji.
 - Nie używaj PHPDoc.
-- Nie zmieniaj istniejących nazw i formatowania poza zakresem zadania.
+- Komentarze wyjaśniają powód decyzji lub nieoczywistą regułę, nie każdą
+  instrukcję.
 
 Każdy plik PHP zaczynaj od:
 
@@ -84,110 +91,71 @@ declare(strict_types=1);
  */
 ```
 
-Na początku każdego nowego lub istotnie zmienianego pliku kodu dodaj
-krótki blok komentarza opisujący jego odpowiedzialność. Użyj składni
-odpowiedniej dla języka; zachowaj wymagane położenie dyrektyw i deklaracji.
-
-Komentarze wewnątrz kodu wyjaśniają powód decyzji lub nieoczywistą regułę.
-Nie opisuj każdej instrukcji ani oczywistych operacji.
-
 ## HTTP i JSON API
 
-- Publiczne URL-e nie mają rozszerzenia .php.
-- Używaj /api/* bez wymaganego /v1.
-- Apache mapuje URL-e na istniejące pliki PHP.
-- Operacje auth mają oddzielne endpointy, np. /api/auth/login,
-  /api/auth/register i /api/auth/logout.
-- Nie łącz operacji w jeden endpoint z parametrem action.
+- Publiczne URL-e bez rozszerzenia `.php`; Apache mapuje je na pliki PHP.
+- Endpointy pod `/api/*`, bez `/v1/`.
+- Operacje auth mają osobne endpointy (`/api/auth/login`, `/api/auth/register`,
+  `/api/auth/logout`). Nie łącz ich w jeden endpoint z parametrem `action`.
+- Linki, `fetch()` i redirecty muszą działać również w podkatalogu. Nigdy nie
+  zakładaj root domeny.
 
-Dla endpointów przyjmujących JSON:
+Kody odpowiedzi:
 
-- Sukces: 200, a przy utworzeniu nowego zasobu 201.
-- Sprawdź metodę HTTP i Content-Type.
-- Niepoprawna metoda: 405 i właściwy nagłówek Allow.
-- Nieobsługiwany Content-Type: 415.
-- Uszkodzony JSON lub niewłaściwa struktura body: 400.
-- Błędy walidacji pól: 422.
-- Odrzucone dane logowania lub brak authentication: 401.
-- Brak uprawnień albo niepoprawny CSRF: 403.
-- Konflikt stanu, np. zajęty termin: 409.
-- Nieoczekiwany błąd wewnętrzny: 500 bez szczegółów technicznych.
+- 200 — sukces; 201 — utworzenie zasobu.
+- 405 z nagłówkiem `Allow` — zła metoda.
+- 415 — nieobsługiwany `Content-Type`.
+- 400 — uszkodzony JSON lub zła struktura body.
+- 422 — błędy walidacji pól.
+- 401 — brak authentication lub odrzucone dane logowania.
+- 403 — brak uprawnień lub niepoprawny CSRF.
+- 409 — konflikt stanu, np. zajęty termin.
+- 500 — bez szczegółów technicznych.
 
-Odpowiedzi JSON mają Content-Type: application/json; charset=utf-8.
-Dla auth i danych użytkownika stosuj Cache-Control: no-store.
+Kontrakt:
 
-Format sukcesu:
-
-```json
-{
-  "success": true,
-  "user_id": 4
-}
-```
-
-Pola sukcesu zależą od operacji. Nie wymagaj opakowania data ani error: null.
-
-Format błędu:
-
-```json
-{
-  "error": "Nieprawidłowy e-mail lub hasło."
-}
-```
-
-Błędy walidacji mogą dodatkowo zawierać mapę pól:
-
-```json
-{
-  "error": "Nieprawidłowe dane logowania.",
-  "errors": {
-    "email": "Podaj prawidłowy adres e-mail."
-  }
-}
-```
-
-- Używaj wspólnego helpera odpowiedzi JSON, gdy korzysta z niego wiele
-  endpointów; nie kopiuj identycznych funkcji do kolejnych plików.
+- `Content-Type: application/json; charset=utf-8`.
+- `Cache-Control: no-store` dla auth i danych użytkownika.
+- Sukces: `{"success": true, ...}` — pola zależne od operacji, bez opakowania
+  `data` i bez `error: null`.
+- Błąd: `{"error": "..."}`, opcjonalnie mapa `errors` dla walidacji pól.
+- Używaj wspólnego helpera odpowiedzi JSON zamiast kopiowania funkcji.
 - Nie dopuszczaj HTML, warningów PHP ani debug outputu w odpowiedzi JSON.
-- Nie zwracaj powodzenia po nieudanej operacji.
 - Nie pokazuj klientowi wyjątków, SQL, ścieżek ani danych połączenia.
 
 ## Walidacja i bezpieczeństwo
 
 - Waliduj dane po stronie serwera; JavaScript poprawia wyłącznie UX.
 - Jawnie sprawdzaj typy, formaty i zakresy danych HTTP.
-- strict_types nie zastępuje walidacji danych wejściowych.
-- Hasła obsługuj przez password_hash() i password_verify().
-- Nie wykonuj trim() na hasłach.
-- Po udanym logowaniu wykonuj session_regenerate_id(true).
+- `strict_types` nie zastępuje walidacji danych wejściowych.
+- Hasła przez `password_hash()` i `password_verify()`, bez `trim()` na hasłach.
+- Po skutecznym logowaniu `session_regenerate_id(true)` oraz rotacja tokenu
+  CSRF.
 - Sprawdzaj aktywność konta i aktualne uprawnienia po stronie serwera.
-- Na każdym chronionym endpointcie i stronie sprawdzaj authentication,
-  rolę oraz ownership, jeśli operacja dotyczy konkretnego zasobu.
-- Nie ufaj user_id, roli ani uprawnieniom przekazanym przez klienta.
-- Stosuj CSRF dla operacji zmieniających stan, również logowania,
-  wylogowania i JSON POST/PATCH/DELETE.
-- Token CSRF przesyłaj w nagłówku X-CSRF-Token, nie w query stringu
-  ani w polu body.
-- Po udanym logowaniu rotuj token CSRF razem z odświeżeniem sesji.
-- Escapuj dynamiczne dane w kontekście, w którym są wyświetlane.
-- Do tekstowych komunikatów w JS używaj textContent, nie innerHTML.
-- Nie zapisuj haseł, tokenów ani innych sekretów w logach.
-- Sekrety przechowuj poza public/ w ignorowanym .env.
-- Utrzymuj .env.example bez rzeczywistych sekretów.
+- Na każdym chronionym endpointcie i stronie sprawdzaj authentication, rolę
+  oraz ownership, jeśli operacja dotyczy konkretnego zasobu.
+- `user_id`, rola i uprawnienia nigdy nie pochodzą z żądania klienta.
+- CSRF obowiązuje każdą operację zmieniającą stan, także logowanie,
+  wylogowanie i JSON `POST`/`PATCH`/`DELETE`. Token w nagłówku
+  `X-CSRF-Token`.
+- Escapuj dynamiczne dane w kontekście wyświetlania; w JS tekst przez
+  `textContent`, nie `innerHTML`.
+- Nie loguj haseł, tokenów ani sekretów.
+- Sekrety wyłącznie w ignorowanym `.env`; `.env.example` bez realnych wartości.
 
 ## Baza danych
 
-- Używaj prepared statements dla dynamicznych wartości SQL.
+- Prepared statements dla wszystkich dynamicznych wartości SQL.
 - Dynamiczne nazwy kolumn i kierunki sortowania wybieraj z allowlisty.
-- Konfiguruj połączenie PDO z charset=utf8mb4 i obsługą błędów
-  przez wyjątki.
-- Konfiguracja Docker/XAMPP różni się wartościami .env, nie kodem PHP.
-- Ceny przechowuj jako DECIMAL, czas usługi jako liczbę minut.
-- Preferuj dezaktywację zamiast usuwania rekordów potrzebnych w historii.
-- Cenę i inne niezbędne dane historyczne rezerwacji ustala serwer.
+- PDO z `charset=utf8mb4` i obsługą błędów przez wyjątki.
+- Konfiguracja Docker/XAMPP różni się wartościami `.env`, nie kodem PHP.
+- Ceny jako `DECIMAL`, czas usługi w minutach.
+- Preferuj dezaktywację rekordów zamiast usuwania historii.
+- Cenę i dane historyczne rezerwacji ustala serwer.
+- Zmiana `database.sql` nie aktualizuje istniejącego volume MariaDB.
 
 Tworzenie rezerwacji musi atomowo sprawdzać dostępność i zapisywać dane.
-Sama transakcja bez odpowiedniej blokady nie eliminuje race condition.
+Sama transakcja bez właściwej blokady nie eliminuje race condition.
 
 Warunek konfliktu:
 
@@ -196,88 +164,61 @@ existing.start_at < requested.end_at
 AND existing.end_at > requested.start_at
 ```
 
-Nazwy w warunku są schematyczne. Rzeczywiste kolumny w tabeli rezerwacje
-to czas_rozpoczecia i czas_zakonczenia.
-Przedziały stykające się granicami nie kolidują.
-
+Rzeczywiste kolumny w tabeli `rezerwacje` to `czas_rozpoczecia`
+i `czas_zakonczenia`. Przedziały stykające się granicami nie kolidują.
 Bezpośrednio przed zapisem sprawdź ponownie uprawnienia, aktywność usługi
 i pracownika, przypisanie usługi, godziny pracy, nieobecności oraz konflikty.
 
-## Frontend i uruchamianie
+## Frontend / Tailwind
 
-- Używaj statycznych, pełnych nazw klas Tailwind.
-- Nie składaj nazw klas z fragmentów stringów.
-- Nie edytuj ręcznie wygenerowanego app.css; przebuduj go ze źródeł.
-- W dev kontener tailwind-watcher przebudowuje app.css na żywo po zmianie
-  źródeł; nie uruchamiaj ręcznego builda, wystarczy odczekać na wynik.
-- Przy zmianie źródeł stylowania dołącz aktualny wynik builda.
-- Linki, fetch() i redirecty muszą działać również w podkatalogu XAMPP.
-- Nie zakładaj, że aplikacja zawsze działa w root domeny.
-- Kod, .env i pliki SQL poza public/ nie mogą być dostępne przez HTTP.
-- Zmiana database.sql nie aktualizuje istniejącego volume MariaDB.
+- Klasy Tailwind zapisuj jako pełne, statyczne stringi w HTML/PHP.
+  CLI nie widzi nazw składanych z fragmentów.
+- `public/assets/css/app.css` przebudowuje się automatycznie po zmianie źródeł
+  stylowania. Nie buduj go samodzielnie i nie edytuj ręcznie.
+- Po zmianie klas lub `input.css` odczekaj na przebudowę i sprawdź:
+
+      git status --short public/assets/css/app.css
+
+- Plik się zmienił → dołącz go do commita.
+- Plik się nie zmienił → poinformuj użytkownika, że `app.css` nie został
+  przebudowany, podaj pliki z nowymi klasami i przerwij. Nie commituj wtedy
+  i nie próbuj obejść problemu.
 
 ## Testy
 
-- Testy HTTP znajdują się w tests/ i uruchamia się je przez
-  php tests/run.php.
-- Nowe testy dokładaj do istniejącego mechanizmu, w tym samym stylu.
-  Nie dodawaj frameworka testowego bez uzasadnienia.
-- Testy nie mogą działać na bazie deweloperskiej. Importuj i resetuj
-  wyłącznie izolowaną bazę wskazaną przez DB_NAME, domyślnie wefixit_test.
-- Testy uruchamiają wbudowany serwer php -S, który nie obsługuje
-  .htaccess. Dlatego uderzają w ścieżki z rozszerzeniem .php, mimo że
-  publiczne URL-e go nie mają.
-- Zmiana zachowania endpointu bez aktualizacji testów jest niekompletna;
-  CI wymaga zielonego zadania http_tests.
-- Nowe zachowania pokrywaj testem sprawdzającym przypadek poprawny oraz
-  odrzucenie danych niepoprawnych.
+- Testy HTTP są w `tests/` i uruchamia się je przez `php tests/run.php`.
+- Nowe testy dokładaj do istniejącego mechanizmu, w tym samym stylu. Nie
+  dodawaj frameworka testowego bez uzasadnienia.
+- Testy nie mogą działać na bazie deweloperskiej — wyłącznie izolowana baza
+  wskazana przez `DB_NAME`, domyślnie `wefixit_test`.
+- Testy startują wbudowany `php -S`, który nie czyta `.htaccess`, dlatego
+  uderzają w ścieżki z rozszerzeniem `.php`.
+
+### Kiedy uruchamiać testy
+
+Uruchamiaj testy przy zmianach logiki, endpointów, zapytań SQL, walidacji,
+auth lub uprawnień.
+
+Nie uruchamiaj testów, gdy zmiana jest prosta i ograniczona do: tekstu
+interfejsu, klasy Tailwind, komentarza, formatowania, literówki, nazwy
+zmiennej lokalnej albo drobnej poprawki stylu.
+
+Przy zmianie wątpliwej — dotyczącej jednej gałęzi warunku, jednego pola
+formularza lub pojedynczej reguły walidacji — uruchom tylko powiązany test
+albo najbliższą grupę, nie cały zestaw.
+
+Zmiana zachowania endpointu bez aktualizacji testów jest niekompletna.
+Jeśli testów nie uruchomiłeś, napisz to wprost w podsumowaniu, razem
+z uzasadnieniem.
 
 ## Git
 
-- Commity zapisuj z prefiksem: feat:, fix:, docs:, test:, ci:.
-  Nie mieszaj obu konwencji w jednym pull requeście.
-- Opis commitu mówi, co się zmieniło i dlaczego. Commity w rodzaju
-  "cos tam" są niedopuszczalne.
-- Pracuj na feature branchu i zgłaszaj zmiany pull requestem do main.
-- Każdy PR musi przejść CI oraz code review przed mergem.
+- Prefiksy commitów: `feat:`, `fix:`, `docs:`, `test:`, `ci:`.
+- Opis commitu mówi, co się zmieniło i dlaczego.
+- Praca na feature branchu, zmiany przez pull request do `main`.
+- Każdy PR musi przejść CI i code review przed mergem.
 
-## Granice działania agenta
+## Po zakończeniu pracy
 
-Agent może edytować kod i uruchamiać niedestrukcyjne testy w zakresie
-polecenia użytkownika.
-
-Bez wyraźnego polecenia nie wykonuj:
-- commitów, pushów, merge'ów ani deployu,
-- resetowania DB ani usuwania volumes,
-- destrukcyjnych poleceń Git,
-- dodawania zależności,
-- zmian zadań w narzędziu task management.
-
-Nie nadpisuj niezwiązanych zmian użytkownika.
-Po pracy krótko podsumuj zmiany, wykonane testy i pozostałe ograniczenia.
-
-## Zasady code review
-
-Review służy wykrywaniu rzeczywistych błędów, nie przebudowie projektu.
-
-Priorytet:
-- błędy runtime i logiki,
-- regresje,
-- authentication, authorization i ownership,
-- SQL injection, XSS, CSRF i ujawnianie danych,
-- błędna walidacja,
-- race conditions i niespójność danych,
-- naruszenie jawnych wymagań projektu.
-
-Każde zgłoszenie powinno wskazywać konkretną ścieżkę wystąpienia problemu,
-jego praktyczny skutek i możliwą poprawkę.
-
-Nie zgłaszaj kosmetyki, alternatywnego formatowania, arbitralnych zmian
-nazw, abstrakcji na zapas ani hipotetycznych problemów bez uzasadnienia.
-
-Przy lokalnej, jednoznacznej i bezpiecznej poprawce podaj committable
-code suggestion nadające się do GitHub Apply suggestion.
-
-Nie proponuj dużej przebudowy, jeśli wystarcza mała poprawka.
-Reguły stylu stosuj podczas pisania kodu; nie używaj ich jako powodu
-do kosmetycznych komentarzy review.
+Krótko podsumuj: co zmieniłeś, jakie testy wykonałeś, jakie ograniczenia
+zostały.

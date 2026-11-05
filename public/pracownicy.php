@@ -17,23 +17,27 @@ $basePath = auth_base_path();
 $employeesUrl = $basePath . '/pracownicy';
 $employeesApi = $basePath . '/api/admin/employees';
 $search = pagination_search_value($_GET['szukaj'] ?? null);
+$statusFilter = pracownik_filter_status($_GET['status'] ?? null);
 $page = pagination_page($_GET['page'] ?? null);
 $size = pagination_size($_GET['size'] ?? null);
-$employeePage = pracownicy_list_paginated($search, $page, $size);
+$employeePage = pracownicy_list_paginated($search, $page, $size, $statusFilter);
 $employees = $employeePage['items'] ?? null;
 $availableAccounts = pracownicy_available_accounts();
-$csrfToken = csrf_token();
 $hasAvailableAccounts = $availableAccounts !== null && $availableAccounts !== [];
 $hasEmployees = $employeePage !== null && ($employeePage['total'] ?? 0) > 0;
-$hasFilters = $search !== '';
+$hasFilters = $search !== '' || $statusFilter !== 'all';
 $paginationParams = ['size' => $size];
 
 if ($search !== '') {
     $paginationParams['szukaj'] = $search;
 }
 
+if ($statusFilter !== 'all') {
+    $paginationParams['status'] = $statusFilter;
+}
+
 $headerActions = $hasAvailableAccounts
-    ? [['label' => 'Dodaj pracownika', 'href' => '#employee-form']]
+    ? [['label' => 'Dodaj pracownika', 'drawer' => 'employee-drawer']]
     : [];
 
 panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
@@ -47,53 +51,32 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
     );
     ?>
 
-    <form id="employees-filter-form" method="get"
-        action="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
-        class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2">
-        <input type="hidden" name="size" value="<?= $size ?>">
-
-        <div>
-            <label for="employees-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
-            <input id="employees-filter-search" name="szukaj" type="search" maxlength="100"
-                value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
-                placeholder="Imię lub nazwisko pracownika" class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2 sm:items-end">
-            <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
-            <?php if ($hasFilters): ?>
-                <a href="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
-                    class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
-            <?php endif; ?>
-        </div>
-    </form>
-
     <?php if ($employees === null): ?>
         <div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
             Nie udało się pobrać listy pracowników. Spróbuj ponownie później.
         </div>
-    <?php elseif ($employees === []): ?>
-        <?php
-        if ($hasFilters) {
-            panel_empty_state(
-                'Brak pracowników dla wybranej frazy',
-                'Zmień frazę wyszukiwania, aby zobaczyć inne profile.',
-                ['label' => 'Wyczyść wyszukiwanie', 'href' => $employeesUrl]
-            );
-        } elseif ($availableAccounts === []) {
-            panel_empty_state(
-                'Brak pracowników i kont do powiązania',
-                'Aby dodać pierwszego pracownika, najpierw utwórz konto z rolą pracownik. '
-                . 'Panel pracowników nie tworzy kont użytkowników.'
-            );
-        } else {
-            panel_empty_state(
-                'Brak pracowników',
-                'Utwórz profil pracownika powiązany z istniejącym kontem o roli pracownik.'
-            );
-        }
-        ?>
     <?php else: ?>
+        <form id="employees-filter-form" method="get"
+            action="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
+            class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2">
+            <input type="hidden" name="size" value="<?= $size ?>">
+
+            <div>
+                <label for="employees-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
+                <input id="employees-filter-search" name="szukaj" type="search" maxlength="100"
+                    value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
+                    placeholder="Imię lub nazwisko" class="<?= LAYOUT_INPUT_CLASS ?>">
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 sm:items-end">
+                <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
+                <?php if ($hasFilters): ?>
+                    <a href="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
+                        class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
+                <?php endif; ?>
+            </div>
+        </form>
+
         <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">
             <table id="employees-table" class="<?= PANEL_TABLE_CLASS ?>">
                 <thead>
@@ -101,11 +84,51 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Pracownik</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">E-mail</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Usługi</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status</th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">
+                            <?php panel_filter_start('employees-status', 'Status', $statusFilter !== 'all'); ?>
+                                <?php panel_filter_options(
+                                    'employees-filter-form',
+                                    'status',
+                                    'Filtruj według statusu',
+                                    [
+                                        ['value' => 'all', 'label' => 'Wszystkie'],
+                                        ['value' => 'active', 'label' => 'Aktywne'],
+                                        ['value' => 'inactive', 'label' => 'Nieaktywne'],
+                                    ],
+                                    $statusFilter
+                                ); ?>
+                            <?php panel_filter_end(); ?>
+                        </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?> text-right">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
+                    <?php if ($employees === []): ?>
+                        <tr>
+                            <td colspan="5" class="p-4">
+                                <?php
+                                if ($hasFilters) {
+                                    panel_empty_state(
+                                        'Brak pracowników dla wybranej frazy',
+                                        'Zmień frazę wyszukiwania, aby zobaczyć inne profile.',
+                                        ['label' => 'Wyczyść wyszukiwanie', 'href' => $employeesUrl]
+                                    );
+                                } elseif ($availableAccounts === []) {
+                                    panel_empty_state(
+                                        'Brak pracowników i kont do powiązania',
+                                        'Aby dodać pierwszego pracownika, najpierw utwórz konto z rolą pracownik. '
+                                        . 'Panel pracowników nie tworzy kont użytkowników.'
+                                    );
+                                } else {
+                                    panel_empty_state(
+                                        'Brak pracowników',
+                                        'Utwórz profil pracownika powiązany z istniejącym kontem o roli pracownik.'
+                                    );
+                                }
+                                ?>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                     <?php foreach ($employees as $employee): ?>
                         <?php
                         $description = $employee['opis'] ?? '';
@@ -154,6 +177,7 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                                     </a>
                                     <button type="button" class="<?= panel_button_classes('ghost') ?>"
                                         data-employee-edit
+                                        data-drawer-open="employee-drawer"
                                         data-id="<?= $employee['id'] ?>"
                                         data-name="<?= htmlspecialchars($employee['imie'] . ' ' . $employee['nazwisko'], ENT_QUOTES, 'UTF-8') ?>"
                                         data-description="<?= htmlspecialchars($employee['opis'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
@@ -165,14 +189,21 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                                         data-employee-toggle
                                         data-id="<?= $employee['id'] ?>"
                                         data-name="<?= htmlspecialchars($employee['imie'] . ' ' . $employee['nazwisko'], ENT_QUOTES, 'UTF-8') ?>"
-                                        data-active="<?= $employee['aktywny'] ? '1' : '0' ?>">
-                                        <?= $employee['aktywny'] ? 'Dezaktywuj' : 'Aktywuj' ?>
+                                        data-active="<?= $employee['aktywny'] ? '1' : '0' ?>"
+                                        title="<?= $employee['aktywny'] ? 'Dezaktywuj' : 'Aktywuj' ?>"
+                                        aria-label="<?= $employee['aktywny'] ? 'Dezaktywuj' : 'Aktywuj' ?>">
+                                        <?php if ($employee['aktywny']): ?>
+                                            <?= panel_icon('circle-slash', 'h-4 w-4 shrink-0 text-red-600 dark:text-red-400') ?>
+                                        <?php else: ?>
+                                            <?= panel_icon('circle-check', 'h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400') ?>
+                                        <?php endif; ?>
                                     </button>
                                     <button type="button" class="<?= panel_button_classes('danger') ?>"
                                         data-employee-delete
                                         data-id="<?= $employee['id'] ?>"
-                                        data-name="<?= htmlspecialchars($employee['imie'] . ' ' . $employee['nazwisko'], ENT_QUOTES, 'UTF-8') ?>">
-                                        Usuń
+                                        data-name="<?= htmlspecialchars($employee['imie'] . ' ' . $employee['nazwisko'], ENT_QUOTES, 'UTF-8') ?>"
+                                        title="Usuń" aria-label="Usuń">
+                                        <?= panel_icon('trash', 'h-4 w-4 shrink-0') ?>
                                     </button>
                                 </div>
                             </td>
@@ -204,13 +235,17 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
 <?php endif; ?>
 
 <?php if ($hasEmployees || $hasAvailableAccounts): ?>
-    <section id="employee-form-card" class="<?= PANEL_CARD_WIDE_CLASS ?> mt-6 <?= $hasAvailableAccounts ? '' : 'hidden' ?>">
-        <h2 id="employee-form-title" class="text-lg font-semibold tracking-tight">Dodaj pracownika</h2>
-        <p id="employee-form-hint" class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-            Profil zostanie powiązany z istniejącym kontem o roli pracownik.
-        </p>
-
-        <form id="employee-form" class="mt-5 max-w-2xl space-y-4" novalidate>
+    <?php
+    panel_drawer_start(
+        'employee-drawer',
+        'employee-form-title',
+        'Dodaj pracownika',
+        'Profil zostanie powiązany z istniejącym kontem o roli pracownik.',
+        'employee-form-hint'
+    );
+    ?>
+        <form id="employee-form" class="space-y-4" novalidate
+            data-api="<?= htmlspecialchars($employeesApi, ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" id="employee-id" name="id" value="">
 
             <div id="employee-account-select-wrap">
@@ -261,290 +296,17 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                 <button type="submit" id="employee-submit" class="<?= panel_button_classes('primary') ?>">
                     Dodaj pracownika
                 </button>
-                <button type="button" id="employee-cancel" class="<?= panel_button_classes('secondary') ?> hidden">
+                <button type="button" id="employee-cancel" data-drawer-close
+                    class="<?= panel_button_classes('secondary') ?> hidden">
                     Anuluj edycję
                 </button>
             </div>
         </form>
+    <?php panel_drawer_end(); ?>
 
-        <noscript>
-            <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby zarządzać pracownikami.</p>
-        </noscript>
-    </section>
+    <noscript>
+        <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby zarządzać pracownikami.</p>
+    </noscript>
 <?php endif; ?>
 
-<script>
-(function () {
-    const employeeForm = document.getElementById('employee-form');
-    const employeeFormCard = document.getElementById('employee-form-card');
-    const employeeFormTitle = document.getElementById('employee-form-title');
-    const employeeFormHint = document.getElementById('employee-form-hint');
-    const employeeFormError = document.getElementById('employee-form-error');
-    const employeeSubmit = document.getElementById('employee-submit');
-    const employeeCancel = document.getElementById('employee-cancel');
-    const employeeId = document.getElementById('employee-id');
-    const employeeDescription = document.getElementById('employee-opis');
-    const employeeActive = document.getElementById('employee-aktywny');
-    const employeeAccount = document.getElementById('employee-uzytkownik');
-    const employeeAccountSelectWrap = document.getElementById('employee-account-select-wrap');
-    const employeeAccountReadonlyWrap = document.getElementById('employee-account-readonly-wrap');
-    const employeeAccountReadonly = document.getElementById('employee-account-readonly');
-    const employeeApi = <?= json_encode($employeesApi, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    const csrfToken = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    const canAdd = <?= $hasAvailableAccounts ? 'true' : 'false' ?>;
-    const employeeFieldErrors = {
-        uzytkownik_id: document.getElementById('employee-error-uzytkownik_id'),
-        opis: document.getElementById('employee-error-opis'),
-        aktywny: document.getElementById('employee-error-aktywny')
-    };
-    let editingEmployeeId = null;
-    let formBusy = false;
-
-    function clearEmployeeMessages() {
-        employeeFormError.textContent = '';
-        employeeFormError.classList.add('hidden');
-
-        for (const element of Object.values(employeeFieldErrors)) {
-            element.textContent = '';
-            element.classList.add('hidden');
-        }
-    }
-
-    function showEmployeeErrors(data) {
-        let shownFieldError = false;
-
-        for (const [field, message] of Object.entries(data.errors || {})) {
-            if (!employeeFieldErrors[field] || typeof message !== 'string') continue;
-
-            employeeFieldErrors[field].textContent = message;
-            employeeFieldErrors[field].classList.remove('hidden');
-            shownFieldError = true;
-        }
-
-        if (shownFieldError) return;
-
-        employeeFormError.textContent = typeof data.error === 'string' && data.error !== ''
-            ? data.error
-            : 'Nie udało się zapisać pracownika.';
-        employeeFormError.classList.remove('hidden');
-    }
-
-    function resetEmployeeForm() {
-        editingEmployeeId = null;
-        employeeForm.reset();
-        employeeId.value = '';
-        employeeFormTitle.textContent = 'Dodaj pracownika';
-        employeeFormHint.textContent = 'Profil zostanie powiązany z istniejącym kontem o roli pracownik.';
-        employeeSubmit.textContent = 'Dodaj pracownika';
-        employeeCancel.classList.add('hidden');
-        employeeAccount.disabled = false;
-        employeeAccountSelectWrap.classList.remove('hidden');
-        employeeAccountReadonlyWrap.classList.add('hidden');
-        clearEmployeeMessages();
-
-        if (!canAdd) {
-            employeeFormCard.classList.add('hidden');
-        }
-    }
-
-    function reloadEmployees() {
-        window.setTimeout(function () {
-            window.location.reload();
-        }, 700);
-    }
-
-    async function sendEmployeeRequest(method, payload) {
-        const response = await fetch(employeeApi, {
-            method: method,
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-            body: JSON.stringify(payload)
-        });
-        let data = {};
-
-        try {
-            data = await response.json();
-        } catch {
-            data = {};
-        }
-
-        return { response: response, data: data };
-    }
-
-    if (employeeForm) {
-        employeeForm.addEventListener('submit', async function (event) {
-            event.preventDefault();
-
-            if (formBusy) return;
-
-            clearEmployeeMessages();
-            formBusy = true;
-            employeeSubmit.disabled = true;
-            employeeCancel.disabled = true;
-
-            const submitLabel = employeeSubmit.textContent;
-            let completed = false;
-            employeeSubmit.textContent = 'Zapisywanie…';
-
-            const payload = {
-                opis: employeeDescription.value.trim(),
-                aktywny: employeeActive.checked
-            };
-
-            if (editingEmployeeId === null) {
-                payload.uzytkownik_id = Number(employeeAccount.value);
-            } else {
-                payload.id = editingEmployeeId;
-            }
-
-            try {
-                const result = await sendEmployeeRequest(
-                    editingEmployeeId === null ? 'POST' : 'PATCH',
-                    payload
-                );
-
-                if (!result.response.ok || result.data.success !== true) {
-                    showEmployeeErrors(result.data);
-                    return;
-                }
-
-                completed = true;
-                window.showToast(
-                    editingEmployeeId === null ? 'Pracownik został dodany.' : 'Pracownik został zapisany.',
-                    'success'
-                );
-                reloadEmployees();
-            } catch {
-                employeeFormError.textContent = 'Nie udało się połączyć z serwerem. Spróbuj ponownie.';
-                employeeFormError.classList.remove('hidden');
-            } finally {
-                if (!completed) {
-                    formBusy = false;
-                    employeeSubmit.disabled = false;
-                    employeeCancel.disabled = false;
-                    employeeSubmit.textContent = submitLabel;
-                }
-            }
-        });
-
-        employeeCancel.addEventListener('click', function () {
-            resetEmployeeForm();
-        });
-    }
-
-    for (const button of document.querySelectorAll('[data-employee-edit]')) {
-        button.addEventListener('click', function () {
-            editingEmployeeId = Number(button.dataset.id);
-            employeeId.value = String(editingEmployeeId);
-            employeeDescription.value = button.dataset.description || '';
-            employeeActive.checked = button.dataset.active === '1';
-            employeeAccountReadonly.textContent = button.dataset.account || '';
-            employeeFormCard.classList.remove('hidden');
-            employeeFormTitle.textContent = 'Edytuj pracownika';
-            employeeFormHint.textContent = 'Edytowalne są tylko opis i flaga aktywności.';
-            employeeSubmit.textContent = 'Zapisz zmiany';
-            employeeCancel.classList.remove('hidden');
-            employeeAccount.disabled = true;
-            employeeAccountSelectWrap.classList.add('hidden');
-            employeeAccountReadonlyWrap.classList.remove('hidden');
-            clearEmployeeMessages();
-            employeeFormCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            employeeDescription.focus();
-        });
-    }
-
-    for (const button of document.querySelectorAll('[data-employee-toggle]')) {
-        button.addEventListener('click', async function () {
-            const isActive = button.dataset.active === '1';
-            const name = button.dataset.name || 'tego pracownika';
-            const confirmed = await window.panelConfirm({
-                title: isActive ? 'Dezaktywować pracownika?' : 'Aktywować pracownika?',
-                message: isActive
-                    ? 'Profil pracownika „' + name + '” zostanie oznaczony jako nieaktywny. Powiązania pozostaną w bazie.'
-                    : 'Profil pracownika „' + name + '” znów będzie aktywny.',
-                confirmLabel: isActive ? 'Dezaktywuj' : 'Aktywuj',
-                danger: false
-            });
-
-            if (!confirmed) return;
-
-            button.disabled = true;
-            let completed = false;
-
-            try {
-                const result = await sendEmployeeRequest('PATCH', {
-                    id: Number(button.dataset.id),
-                    aktywny: !isActive
-                });
-
-                if (!result.response.ok || result.data.success !== true) {
-                    window.showToast(
-                        typeof result.data.error === 'string' && result.data.error !== ''
-                            ? result.data.error
-                            : 'Nie udało się zmienić statusu pracownika.',
-                        'error'
-                    );
-                    return;
-                }
-
-                completed = true;
-                window.showToast(
-                    isActive ? 'Pracownik został dezaktywowany.' : 'Pracownik został aktywowany.',
-                    'success'
-                );
-                reloadEmployees();
-            } catch {
-                window.showToast('Nie udało się połączyć z serwerem. Spróbuj ponownie.', 'error');
-            } finally {
-                if (!completed) {
-                    button.disabled = false;
-                }
-            }
-        });
-    }
-
-    for (const button of document.querySelectorAll('[data-employee-delete]')) {
-        button.addEventListener('click', async function () {
-            const name = button.dataset.name || 'tego pracownika';
-            const confirmed = await window.panelConfirm({
-                title: 'Usunąć pracownika?',
-                message: 'Profil pracownika „' + name + '” zostanie trwale usunięty. Tej operacji nie można cofnąć.',
-                confirmLabel: 'Usuń',
-                danger: true
-            });
-
-            if (!confirmed) return;
-
-            button.disabled = true;
-            let completed = false;
-
-            try {
-                const result = await sendEmployeeRequest('DELETE', {
-                    id: Number(button.dataset.id)
-                });
-
-                if (!result.response.ok || result.data.success !== true) {
-                    window.showToast(
-                        typeof result.data.error === 'string' && result.data.error !== ''
-                            ? result.data.error
-                            : 'Nie udało się usunąć pracownika.',
-                        'error'
-                    );
-                    return;
-                }
-
-                completed = true;
-                window.showToast('Pracownik został usunięty.', 'success');
-                reloadEmployees();
-            } catch {
-                window.showToast('Nie udało się połączyć z serwerem. Spróbuj ponownie.', 'error');
-            } finally {
-                if (!completed) {
-                    button.disabled = false;
-                }
-            }
-        });
-    }
-})();
-</script>
-<?php panel_layout_foot(); ?>
+<?php panel_layout_foot('employees.js'); ?>

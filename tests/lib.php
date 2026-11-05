@@ -248,7 +248,7 @@ function csrf_from_page(array &$cookies, string $path): string
     $response = http_request($cookies, 'GET', $path);
     assert_status(200, $response, 'Nie udało się pobrać strony ' . $path);
 
-    if (preg_match('/const csrfToken = "([0-9a-f]+)"/', $response['body'], $matches) !== 1) {
+    if (preg_match('/name="csrf-token" content="([0-9a-f]+)"/', $response['body'], $matches) !== 1) {
         fail('Nie znaleziono tokenu CSRF na stronie ' . $path);
     }
 

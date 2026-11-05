@@ -158,13 +158,39 @@ test('123. wyszukiwanie usług i kategorii działa oraz escapuje znaki LIKE', fu
 
     $percent = http_request($session['cookies'], 'GET', '/uslugi.php?szukaj=%25');
     assert_status(200, $percent, 'Fraza z procentem nie może wywołać błędu');
-    assert_true(strpos($percent['body'], 'id="services-table"') === false, 'Procent nie może być traktowany jak wildcard');
+    assert_true(
+        strpos($percent['body'], 'Wymiana matrycy w laptopie') === false,
+        'Procent nie może być traktowany jak wildcard'
+    );
     assert_true(strpos($percent['body'], 'Brak usług dla wybranych filtrów') !== false, 'Brak wyników powinien pokazać pusty stan');
 
     $underscore = http_request($session['cookies'], 'GET', '/kategorie.php?szukaj=_');
     assert_status(200, $underscore, 'Fraza z podkreśleniem nie może wywołać błędu');
-    assert_true(strpos($underscore['body'], 'id="categories-table"') === false, 'Podkreślenie nie może być traktowane jak wildcard');
+    assert_true(
+        strpos($underscore['body'], 'Naprawy Sprzętowe PC i Laptopów') === false,
+        'Podkreślenie nie może być traktowane jak wildcard'
+    );
     assert_true(strpos($underscore['body'], 'Brak kategorii dla wybranej frazy') !== false, 'Brak wyników powinien pokazać pusty stan');
+});
+
+test('141. filtry statusu kategorii i pracowników działają z nagłówków tabel', function (): void {
+    $session = pagination_admin_session();
+
+    $inactiveCategories = http_request($session['cookies'], 'GET', '/kategorie.php?status=inactive');
+    assert_status(200, $inactiveCategories, 'Filtr nieaktywnych kategorii powinien dać 200');
+    assert_true(strpos($inactiveCategories['body'], 'Archiwalna Kategoria') !== false, 'Filtr powinien pokazać nieaktywną kategorię');
+    assert_true(strpos($inactiveCategories['body'], 'Diagnostyka i Konserwacja') === false, 'Filtr nie powinien pokazać aktywnej kategorii');
+    assert_true(strpos($inactiveCategories['body'], 'name="status"') !== false, 'Filtr statusu powinien być w nagłówku tabeli');
+
+    $activeEmployees = http_request($session['cookies'], 'GET', '/pracownicy.php?status=active');
+    assert_status(200, $activeEmployees, 'Filtr aktywnych pracowników powinien dać 200');
+    assert_true(strpos($activeEmployees['body'], 'Tomasz Serwisant') !== false, 'Filtr powinien pokazać aktywnego pracownika');
+    assert_true(strpos($activeEmployees['body'], 'name="status"') !== false, 'Filtr statusu powinien być w nagłówku tabeli');
+
+    $inactiveEmployees = http_request($session['cookies'], 'GET', '/pracownicy.php?status=inactive');
+    assert_status(200, $inactiveEmployees, 'Filtr nieaktywnych pracowników powinien dać 200');
+    assert_true(strpos($inactiveEmployees['body'], 'Brak pracowników dla wybranej frazy') !== false, 'Brak nieaktywnych pracowników powinien pokazać pusty stan');
+    assert_true(strpos($inactiveEmployees['body'], 'Tomasz Serwisant') === false, 'Filtr nie powinien pokazać aktywnego pracownika');
 });
 
 test('124. filtr statusu i paginacja liczą strony po zawężeniu', function (): void {

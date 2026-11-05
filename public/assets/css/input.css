@@ -34,3 +34,234 @@
         width: 0;
     }
 }
+
+/*
+    Delikatne pojawienie się okna potwierdzenia: panel lekko się powiększa
+    i unosi, a przyciemnione tło płynnie przechodzi z przezroczystości.
+*/
+@keyframes confirm-in {
+    from {
+        opacity: 0;
+        transform: translateY(0.75rem) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes confirm-backdrop-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/*
+    Wyjście okna potwierdzenia: panel wraca do mniejszej skali i opada,
+    a tło płynnie zanika, zanim dialog zostanie faktycznie zamknięty.
+*/
+@keyframes confirm-out {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(0.75rem) scale(0.97);
+    }
+}
+
+@keyframes confirm-backdrop-out {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+dialog#app-confirm[open] {
+    animation: confirm-in 160ms ease-out;
+}
+
+dialog#app-confirm::backdrop {
+    animation: confirm-backdrop-in 160ms ease-out;
+}
+
+dialog#app-confirm.app-confirm-closing {
+    animation: confirm-out 160ms ease-in forwards;
+}
+
+dialog#app-confirm.app-confirm-closing::backdrop {
+    animation: confirm-backdrop-out 160ms ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    dialog#app-confirm[open],
+    dialog#app-confirm::backdrop,
+    dialog#app-confirm.app-confirm-closing,
+    dialog#app-confirm.app-confirm-closing::backdrop {
+        animation: none;
+    }
+}
+
+/*
+    Wysuwany panel edycji wjeżdża z prawej strony, a jego tło płynnie
+    przyciemnia widok. Przy zamykaniu animacja kończy się przed ukryciem
+    panelu, dlatego JavaScript czeka tyle samo, ile trwa animacja wyjścia.
+*/
+@keyframes drawer-in {
+    from {
+        opacity: 0;
+        transform: translateX(1.5rem);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes drawer-backdrop-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes drawer-out {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(1.5rem);
+    }
+}
+
+@keyframes drawer-backdrop-out {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+[data-drawer-panel] {
+    animation: drawer-in 200ms ease-out;
+}
+
+[data-drawer-overlay] {
+    animation: drawer-backdrop-in 200ms ease-out;
+}
+
+[data-drawer].app-drawer-closing [data-drawer-panel] {
+    animation: drawer-out 160ms ease-in forwards;
+}
+
+[data-drawer].app-drawer-closing [data-drawer-overlay] {
+    animation: drawer-backdrop-out 160ms ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-drawer-panel],
+    [data-drawer-overlay],
+    [data-drawer].app-drawer-closing [data-drawer-panel],
+    [data-drawer].app-drawer-closing [data-drawer-overlay] {
+        animation: none;
+    }
+}
+
+/*
+    Rozwijane menu filtrów i formularzy pojawia się i znika krótkim wjazdem,
+    spójnym z animacją wysuwanego panelu edycji. Klasy dodaje JavaScript,
+    a przy zamykaniu czeka z ukryciem menu tyle, ile trwa animacja wyjścia.
+*/
+@keyframes dropdown-in {
+    from {
+        opacity: 0;
+        transform: translateY(-0.25rem) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes dropdown-out {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-0.25rem) scale(0.98);
+    }
+}
+
+.panel-dropdown-in {
+    animation: dropdown-in 160ms ease-out;
+}
+
+.panel-dropdown-out {
+    pointer-events: none;
+    animation: dropdown-out 120ms ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .panel-dropdown-in,
+    .panel-dropdown-out {
+        animation: none;
+    }
+}
+
+/*
+    Minimalistyczny scrollbar rozwijanych menu filtrów: cienki, zaokrąglony
+    pasek bez widocznego toru. Firefox dostaje scrollbar-width: thin, a reszta
+    przeglądarek dostosowany pasek WebKit. Tryb ciemny działa na
+    prefers-color-scheme, tak jak wariant dark: w Tailwindzie.
+*/
+.panel-filter-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #d4d4d8 transparent;
+}
+
+.panel-filter-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.panel-filter-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.panel-filter-scrollbar::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-color: #d4d4d8;
+    background-clip: content-box;
+}
+
+.panel-filter-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #a1a1aa;
+}
+
+@media (prefers-color-scheme: dark) {
+    .panel-filter-scrollbar {
+        scrollbar-color: #52525b transparent;
+    }
+
+    .panel-filter-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #52525b;
+    }
+
+    .panel-filter-scrollbar::-webkit-scrollbar-thumb:hover {
+        background-color: #71717a;
+    }
+}

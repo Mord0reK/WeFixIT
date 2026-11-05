@@ -24,7 +24,22 @@ $size = pagination_size($_GET['size'] ?? null);
 $servicePage = uslugi_list_paginated($categoryFilter, $statusFilter, $search, $page, $size);
 $services = $servicePage['items'] ?? null;
 $categories = kategorie_list();
-$csrfToken = csrf_token();
+$categoryFilterOptions = [['value' => '0', 'label' => 'Wszystkie']];
+$serviceCategoryOptions = [];
+
+foreach ($categories ?? [] as $category) {
+    $categoryFilterOptions[] = [
+        'value' => (string) $category['id'],
+        'label' => $category['nazwa'] . ($category['aktywna'] ? '' : ' (nieaktywna)'),
+    ];
+    $serviceCategoryOptions[] = [
+        'value' => (string) $category['id'],
+        'label' => $category['nazwa'] . ($category['aktywna'] ? '' : ' (nieaktywna)'),
+        'disabled' => !$category['aktywna'],
+        'inactive' => !$category['aktywna'],
+    ];
+}
+
 $filtersActive = $categoryFilter > 0 || $statusFilter !== 'all' || $search !== '';
 $paginationParams = ['size' => $size];
 
@@ -48,89 +63,96 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
         'Usługi',
         'Zarządzaj usługami dostępnymi w serwisie.',
         [
-            ['label' => 'Dodaj usługę', 'href' => '#service-form'],
+            ['label' => 'Dodaj usługę', 'drawer' => 'service-drawer'],
         ]
     );
     ?>
-
-    <form id="services-filter-form" method="get"
-        action="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>"
-        class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2">
-        <input type="hidden" name="size" value="<?= $size ?>">
-
-        <div>
-            <label for="services-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
-            <input id="services-filter-search" name="szukaj" type="search" maxlength="100"
-                value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
-                placeholder="Nazwa usługi" class="<?= LAYOUT_INPUT_CLASS ?>">
-        </div>
-
-        <div>
-            <label for="filter-kategoria" class="<?= LAYOUT_LABEL_CLASS ?>">Kategoria</label>
-            <select id="filter-kategoria" name="id_kategorii" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="0">Wszystkie kategorie</option>
-                <?php foreach ($categories ?? [] as $category): ?>
-                    <option value="<?= $category['id'] ?>" <?= $categoryFilter === $category['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($category['nazwa'], ENT_QUOTES, 'UTF-8') ?>
-                        <?= $category['aktywna'] ? '' : '(nieaktywna)' ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <div>
-            <label for="filter-status" class="<?= LAYOUT_LABEL_CLASS ?>">Status</label>
-            <select id="filter-status" name="status" class="<?= LAYOUT_INPUT_CLASS ?>">
-                <option value="all" <?= $statusFilter === 'all' ? 'selected' : '' ?>>Wszystkie statusy</option>
-                <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Aktywne</option>
-                <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Nieaktywne</option>
-            </select>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-            <button type="submit" class="<?= panel_button_classes('secondary') ?>">Filtruj</button>
-            <?php if ($filtersActive): ?>
-                <a href="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>"
-                    class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
-            <?php endif; ?>
-        </div>
-    </form>
 
     <?php if ($services === null): ?>
         <div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
             Nie udało się pobrać listy usług. Spróbuj ponownie później.
         </div>
-    <?php elseif ($services === []): ?>
-        <?php
-        if ($filtersActive) {
-            panel_empty_state(
-                'Brak usług dla wybranych filtrów',
-                'Zmień kategorię, status lub frazę wyszukiwania, aby zobaczyć inne usługi.',
-                ['label' => 'Wyczyść filtry', 'href' => $servicesUrl]
-            );
-        } else {
-            panel_empty_state(
-                'Brak usług',
-                'Dodaj pierwszą usługę, aby przypisywać ją do pracowników.',
-                ['label' => 'Dodaj usługę', 'href' => '#service-form']
-            );
-        }
-        ?>
     <?php else: ?>
+        <form id="services-filter-form" method="get"
+            action="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>"
+            class="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-2">
+            <input type="hidden" name="size" value="<?= $size ?>">
+
+            <div>
+                <label for="services-filter-search" class="<?= LAYOUT_LABEL_CLASS ?>">Szukaj</label>
+                <input id="services-filter-search" name="szukaj" type="search" maxlength="100"
+                    value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
+                    placeholder="Nazwa usługi" class="<?= LAYOUT_INPUT_CLASS ?>">
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 sm:items-end">
+                <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
+                <?php if ($filtersActive): ?>
+                    <a href="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>"
+                        class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
+                <?php endif; ?>
+            </div>
+        </form>
+
         <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">
             <table id="services-table" class="<?= PANEL_TABLE_CLASS ?>">
                 <thead>
                     <tr>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Nazwa</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Kategoria</th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">
+                            <?php panel_filter_start('services-category', 'Kategoria', $categoryFilter > 0); ?>
+                                <?php panel_filter_options(
+                                    'services-filter-form',
+                                    'id_kategorii',
+                                    'Filtruj według kategorii',
+                                    $categoryFilterOptions,
+                                    (string) $categoryFilter
+                                ); ?>
+                            <?php panel_filter_end(); ?>
+                        </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Cena</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Czas trwania</th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?>">Pracownicy</th>
-                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">Status</th>
+                        <th scope="col" class="<?= PANEL_TH_CLASS ?>">
+                            <?php panel_filter_start('services-status', 'Status', $statusFilter !== 'all'); ?>
+                                <?php panel_filter_options(
+                                    'services-filter-form',
+                                    'status',
+                                    'Filtruj według statusu',
+                                    [
+                                        ['value' => 'all', 'label' => 'Wszystkie'],
+                                        ['value' => 'active', 'label' => 'Aktywne'],
+                                        ['value' => 'inactive', 'label' => 'Nieaktywne'],
+                                    ],
+                                    $statusFilter
+                                ); ?>
+                            <?php panel_filter_end(); ?>
+                        </th>
                         <th scope="col" class="<?= PANEL_TH_CLASS ?> text-right">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
+                    <?php if ($services === []): ?>
+                        <tr>
+                            <td colspan="7" class="p-4">
+                                <?php
+                                if ($filtersActive) {
+                                    panel_empty_state(
+                                        'Brak usług dla wybranych filtrów',
+                                        'Zmień kategorię, status lub frazę wyszukiwania, aby zobaczyć inne usługi.',
+                                        ['label' => 'Wyczyść filtry', 'href' => $servicesUrl]
+                                    );
+                                } else {
+                                    panel_empty_state(
+                                        'Brak usług',
+                                        'Dodaj pierwszą usługę, aby przypisywać ją do pracowników.',
+                                        ['label' => 'Dodaj usługę', 'drawer' => 'service-drawer']
+                                    );
+                                }
+                                ?>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                     <?php foreach ($services as $service): ?>
                         <tr class="<?= PANEL_TR_CLASS ?>">
                             <td class="<?= PANEL_TD_CLASS ?> font-medium text-zinc-900 dark:text-zinc-50">
@@ -166,6 +188,7 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
                                 <div class="flex flex-wrap justify-end gap-2">
                                     <button type="button" class="<?= panel_button_classes('ghost') ?>"
                                         data-service-edit
+                                        data-drawer-open="service-drawer"
                                         data-id="<?= $service['id'] ?>"
                                         data-name="<?= htmlspecialchars($service['nazwa'], ENT_QUOTES, 'UTF-8') ?>"
                                         data-description="<?= htmlspecialchars($service['opis'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
@@ -178,14 +201,21 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
                                         data-service-toggle
                                         data-id="<?= $service['id'] ?>"
                                         data-name="<?= htmlspecialchars($service['nazwa'], ENT_QUOTES, 'UTF-8') ?>"
-                                        data-active="<?= $service['aktywna'] ? '1' : '0' ?>">
-                                        <?= $service['aktywna'] ? 'Dezaktywuj' : 'Aktywuj' ?>
+                                        data-active="<?= $service['aktywna'] ? '1' : '0' ?>"
+                                        title="<?= $service['aktywna'] ? 'Dezaktywuj' : 'Aktywuj' ?>"
+                                        aria-label="<?= $service['aktywna'] ? 'Dezaktywuj' : 'Aktywuj' ?>">
+                                        <?php if ($service['aktywna']): ?>
+                                            <?= panel_icon('circle-slash', 'h-4 w-4 shrink-0 text-red-600 dark:text-red-400') ?>
+                                        <?php else: ?>
+                                            <?= panel_icon('circle-check', 'h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400') ?>
+                                        <?php endif; ?>
                                     </button>
                                     <button type="button" class="<?= panel_button_classes('danger') ?>"
                                         data-service-delete
                                         data-id="<?= $service['id'] ?>"
-                                        data-name="<?= htmlspecialchars($service['nazwa'], ENT_QUOTES, 'UTF-8') ?>">
-                                        Usuń
+                                        data-name="<?= htmlspecialchars($service['nazwa'], ENT_QUOTES, 'UTF-8') ?>"
+                                        title="Usuń" aria-label="Usuń">
+                                        <?= panel_icon('trash', 'h-4 w-4 shrink-0') ?>
                                     </button>
                                 </div>
                             </td>
@@ -198,11 +228,16 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
     <?php endif; ?>
 </section>
 
-<section id="service-form-card" class="<?= PANEL_CARD_WIDE_CLASS ?> mt-6">
-    <h2 id="service-form-title" class="text-lg font-semibold tracking-tight">Dodaj usługę</h2>
-    <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">Nowa usługa będzie od razu aktywna.</p>
-
-    <form id="service-form" class="mt-5 max-w-2xl space-y-4" novalidate>
+<?php
+panel_drawer_start(
+    'service-drawer',
+    'service-form-title',
+    'Dodaj usługę',
+    'Nowa usługa będzie od razu aktywna.'
+);
+?>
+    <form id="service-form" class="space-y-4" novalidate
+        data-api="<?= htmlspecialchars($servicesApi, ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" id="service-id" name="id" value="">
 
         <div>
@@ -221,20 +256,30 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
             <?= panel_field_error('service-error-opis') ?>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="space-y-4">
             <div>
-                <label for="service-kategoria" class="<?= LAYOUT_LABEL_CLASS ?>">Kategoria</label>
-                <select id="service-kategoria" name="kategoria_id" class="<?= LAYOUT_INPUT_CLASS ?>" required>
-                    <option value="">Wybierz kategorię</option>
-                    <?php foreach ($categories ?? [] as $category): ?>
-                        <option value="<?= $category['id'] ?>"
-                            data-inactive="<?= $category['aktywna'] ? '0' : '1' ?>"
-                            <?= $category['aktywna'] ? '' : 'disabled' ?>>
-                            <?= htmlspecialchars($category['nazwa'], ENT_QUOTES, 'UTF-8') ?>
-                            <?= $category['aktywna'] ? '' : '(nieaktywna)' ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+                <span id="service-kategoria-label" class="<?= LAYOUT_LABEL_CLASS ?>">Kategoria</span>
+                <div class="relative" data-filter-dropdown>
+                    <button type="button"
+                        class="<?= LAYOUT_INPUT_CLASS ?> items-center justify-between gap-2 text-left"
+                        data-filter-toggle aria-expanded="false" aria-haspopup="true"
+                        aria-labelledby="service-kategoria-label service-kategoria-value">
+                        <span id="service-kategoria-value"
+                            class="truncate text-zinc-400 dark:text-zinc-500"
+                            data-service-category-value>Wybierz kategorię</span>
+                        <?= panel_icon('chevron-down', 'h-4 w-4 shrink-0 text-zinc-500') ?>
+                    </button>
+                    <div class="<?= PANEL_FILTER_MENU_CLASS ?>" data-filter-menu>
+                        <?php panel_filter_options(
+                            'service-form',
+                            'kategoria_id',
+                            'Kategoria',
+                            $serviceCategoryOptions,
+                            '',
+                            false
+                        ); ?>
+                    </div>
+                </div>
                 <?= panel_field_error('service-error-kategoria_id') ?>
             </div>
 
@@ -261,290 +306,16 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
             <button type="submit" id="service-submit" class="<?= panel_button_classes('primary') ?>">
                 Dodaj usługę
             </button>
-            <button type="button" id="service-cancel" class="<?= panel_button_classes('secondary') ?> hidden">
+            <button type="button" id="service-cancel" data-drawer-close
+                class="<?= panel_button_classes('secondary') ?> hidden">
                 Anuluj edycję
             </button>
         </div>
     </form>
+<?php panel_drawer_end(); ?>
 
-    <noscript>
-        <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby zarządzać usługami.</p>
-    </noscript>
-</section>
+<noscript>
+    <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby zarządzać usługami.</p>
+</noscript>
 
-<script>
-(function () {
-    const serviceForm = document.getElementById('service-form');
-    const serviceFormTitle = document.getElementById('service-form-title');
-    const serviceFormError = document.getElementById('service-form-error');
-    const serviceSubmit = document.getElementById('service-submit');
-    const serviceCancel = document.getElementById('service-cancel');
-    const serviceId = document.getElementById('service-id');
-    const serviceName = document.getElementById('service-nazwa');
-    const serviceDescription = document.getElementById('service-opis');
-    const serviceCategory = document.getElementById('service-kategoria');
-    const servicePrice = document.getElementById('service-cena');
-    const serviceDuration = document.getElementById('service-czas');
-    const serviceApi = <?= json_encode($servicesApi, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    const csrfToken = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    const serviceFieldErrors = {
-        nazwa: document.getElementById('service-error-nazwa'),
-        opis: document.getElementById('service-error-opis'),
-        kategoria_id: document.getElementById('service-error-kategoria_id'),
-        cena: document.getElementById('service-error-cena'),
-        czas_trwania_minuty: document.getElementById('service-error-czas_trwania_minuty')
-    };
-    let editingServiceId = null;
-    let formBusy = false;
-
-    function clearServiceMessages() {
-        serviceFormError.textContent = '';
-        serviceFormError.classList.add('hidden');
-
-        for (const element of Object.values(serviceFieldErrors)) {
-            element.textContent = '';
-            element.classList.add('hidden');
-        }
-    }
-
-    function showServiceErrors(data) {
-        let shownFieldError = false;
-
-        for (const [field, message] of Object.entries(data.errors || {})) {
-            if (!serviceFieldErrors[field] || typeof message !== 'string') continue;
-
-            serviceFieldErrors[field].textContent = message;
-            serviceFieldErrors[field].classList.remove('hidden');
-            shownFieldError = true;
-        }
-
-        if (shownFieldError) return;
-
-        serviceFormError.textContent = typeof data.error === 'string' && data.error !== ''
-            ? data.error
-            : 'Nie udało się zapisać usługi.';
-        serviceFormError.classList.remove('hidden');
-    }
-
-    function setInactiveCategoryOptionsDisabled() {
-        for (const option of serviceCategory.options) {
-            if (option.dataset.inactive === '1') {
-                option.disabled = true;
-            }
-        }
-    }
-
-    function resetServiceForm() {
-        editingServiceId = null;
-        serviceForm.reset();
-        setInactiveCategoryOptionsDisabled();
-        serviceId.value = '';
-        serviceFormTitle.textContent = 'Dodaj usługę';
-        serviceSubmit.textContent = 'Dodaj usługę';
-        serviceCancel.classList.add('hidden');
-        clearServiceMessages();
-    }
-
-    function reloadServices() {
-        window.setTimeout(function () {
-            window.location.reload();
-        }, 700);
-    }
-
-    async function sendServiceRequest(method, payload) {
-        const response = await fetch(serviceApi, {
-            method: method,
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-            body: JSON.stringify(payload)
-        });
-        let data = {};
-
-        try {
-            data = await response.json();
-        } catch {
-            data = {};
-        }
-
-        return { response: response, data: data };
-    }
-
-    serviceForm.addEventListener('submit', async function (event) {
-        event.preventDefault();
-
-        if (formBusy) return;
-
-        clearServiceMessages();
-        formBusy = true;
-        serviceSubmit.disabled = true;
-        serviceCancel.disabled = true;
-
-        const submitLabel = serviceSubmit.textContent;
-        let completed = false;
-        serviceSubmit.textContent = 'Zapisywanie…';
-
-        const payload = {
-            nazwa: serviceName.value.trim(),
-            opis: serviceDescription.value.trim(),
-            kategoria_id: Number(serviceCategory.value),
-            cena: servicePrice.value.trim(),
-            czas_trwania_minuty: Number(serviceDuration.value)
-        };
-
-        if (editingServiceId !== null) {
-            payload.id = editingServiceId;
-        }
-
-        try {
-            const result = await sendServiceRequest(editingServiceId === null ? 'POST' : 'PATCH', payload);
-
-            if (!result.response.ok || result.data.success !== true) {
-                showServiceErrors(result.data);
-                return;
-            }
-
-            completed = true;
-            window.showToast(
-                editingServiceId === null ? 'Usługa została dodana.' : 'Usługa została zapisana.',
-                'success'
-            );
-            reloadServices();
-        } catch {
-            serviceFormError.textContent = 'Nie udało się połączyć z serwerem. Spróbuj ponownie.';
-            serviceFormError.classList.remove('hidden');
-        } finally {
-            if (!completed) {
-                formBusy = false;
-                serviceSubmit.disabled = false;
-                serviceCancel.disabled = false;
-                serviceSubmit.textContent = submitLabel;
-            }
-        }
-    });
-
-    serviceCancel.addEventListener('click', function () {
-        resetServiceForm();
-    });
-
-    for (const button of document.querySelectorAll('[data-service-edit]')) {
-        button.addEventListener('click', function () {
-            editingServiceId = Number(button.dataset.id);
-            serviceId.value = String(editingServiceId);
-            serviceName.value = button.dataset.name || '';
-            serviceDescription.value = button.dataset.description || '';
-            setInactiveCategoryOptionsDisabled();
-            const selectedCategoryId = button.dataset.category || '';
-
-            for (const option of serviceCategory.options) {
-                if (option.value === selectedCategoryId && option.dataset.inactive === '1') {
-                    option.disabled = false;
-                }
-            }
-
-            serviceCategory.value = selectedCategoryId;
-            servicePrice.value = button.dataset.price || '';
-            serviceDuration.value = button.dataset.duration || '';
-            serviceFormTitle.textContent = 'Edytuj usługę';
-            serviceSubmit.textContent = 'Zapisz zmiany';
-            serviceCancel.classList.remove('hidden');
-            clearServiceMessages();
-            serviceForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            serviceName.focus();
-        });
-    }
-
-    for (const button of document.querySelectorAll('[data-service-toggle]')) {
-        button.addEventListener('click', async function () {
-            const isActive = button.dataset.active === '1';
-            const name = button.dataset.name || 'tę usługę';
-            const confirmed = await window.panelConfirm({
-                title: isActive ? 'Dezaktywować usługę?' : 'Aktywować usługę?',
-                message: isActive
-                    ? 'Usługa „' + name + '” przestanie być dostępna. Przypisania pracowników pozostaną w bazie.'
-                    : 'Usługa „' + name + '” znów będzie dostępna.',
-                confirmLabel: isActive ? 'Dezaktywuj' : 'Aktywuj',
-                danger: false
-            });
-
-            if (!confirmed) return;
-
-            button.disabled = true;
-            let completed = false;
-
-            try {
-                const result = await sendServiceRequest('PATCH', {
-                    id: Number(button.dataset.id),
-                    aktywna: !isActive
-                });
-
-                if (!result.response.ok || result.data.success !== true) {
-                    window.showToast(
-                        typeof result.data.error === 'string' && result.data.error !== ''
-                            ? result.data.error
-                            : 'Nie udało się zmienić statusu usługi.',
-                        'error'
-                    );
-                    return;
-                }
-
-                completed = true;
-                window.showToast(
-                    isActive ? 'Usługa została dezaktywowana.' : 'Usługa została aktywowana.',
-                    'success'
-                );
-                reloadServices();
-            } catch {
-                window.showToast('Nie udało się połączyć z serwerem. Spróbuj ponownie.', 'error');
-            } finally {
-                if (!completed) {
-                    button.disabled = false;
-                }
-            }
-        });
-    }
-
-    for (const button of document.querySelectorAll('[data-service-delete]')) {
-        button.addEventListener('click', async function () {
-            const name = button.dataset.name || 'tę usługę';
-            const confirmed = await window.panelConfirm({
-                title: 'Usunąć usługę?',
-                message: 'Usługa „' + name + '” zostanie trwale usunięta. Tej operacji nie można cofnąć.',
-                confirmLabel: 'Usuń',
-                danger: true
-            });
-
-            if (!confirmed) return;
-
-            button.disabled = true;
-            let completed = false;
-
-            try {
-                const result = await sendServiceRequest('DELETE', {
-                    id: Number(button.dataset.id)
-                });
-
-                if (!result.response.ok || result.data.success !== true) {
-                    window.showToast(
-                        typeof result.data.error === 'string' && result.data.error !== ''
-                            ? result.data.error
-                            : 'Nie udało się usunąć usługi.',
-                        'error'
-                    );
-                    return;
-                }
-
-                completed = true;
-                window.showToast('Usługa została usunięta.', 'success');
-                reloadServices();
-            } catch {
-                window.showToast('Nie udało się połączyć z serwerem. Spróbuj ponownie.', 'error');
-            } finally {
-                if (!completed) {
-                    button.disabled = false;
-                }
-            }
-        });
-    }
-})();
-</script>
-<?php panel_layout_foot(); ?>
+<?php panel_layout_foot('services.js'); ?>
