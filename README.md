@@ -13,10 +13,14 @@ System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników 
   - [Zrealizowano w Etapie 1](#zrealizowano-w-etapie-1)
   - [Zrealizowano w Etapie 2 - Użytkownicy i logowanie](#zrealizowano-w-etapie-2---użytkownicy-i-logowanie)
   - [Zrealizowano w Etapie 3 — panel administratora](#zrealizowano-w-etapie-3--panel-administratora)
+    - [Endpointy administracyjne](#endpointy-administracyjne)
+    - [Reguły walidacji i obsługa zależności](#reguły-walidacji-i-obsługa-zależności)
+    - [Eksport CSV](#eksport-csv)
 - [Wymagania](#wymagania)
 - [Uruchomienie przez Docker](#uruchomienie-przez-docker)
 - [Uruchomienie przez XAMPP](#uruchomienie-przez-xampp)
 - [Testy integracyjne i CI](#testy-integracyjne-i-ci)
+  - [Zakres plików testowych](#zakres-plików-testowych)
 - [Autorzy](#autorzy)
 
 ## Technologie
@@ -292,7 +296,7 @@ stronie serwera.
 
 | Moduł i ścieżka publiczna | Rola | Zakres |
 |---------------------------|------|--------|
-| Dashboard — `/admin` | `admin` | Pokazuje liczbę klientów, aktywnych pracowników, usług (w tym aktywnych), rezerwacji łącznie i rezerwacji na dziś. Tylko odczyt; nie zarządza danymi. |
+| Strona główna — `/admin` | `admin` | Panel startowy administratora: pokazuje liczbę klientów, aktywnych pracowników, usług (w tym aktywnych), rezerwacji łącznie i rezerwacji na dziś. Tylko odczyt; nie zarządza danymi. |
 | Kategorie — `/kategorie` | `admin` | Lista z wyszukiwaniem i paginacją, dodawanie i edycja, aktywacja/dezaktywacja oraz usuwanie kategorii bez usług. Nie przypisuje usług do kategorii; kategoria z usługami nie zostanie usunięta (409). |
 | Usługi — `/uslugi` | `admin` | Lista z filtrami kategorii i statusu, wyszukiwaniem i paginacją; dodawanie i edycja nazwy, opisu, kategorii, ceny i czasu trwania, a także aktywacja/dezaktywacja. Nie przypisuje pracowników; usługa z przypisaniem lub rezerwacją nie zostanie usunięta (409). |
 | Pracownicy — `/pracownicy` | `admin` | Lista, wyszukiwanie i paginacja; tworzenie profilu tylko dla istniejącego, aktywnego konta o roli `pracownik`, które nie ma jeszcze profilu; edycja opisu i aktywności oraz usuwanie profilu bez zależności. Nie tworzy ani nie usuwa kont użytkowników i nie zmienia ich ról. |
@@ -367,7 +371,9 @@ i `szukaj`. Odpowiedź ma stały kształt:
 ```
 
 `size` należy do allowlisty `1`, `2`, `10`, `25`, `50`, `100` (domyślnie 25);
-niepoprawna wartość wraca do 25. `page` mniejsze od 1 daje stronę 1, a strona
+niepoprawna wartość wraca do 25. Wartości `1` i `2` są dolną granicą techniczną
+i są używane w testach automatycznych; w interfejsie użytkownik wybiera rozmiar
+z pozostałych wartości. `page` mniejsze od 1 daje stronę 1, a strona
 powyżej zakresu jest sprowadzana do ostatniej. `stron` ma minimum 1, także dla
 pustego wyniku. `kierunek` przyjmuje `asc` lub `desc` (domyślnie `desc`).
 `szukaj` obejmuje nazwisko klienta i pracownika. `LIMIT` i `OFFSET` są
@@ -577,13 +583,14 @@ W środowisku Docker wartość `DB_HOST` musi wynosić `mariadb`; w środowisku 
 
 ## Testy integracyjne i CI
 
-Testy znajdują się w katalogu [`tests/`](tests/) i obejmują Etapy 1–3. Sprawdzają
-aplikację przez HTTP na izolowanej bazie testowej (domyślnie `wefixit_test`).
-Nie korzystają z bazy deweloperskiej ani z wolumenu Dockera.
+Testy znajdują się w katalogu [`tests/`](tests/) i sprawdzają aplikację przez HTTP
+na izolowanej bazie testowej (domyślnie `wefixit_test`). Nie korzystają z bazy
+deweloperskiej ani z wolumenu Dockera.
 
-W uruchomieniu, na podstawie którego zaktualizowano ten opis, wynik był
-następujący: `Wynik: 148 poprawnych, 0 niepoprawnych.` Log serwera nie zawierał
-błędów PHP.
+Zestaw obejmuje testy Etapów 1–3 i uruchamia się przez `php tests/run.php`.
+Aktualny wynik — liczbę testów poprawnych i niepoprawnych oraz kontrolę logu
+serwera — wypisuje samo uruchomienie. Polecenie znajduje się w sekcji
+[Uruchomienie](#uruchomienie).
 
 ### Zakres plików testowych
 
@@ -594,7 +601,7 @@ błędów PHP.
 | [`tests/cases_auth.php`](tests/cases_auth.php) | Logowanie i wylogowanie, rotacja identyfikatora sesji, konto nieaktywne oraz cookie `HttpOnly` i `SameSite=Lax`. |
 | [`tests/cases_pages.php`](tests/cases_pages.php) | Ochrona stron, role, przekierowania i widoczność pozycji menu. |
 | [`tests/cases_profile.php`](tests/cases_profile.php) | Edycja profilu, CSRF, zajęty e-mail 409 oraz ignorowanie `id` i `roli` z body. |
-| [`tests/cases_admin.php`](tests/cases_admin.php) | Statystyki dashboardu, dostęp tylko dla administratora i brak ujawniania hashy. |
+| [`tests/cases_admin.php`](tests/cases_admin.php) | Statystyki panelu startowego, dostęp tylko dla administratora i brak ujawniania hashy. |
 | [`tests/cases_admin_categories.php`](tests/cases_admin_categories.php) | Kategorie: dodawanie, edycja, aktywacja, usuwanie, CSRF, 405 i 415. |
 | [`tests/cases_admin_services.php`](tests/cases_admin_services.php) | Usługi: CRUD, filtry, ceny, duplikaty nazw, zależności i kontrakt metod. |
 | [`tests/cases_admin_employees.php`](tests/cases_admin_employees.php) | Profile pracowników: wybór konta, niezmienny `uzytkownik_id`, zależności i usuwanie. |
@@ -605,7 +612,7 @@ błędów PHP.
 | [`tests/cases_admin_pagination.php`](tests/cases_admin_pagination.php) | Allowlista `page`/`size`, metadane paginacji, wyszukiwanie i linki zachowujące filtry. |
 | [`tests/cases_admin_log_export.php`](tests/cases_admin_log_export.php) | Filtry dziennika, prywatność aktora, BOM i filtry CSV oraz neutralizacja formuł. |
 
-### Wymagania
+### Wymagania testów
 
 - PHP 8.2 z rozszerzeniami `curl`, `mbstring`, `pdo_mysql` i `session`.
 - Działający serwer MariaDB 11.4 lub MySQL.
