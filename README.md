@@ -6,14 +6,18 @@ System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników 
 
 ## Spis treści
 
-- [Technologie](#Technologie)
-- [Baza danych](#Baza-danych)
+- [Technologie](#technologie)
+- [Baza danych](#baza-danych)
+  - [Opis tabel nieobecnosci i log_zdarzen](#opis-tabel-nieobecnosci-i-log_zdarzen)
 - [Zakres projektu](#zakres-projektu)
+  - [Zrealizowano w Etapie 1](#zrealizowano-w-etapie-1)
+  - [Zrealizowano w Etapie 2 - Użytkownicy i logowanie](#zrealizowano-w-etapie-2---użytkownicy-i-logowanie)
+  - [Zrealizowano w Etapie 3 — panel administratora](#zrealizowano-w-etapie-3--panel-administratora)
 - [Wymagania](#wymagania)
 - [Uruchomienie przez Docker](#uruchomienie-przez-docker)
 - [Uruchomienie przez XAMPP](#uruchomienie-przez-xampp)
 - [Testy integracyjne](#testy-integracyjne)
-- [Autorzy](#Autorzy)
+- [Autorzy](#autorzy)
 
 ## Technologie
 Projekt wykorzystuje następujące technologie:
@@ -200,7 +204,16 @@ WeFixIT to system rezerwacji dla serwisu komputerowego z trzema rolami: klient, 
 |------|--------|
 | Klient (`klient`) | `/panel`, `/profil`, `GET /api/me`, `PATCH /api/profile` |
 | Pracownik (`pracownik`) | jak klient oraz `/pracownik` |
-| Administrator (`admin`) | jak pracownik oraz `/admin` |
+| Administrator (`admin`) | jak pracownik oraz `/admin`, `/kategorie`, `/uslugi`, `/pracownicy`, `/pracownicy-uslugi?id=…`, `/pracownicy-dostepnosc?id=…`, `/uzytkownicy`, `/rezerwacje`, `/log`, `/eksport?typ=rezerwacje` i `/eksport?typ=uzytkownicy` |
+
+Rola jest sprawdzana po stronie serwera na każdej chronionej stronie przez
+`require_role()` i na każdym chronionym endpointcie przez `require_api_login()`
+oraz porównanie pola `rola`. Widoczność pozycji w menu (`panel_menu_items()`)
+jest tylko wygodą interfejsu. Klient i pracownik, którzy ręcznie wpiszą adres
+`/admin`, `/kategorie`, `/uzytkownicy` lub innej strony administracyjnej,
+otrzymają odpowiedź 403. Bez sesji strona przekierowuje na `/login`, a endpoint
+API zwraca 401. `auth_base_path()` sprawia, że linki i przekierowania działają
+także w podkatalogu XAMPP.
 
 Konto klienta powstaje wyłącznie przez rejestrację. Rolę zawsze ustala serwer,
 więc pola `rola` i `aktywny` przesłane w formularzu są ignorowane. Strona
@@ -221,6 +234,31 @@ decyzji administratora.
 | `POST /api/auth/logout` | tak | 200 sukces, 403 brak CSRF, 405 zła metoda |
 | `GET /api/me` | nie | 200 dane zalogowanego użytkownika, 401 brak sesji |
 | `PATCH /api/profile` | tak | 200 sukces, 401 brak sesji, 403 brak CSRF, 409 zajęty e-mail, 422 błędy walidacji |
+| `POST /api/admin/categories` | tak | 201 sukces, 409 nazwa zajęta, 422 walidacja |
+| `PATCH /api/admin/categories` | tak | 200 sukces, 404 brak kategorii, 409 nazwa zajęta, 422 walidacja lub brak pól |
+| `DELETE /api/admin/categories` | tak | 200 sukces, 400 zły JSON, 404 brak kategorii, 409 kategoria ma usługi, 422 zły `id` |
+| `POST /api/admin/services` | tak | 201 sukces, 409 nazwa zajęta w kategorii, 422 walidacja |
+| `PATCH /api/admin/services` | tak | 200 sukces, 404 brak usługi, 409 nazwa zajęta, 422 walidacja lub brak pól |
+| `DELETE /api/admin/services` | tak | 200 sukces, 400 zły JSON, 404 brak usługi, 409 usługa ma przypisania lub rezerwacje, 422 zły `id` |
+| `POST /api/admin/employees` | tak | 201 sukces, 409 konto ma już profil, 422 walidacja konta lub opisu |
+| `PATCH /api/admin/employees` | tak | 200 sukces, 404 brak profilu, 422 walidacja lub próba zmiany konta |
+| `DELETE /api/admin/employees` | tak | 200 sukces, 400 zły JSON, 404 brak profilu, 409 profil ma zależności, 422 zły `id` |
+| `POST /api/admin/employee-services` | tak | 200 sukces, 404 brak pracownika, 422 niepoprawna lista lub usługa nieaktywna |
+| `POST /api/admin/employee-schedule` | tak | 201 sukces, 404 brak pracownika, 422 walidacja, nakładanie lub duplikat |
+| `PATCH /api/admin/employee-schedule` | tak | 200 sukces, 404 brak wpisu lub niezgodny pracownik, 422 walidacja lub kolizja |
+| `DELETE /api/admin/employee-schedule` | tak | 200 sukces, 400 zły JSON, 404 brak wpisu lub niezgodny pracownik, 422 walidacja |
+| `POST /api/admin/employee-absences` | tak | 201 sukces, 404 brak pracownika, 422 walidacja lub nakładanie |
+| `PATCH /api/admin/employee-absences` | tak | 200 sukces (opcjonalne ostrzeżenie o rezerwacjach), 404 brak wniosku, 422 niedozwolone przejście |
+| `PATCH /api/admin/users` | tak | 200 sukces, 404 brak konta, 422 walidacja, reguła ostatniego administratora lub własne konto |
+| `GET /api/admin/reservations` | nie | 200 lista z metadanymi paginacji, 401 brak sesji, 403 brak roli |
+| `PATCH /api/admin/reservations` | tak | 200 sukces, 404 brak rezerwacji, 422 walidacja lub niedozwolone przejście |
+
+Endpointy administracyjne mogą dodatkowo zwrócić 400 (uszkodzony JSON),
+401 (brak sesji), 403 (rola inna niż `admin` albo błędny CSRF), 405 (zła
+metoda z nagłówkiem `Allow`), 415 (zły `Content-Type` dla POST/PATCH) i 500
+(błąd serwera bez szczegółów technicznych). Publiczne adresy nie mają
+rozszerzenia `.php`; Apache mapuje je na pliki w `public/` zgodnie z
+[`public/.htaccess`](public/.htaccess).
 
 Token CSRF przesyłany jest w nagłówku `X-CSRF-Token`. Body żądań i odpowiedzi
 są w formacie JSON (`Content-Type: application/json`). `GET /api/me` nigdy nie
@@ -234,6 +272,114 @@ identyfikator sesji jest odświeżany (`session_regenerate_id`), a token CSRF
 rotowany. Operacje zmieniające stan wymagają nagłówka `X-CSRF-Token` zgodnego
 z tokenem zapisanym w sesji. Formularze korzystają z `fetch()` i wymagają
 włączonego JavaScriptu.
+
+### Zrealizowano w Etapie 3 — panel administratora
+
+Panel administratora jest dostępny wyłącznie dla roli `admin`. Publiczne
+adresy nie mają rozszerzenia `.php`; Apache mapuje je na pliki w `public/`
+zgodnie z regułą z [`public/.htaccess`](public/.htaccess). Każda strona
+wywołuje `require_role(['admin'])`, a każdy endpoint sprawdza sesję i rolę po
+stronie serwera.
+
+| Moduł i ścieżka publiczna | Rola | Zakres |
+|---------------------------|------|--------|
+| Dashboard — `/admin` | `admin` | Pokazuje liczbę klientów, aktywnych pracowników, usług (w tym aktywnych), rezerwacji łącznie i rezerwacji na dziś. Tylko odczyt; nie zarządza danymi. |
+| Kategorie — `/kategorie` | `admin` | Lista z wyszukiwaniem i paginacją, dodawanie i edycja, aktywacja/dezaktywacja oraz usuwanie kategorii bez usług. Nie przypisuje usług do kategorii; kategoria z usługami nie zostanie usunięta (409). |
+| Usługi — `/uslugi` | `admin` | Lista z filtrami kategorii i statusu, wyszukiwaniem i paginacją; dodawanie i edycja nazwy, opisu, kategorii, ceny i czasu trwania, a także aktywacja/dezaktywacja. Nie przypisuje pracowników; usługa z przypisaniem lub rezerwacją nie zostanie usunięta (409). |
+| Pracownicy — `/pracownicy` | `admin` | Lista, wyszukiwanie i paginacja; tworzenie profilu tylko dla istniejącego, aktywnego konta o roli `pracownik`, które nie ma jeszcze profilu; edycja opisu i aktywności oraz usuwanie profilu bez zależności. Nie tworzy ani nie usuwa kont użytkowników i nie zmienia ich ról. |
+| Usługi pracownika — `/pracownicy-uslugi?id=N` | `admin` | Ustawia cały zbiór przypisań usług do wskazanego pracownika. Przypisać można tylko aktywne usługi; odłączenie zapisuje `aktywne = FALSE` bez usuwania wiersza, więc historia i rezerwacje pozostają spójne. |
+| Dostępność pracownika — `/pracownicy-dostepnosc?id=N` | `admin` | Zarządza tygodniowym grafikiem (dodanie, aktywacja/dezaktywacja i usunięcie wpisu z kontrolą nakładania) oraz wnioskami o nieobecność (utworzenie, zatwierdzenie, odrzucenie, anulowanie). Nie tworzy rezerwacji i nie anuluje ich automatycznie; przy zatwierdzaniu pokazuje ostrzeżenie o rezerwacjach w okresie. |
+| Użytkownicy — `/uzytkownicy` | `admin` | Lista z filtrami roli i statusu oraz wyszukiwaniem; zmiana roli i aktywacja/dezaktywacja konta. Nie tworzy, nie usuwa kont i nie zmienia haseł; chroni własne konto oraz ostatniego aktywnego administratora. |
+| Rezerwacje — `/rezerwacje` | `admin` | Lista z filtrami, wyszukiwaniem, sortowaniem i paginacją; zmiana statusu według zamkniętej maszyny stanów, w tym anulowanie i cofnięcie anulowania. Nie tworzy rezerwacji ani nie usuwa ich. |
+| Dziennik zdarzeń — `/log` | `admin` | Odczyt dziennika z filtrami akcji, poziomu, obiektu i dat oraz paginacją; szczegóły JSON są dostępne w widoku. Tylko odczyt, bez edycji i usuwania wpisów. |
+| Eksport CSV — `/eksport?typ=rezerwacje` i `/eksport?typ=uzytkownicy` | `admin` | Generuje plik CSV odpowiednio rezerwacji lub użytkowników, z filtrami przekazanymi z widoku listy. Tylko odczyt; nie wymaga CSRF i nie zapisuje zdarzenia w dzienniku. |
+
+Menu administratora prowadzi też do podglądów `/panel` i `/pracownik` oraz do
+`/profil`; te pozycje pochodzą z Etapu 2 i nie zmieniają danych administracyjnych.
+
+Czego panel nie robi:
+
+- nie tworzy rezerwacji — to zakres Etapu 4;
+- nie tworzy ani nie usuwa kont użytkowników: konto klienta powstaje przez
+  `/register`, a panel może tylko zmienić rolę lub aktywować/dezaktywować konto;
+- nie usuwa rezerwacji: anulowanie jest zmianą `status_rezerwacji` na
+  `anulowana` i ustawieniem `anulowano` w tej samej instrukcji `UPDATE`;
+- nie usuwa nieobecności: anulowanie wniosku jest zmianą jego statusu;
+- nie usuwa wpisów dziennika zdarzeń.
+
+#### Endpointy administracyjne
+
+Wszystkie endpointy administracyjne znajdują się w tabeli w sekcji
+[Endpointy JSON](#endpointy-json) i mają wspólny prefiks `/api/admin/`.
+Kolejność sprawdzeń jest stała: metoda HTTP, `Content-Type` (tylko dla POST
+i PATCH), sesja, rola `admin`, CSRF (dla POST, PATCH i DELETE), a na końcu body
+JSON (dla POST/PATCH oraz DELETE, który czyta `id`). `GET /api/admin/reservations`
+kończy się na sprawdzeniu roli. Dlatego zła metoda daje 405 także bez sesji, a
+zły `Content-Type` daje 415 przed sprawdzeniem roli.
+
+- CSRF jest wymagany dla każdej zmiany stanu, czyli POST, PATCH i DELETE.
+  Wyjątkiem jest `GET /api/admin/reservations`, który tylko czyta dane i nie
+  wymaga tokenu. Brak lub niepoprawny token daje 403.
+- `Content-Type: application/json` jest wymagany dla POST i PATCH. DELETE nie
+  wymaga tego nagłówka, ale nadal odczytuje body JSON z `id`; uszkodzone lub
+  puste body daje 400.
+- `employee-services` przyjmuje wyłącznie POST. Zastępuje cały zbiór przypisań
+  pracownika i jest idempotentny; zła metoda daje 405 z `Allow: POST`.
+- `employee-absences` przyjmuje POST i PATCH. DELETE celowo nie istnieje, bo
+  anulowanie jest zmianą statusu; zła metoda daje 405 z `Allow: POST, PATCH`.
+- `users` przyjmuje wyłącznie PATCH. Nie ma POST ani DELETE, bo panel nie
+  tworzy i nie usuwa kont; zła metoda daje 405 z `Allow: PATCH`.
+- `reservations` przyjmuje GET i PATCH. Nie ma DELETE, bo rezerwacji nie
+  usuwamy; zła metoda daje 405 z `Allow: GET, PATCH`.
+- Pozostałe endpointy administracyjne (`categories`, `services`, `employees`,
+  `employee-schedule`) przyjmują POST, PATCH i DELETE.
+- `employee-schedule` przy PATCH i DELETE wymaga zgodności `pracownik_id` z
+  wpisem grafiku. Samo `id` nie wystarcza; niezgodny właściciel daje 404.
+- `employee-services` odłącza tylko przypisania do aktywnych usług, których nie
+  ma w żądaniu, i nigdy nie wykonuje `DELETE` na `uslugi_pracownikow`.
+  Przypisania do usług nieaktywnych pozostają zachowane, ale nie można ich
+  przypisać ponownie.
+
+`GET /api/admin/reservations` przyjmuje `page` i `size` oraz filtry `data_od`,
+`data_do`, `status`, `pracownik_id`, `usluga_id`, `uzytkownik_id`, `kierunek`
+i `szukaj`. Odpowiedź ma stały kształt:
+
+```json
+{
+  "success": true,
+  "rezerwacje": [],
+  "paginacja": {
+    "strona": 1,
+    "rozmiar": 25,
+    "stron": 1,
+    "razem": 0
+  }
+}
+```
+
+`size` należy do allowlisty `1`, `2`, `10`, `25`, `50`, `100` (domyślnie 25);
+niepoprawna wartość wraca do 25. `page` mniejsze od 1 daje stronę 1, a strona
+powyżej zakresu jest sprowadzana do ostatniej. `stron` ma minimum 1, także dla
+pustego wyniku. `kierunek` przyjmuje `asc` lub `desc` (domyślnie `desc`).
+`szukaj` obejmuje nazwisko klienta i pracownika. `LIMIT` i `OFFSET` są
+budowane jako literały z wartości już zwalidowanych, ponieważ PDO i MariaDB
+nie przyjmują ich jako parametrów prepared statement.
+
+#### Eksport CSV
+
+Panel udostępnia dwa eksporty: `/eksport?typ=rezerwacje` i
+`/eksport?typ=uzytkownicy` (wymagana rola `admin`). Eksport rezerwacji
+zachowuje filtry z widoku listy: zakres dat, status, pracownika, usługę,
+klienta, kierunek sortowania i frazę wyszukiwania. Eksport użytkowników
+zachowuje filtr roli, statusu i wyszukiwania. Eksport nie ma paginacji —
+zawiera wszystkie rekordy spełniające filtry.
+
+Plik jest kodowany w UTF-8 z BOM, a separatorami pól są średniki. Komórki
+rozpoczynające się od `=`, `+`, `-`, `@`, tabulatora, CR lub LF są
+neutralizowane apostrofem, żeby arkusz nie wykonał formuły pochodzącej z
+danych. Eksport jest wyłącznie odczytem: nie wymaga CSRF i nie zapisuje wpisu
+w dzienniku zdarzeń. Eksport użytkowników nie zawiera telefonu ani hasła;
+eksport rezerwacji zawiera e-mail klienta jako część dokumentu rezerwacji.
 
 ## Wymagania
 
