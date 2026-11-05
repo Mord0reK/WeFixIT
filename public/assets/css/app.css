@@ -37,6 +37,7 @@
     --color-emerald-300: oklch(84.5% 0.143 164.978);
     --color-emerald-400: oklch(76.5% 0.177 163.223);
     --color-emerald-500: oklch(69.6% 0.17 162.48);
+    --color-emerald-600: oklch(59.6% 0.145 163.225);
     --color-emerald-700: oklch(50.8% 0.118 165.612);
     --color-emerald-900: oklch(37.8% 0.077 168.94);
     --color-emerald-950: oklch(26.2% 0.051 172.552);
@@ -595,6 +596,9 @@
   .cursor-move {
     cursor: move;
   }
+  .cursor-not-allowed {
+    cursor: not-allowed;
+  }
   .cursor-pointer {
     cursor: pointer;
   }
@@ -1041,6 +1045,9 @@
   }
   .text-cyan-500 {
     color: var(--color-cyan-500);
+  }
+  .text-emerald-600 {
+    color: var(--color-emerald-600);
   }
   .text-emerald-700 {
     color: var(--color-emerald-700);
@@ -1507,6 +1514,9 @@
     .dark\:text-emerald-300 {
       color: var(--color-emerald-300);
     }
+    .dark\:text-emerald-400 {
+      color: var(--color-emerald-400);
+    }
     .dark\:text-green-400 {
       color: var(--color-green-400);
     }
@@ -1747,6 +1757,38 @@ dialog#app-confirm.app-confirm-closing::backdrop {
 }
 @media (prefers-reduced-motion: reduce) {
   [data-drawer-panel], [data-drawer-overlay], [data-drawer].app-drawer-closing [data-drawer-panel], [data-drawer].app-drawer-closing [data-drawer-overlay] {
+    animation: none;
+  }
+}
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes dropdown-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-0.25rem) scale(0.98);
+  }
+}
+.panel-dropdown-in {
+  animation: dropdown-in 160ms ease-out;
+}
+.panel-dropdown-out {
+  pointer-events: none;
+  animation: dropdown-out 120ms ease-in forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-dropdown-in, .panel-dropdown-out {
     animation: none;
   }
 }

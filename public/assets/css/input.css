@@ -179,6 +179,49 @@ dialog#app-confirm.app-confirm-closing::backdrop {
 }
 
 /*
+    Rozwijane menu filtrów i formularzy pojawia się i znika krótkim wjazdem,
+    spójnym z animacją wysuwanego panelu edycji. Klasy dodaje JavaScript,
+    a przy zamykaniu czeka z ukryciem menu tyle, ile trwa animacja wyjścia.
+*/
+@keyframes dropdown-in {
+    from {
+        opacity: 0;
+        transform: translateY(-0.25rem) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes dropdown-out {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-0.25rem) scale(0.98);
+    }
+}
+
+.panel-dropdown-in {
+    animation: dropdown-in 160ms ease-out;
+}
+
+.panel-dropdown-out {
+    pointer-events: none;
+    animation: dropdown-out 120ms ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .panel-dropdown-in,
+    .panel-dropdown-out {
+        animation: none;
+    }
+}
+
+/*
     Minimalistyczny scrollbar rozwijanych menu filtrów: cienki, zaokrąglony
     pasek bez widocznego toru. Firefox dostaje scrollbar-width: thin, a reszta
     przeglądarek dostosowany pasek WebKit. Tryb ciemny działa na

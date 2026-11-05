@@ -134,9 +134,17 @@ function panel_filter_end(): void
 
 /*
     Opcje filtra renderujemy jako radios powiązane z ukrytym formularzem przez
-    atrybut form. Zmiana zaznaczenia od razu wysyła formularz (data-filter-auto-submit).
+    atrybut form. Domyślnie zmiana zaznaczenia od razu wysyła formularz
+    (data-filter-auto-submit); w dropdownie formularza autoSubmit wyłączamy.
 */
-function panel_filter_options(string $formId, string $name, string $legend, array $options, string $selected): void
+function panel_filter_options(
+    string $formId,
+    string $name,
+    string $legend,
+    array $options,
+    string $selected,
+    bool $autoSubmit = true
+): void
 {
     $formIdSafe = htmlspecialchars($formId, ENT_QUOTES, 'UTF-8');
     $nameSafe = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
@@ -149,13 +157,18 @@ function panel_filter_options(string $formId, string $name, string $legend, arra
             <?php
             $value = (string) ($option['value'] ?? '');
             $optionLabel = (string) ($option['label'] ?? $value);
+            $disabled = (bool) ($option['disabled'] ?? false);
+            $inactive = (bool) ($option['inactive'] ?? false);
+            $optionClasses = PANEL_FILTER_OPTION_CLASS . ($disabled ? ' cursor-not-allowed opacity-50' : '');
             ?>
-            <label class="<?= PANEL_FILTER_OPTION_CLASS ?>">
+            <label class="<?= $optionClasses ?>">
                 <input type="radio" form="<?= $formIdSafe ?>" name="<?= $nameSafe ?>"
                     value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>"
                     class="<?= PANEL_FILTER_RADIO_CLASS ?>"
                     <?= $value === $selected ? 'checked' : '' ?>
-                    data-filter-auto-submit>
+                    <?= $disabled ? 'disabled' : '' ?>
+                    <?= $inactive ? 'data-inactive="1"' : '' ?>
+                    <?= $autoSubmit ? 'data-filter-auto-submit' : '' ?>>
                 <span class="min-w-0 break-words"><?= htmlspecialchars($optionLabel, ENT_QUOTES, 'UTF-8') ?></span>
             </label>
         <?php endforeach; ?>

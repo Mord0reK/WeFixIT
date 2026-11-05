@@ -449,15 +449,19 @@ function panel_layout_foot(): void
             */
             let openFilterDropdown = null;
 
+            // Musi odpowiadać czasowi animacji .panel-dropdown-out w app.css.
+            const dropdownCloseDelay = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                ? 0
+                : 120;
+
             function closeFilterDropdown(dropdown, focusToggle) {
                 const toggle = dropdown.querySelector('[data-filter-toggle]');
                 const menu = dropdown.querySelector('[data-filter-menu]');
 
                 if (!toggle || !menu) return;
 
-                menu.classList.add('hidden');
-                menu.style.top = '';
-                menu.style.left = '';
+                menu.classList.remove('panel-dropdown-in');
+                menu.classList.add('panel-dropdown-out');
                 toggle.setAttribute('aria-expanded', 'false');
 
                 if (openFilterDropdown === dropdown) {
@@ -467,6 +471,19 @@ function panel_layout_foot(): void
                 if (focusToggle) {
                     toggle.focus();
                 }
+
+                // Menu chowamy dopiero po animacji wyjścia, jak przy zamykaniu drawera.
+                if (menu.closeTimer) {
+                    window.clearTimeout(menu.closeTimer);
+                }
+
+                menu.closeTimer = window.setTimeout(function () {
+                    menu.classList.add('hidden');
+                    menu.classList.remove('panel-dropdown-out');
+                    menu.style.top = '';
+                    menu.style.left = '';
+                    menu.closeTimer = null;
+                }, dropdownCloseDelay);
             }
 
             function openFilterDropdownMenu(dropdown) {
@@ -479,7 +496,13 @@ function panel_layout_foot(): void
                     closeFilterDropdown(openFilterDropdown, false);
                 }
 
+                if (menu.closeTimer) {
+                    window.clearTimeout(menu.closeTimer);
+                    menu.closeTimer = null;
+                }
+
                 menu.classList.remove('hidden');
+                menu.classList.remove('panel-dropdown-in', 'panel-dropdown-out');
 
                 const rect = toggle.getBoundingClientRect();
                 const menuWidth = menu.offsetWidth;
@@ -494,6 +517,9 @@ function panel_layout_foot(): void
 
                 menu.style.top = top + 'px';
                 menu.style.left = left + 'px';
+                // Wymuszenie reflow restartuje animację przy szybkim ponownym otwarciu.
+                void menu.offsetWidth;
+                menu.classList.add('panel-dropdown-in');
                 toggle.setAttribute('aria-expanded', 'true');
                 openFilterDropdown = dropdown;
             }
@@ -517,6 +543,11 @@ function panel_layout_foot(): void
 
                 menu.addEventListener('click', function (event) {
                     event.stopPropagation();
+                });
+
+                // Po wybraniu opcji menu zamyka się; filtry dodatkowo wysyłają formularz.
+                menu.addEventListener('change', function () {
+                    closeFilterDropdown(dropdown, false);
                 });
             }
 

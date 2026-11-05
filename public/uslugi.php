@@ -26,11 +26,18 @@ $services = $servicePage['items'] ?? null;
 $categories = kategorie_list();
 $csrfToken = csrf_token();
 $categoryFilterOptions = [['value' => '0', 'label' => 'Wszystkie']];
+$serviceCategoryOptions = [];
 
 foreach ($categories ?? [] as $category) {
     $categoryFilterOptions[] = [
         'value' => (string) $category['id'],
         'label' => $category['nazwa'] . ($category['aktywna'] ? '' : ' (nieaktywna)'),
+    ];
+    $serviceCategoryOptions[] = [
+        'value' => (string) $category['id'],
+        'label' => $category['nazwa'] . ($category['aktywna'] ? '' : ' (nieaktywna)'),
+        'disabled' => !$category['aktywna'],
+        'inactive' => !$category['aktywna'],
     ];
 }
 
@@ -187,9 +194,9 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
                                         title="<?= $service['aktywna'] ? 'Dezaktywuj' : 'Aktywuj' ?>"
                                         aria-label="<?= $service['aktywna'] ? 'Dezaktywuj' : 'Aktywuj' ?>">
                                         <?php if ($service['aktywna']): ?>
-                                            <?= panel_icon('circle-slash', 'h-4 w-4 shrink-0') ?>
+                                            <?= panel_icon('circle-slash', 'h-4 w-4 shrink-0 text-red-600 dark:text-red-400') ?>
                                         <?php else: ?>
-                                            <?= panel_icon('circle-check', 'h-4 w-4 shrink-0') ?>
+                                            <?= panel_icon('circle-check', 'h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400') ?>
                                         <?php endif; ?>
                                     </button>
                                     <button type="button" class="<?= panel_button_classes('danger') ?>"
@@ -237,20 +244,30 @@ panel_drawer_start(
             <?= panel_field_error('service-error-opis') ?>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="space-y-4">
             <div>
-                <label for="service-kategoria" class="<?= LAYOUT_LABEL_CLASS ?>">Kategoria</label>
-                <select id="service-kategoria" name="kategoria_id" class="<?= LAYOUT_INPUT_CLASS ?>" required>
-                    <option value="">Wybierz kategorię</option>
-                    <?php foreach ($categories ?? [] as $category): ?>
-                        <option value="<?= $category['id'] ?>"
-                            data-inactive="<?= $category['aktywna'] ? '0' : '1' ?>"
-                            <?= $category['aktywna'] ? '' : 'disabled' ?>>
-                            <?= htmlspecialchars($category['nazwa'], ENT_QUOTES, 'UTF-8') ?>
-                            <?= $category['aktywna'] ? '' : '(nieaktywna)' ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+                <span id="service-kategoria-label" class="<?= LAYOUT_LABEL_CLASS ?>">Kategoria</span>
+                <div class="relative" data-filter-dropdown>
+                    <button type="button"
+                        class="<?= LAYOUT_INPUT_CLASS ?> items-center justify-between gap-2 text-left"
+                        data-filter-toggle aria-expanded="false" aria-haspopup="true"
+                        aria-labelledby="service-kategoria-label service-kategoria-value">
+                        <span id="service-kategoria-value"
+                            class="truncate text-zinc-400 dark:text-zinc-500"
+                            data-service-category-value>Wybierz kategorię</span>
+                        <?= panel_icon('chevron-down', 'h-4 w-4 shrink-0 text-zinc-500') ?>
+                    </button>
+                    <div class="<?= PANEL_FILTER_MENU_CLASS ?>" data-filter-menu>
+                        <?php panel_filter_options(
+                            'service-form',
+                            'kategoria_id',
+                            'Kategoria',
+                            $serviceCategoryOptions,
+                            '',
+                            false
+                        ); ?>
+                    </div>
+                </div>
                 <?= panel_field_error('service-error-kategoria_id') ?>
             </div>
 
@@ -300,7 +317,8 @@ panel_drawer_start(
     const serviceId = document.getElementById('service-id');
     const serviceName = document.getElementById('service-nazwa');
     const serviceDescription = document.getElementById('service-opis');
-    const serviceCategory = document.getElementById('service-kategoria');
+    const serviceCategoryRadios = Array.from(serviceForm.querySelectorAll('input[name="kategoria_id"]'));
+    const serviceCategoryValue = document.querySelector('[data-service-category-value]');
     const servicePrice = document.getElementById('service-cena');
     const serviceDuration = document.getElementById('service-czas');
     const serviceApi = <?= json_encode($servicesApi, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
@@ -345,17 +363,44 @@ panel_drawer_start(
     }
 
     function setInactiveCategoryOptionsDisabled() {
-        for (const option of serviceCategory.options) {
-            if (option.dataset.inactive === '1') {
-                option.disabled = true;
+        for (const radio of serviceCategoryRadios) {
+            if (radio.dataset.inactive === '1') {
+                radio.disabled = true;
             }
         }
+    }
+
+    function selectedServiceCategory() {
+        return serviceCategoryRadios.find(function (radio) {
+            return radio.checked;
+        }) || null;
+    }
+
+    function syncServiceCategoryValue() {
+        const selected = selectedServiceCategory();
+
+        if (selected === null) {
+            serviceCategoryValue.textContent = 'Wybierz kategorię';
+            serviceCategoryValue.classList.add('text-zinc-400', 'dark:text-zinc-500');
+            return;
+        }
+
+        const optionLabel = selected.closest('label');
+        serviceCategoryValue.textContent = optionLabel !== null
+            ? optionLabel.querySelector('span').textContent
+            : selected.value;
+        serviceCategoryValue.classList.remove('text-zinc-400', 'dark:text-zinc-500');
+    }
+
+    for (const radio of serviceCategoryRadios) {
+        radio.addEventListener('change', syncServiceCategoryValue);
     }
 
     function resetServiceForm() {
         editingServiceId = null;
         serviceForm.reset();
         setInactiveCategoryOptionsDisabled();
+        syncServiceCategoryValue();
         serviceId.value = '';
         serviceFormTitle.textContent = 'Dodaj usługę';
         serviceSubmit.textContent = 'Dodaj usługę';
@@ -405,10 +450,11 @@ panel_drawer_start(
         let completed = false;
         serviceSubmit.textContent = 'Zapisywanie…';
 
+        const selectedCategory = selectedServiceCategory();
         const payload = {
             nazwa: serviceName.value.trim(),
             opis: serviceDescription.value.trim(),
-            kategoria_id: Number(serviceCategory.value),
+            kategoria_id: selectedCategory === null ? 0 : Number(selectedCategory.value),
             cena: servicePrice.value.trim(),
             czas_trwania_minuty: Number(serviceDuration.value)
         };
@@ -457,13 +503,15 @@ panel_drawer_start(
             setInactiveCategoryOptionsDisabled();
             const selectedCategoryId = button.dataset.category || '';
 
-            for (const option of serviceCategory.options) {
-                if (option.value === selectedCategoryId && option.dataset.inactive === '1') {
-                    option.disabled = false;
+            for (const radio of serviceCategoryRadios) {
+                if (radio.value === selectedCategoryId && radio.dataset.inactive === '1') {
+                    radio.disabled = false;
                 }
+
+                radio.checked = radio.value === selectedCategoryId;
             }
 
-            serviceCategory.value = selectedCategoryId;
+            syncServiceCategoryValue();
             servicePrice.value = button.dataset.price || '';
             serviceDuration.value = button.dataset.duration || '';
             serviceFormTitle.textContent = 'Edytuj usługę';

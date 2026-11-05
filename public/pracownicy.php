@@ -182,9 +182,9 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                                         title="<?= $employee['aktywny'] ? 'Dezaktywuj' : 'Aktywuj' ?>"
                                         aria-label="<?= $employee['aktywny'] ? 'Dezaktywuj' : 'Aktywuj' ?>">
                                         <?php if ($employee['aktywny']): ?>
-                                            <?= panel_icon('circle-slash', 'h-4 w-4 shrink-0') ?>
+                                            <?= panel_icon('circle-slash', 'h-4 w-4 shrink-0 text-red-600 dark:text-red-400') ?>
                                         <?php else: ?>
-                                            <?= panel_icon('circle-check', 'h-4 w-4 shrink-0') ?>
+                                            <?= panel_icon('circle-check', 'h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400') ?>
                                         <?php endif; ?>
                                     </button>
                                     <button type="button" class="<?= panel_button_classes('danger') ?>"
