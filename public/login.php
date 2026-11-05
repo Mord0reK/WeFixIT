@@ -14,7 +14,15 @@ if ($user !== null) {
     exit;
 }
 
-$csrfToken = csrf_token();
+$rolePathsJson = htmlspecialchars(
+    json_encode([
+        'klient' => auth_role_home_path('klient'),
+        'pracownik' => auth_role_home_path('pracownik'),
+        'admin' => auth_role_home_path('admin'),
+    ], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT),
+    ENT_QUOTES,
+    'UTF-8'
+);
 
 layout_head('Logowanie — WeFixIT');
 ?>
@@ -28,7 +36,8 @@ layout_head('Logowanie — WeFixIT');
             <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Zaloguj się, aby przejść do panelu.</p>
         </div>
 
-        <form id="login-form" action="api/auth/login" method="post" class="space-y-4">
+        <form id="login-form" action="api/auth/login" method="post" class="space-y-4"
+            data-role-paths="<?= $rolePathsJson ?>">
             <div>
                 <label for="email" class="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">E-mail</label>
                 <input id="email" name="email" type="email" autocomplete="username" maxlength="254" required
@@ -58,61 +67,7 @@ layout_head('Logowanie — WeFixIT');
         </noscript>
     </main>
 
-    <script>
-        const form = document.getElementById('login-form');
-        const error = document.getElementById('login-error');
-        const button = form.querySelector('button[type="submit"]');
-        const csrfToken = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-        const rolePaths = <?= json_encode([
-            'klient' => auth_role_home_path('klient'),
-            'pracownik' => auth_role_home_path('pracownik'),
-            'admin' => auth_role_home_path('admin'),
-        ], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault();
-
-            if (button.disabled) return;
-
-            error.textContent = '';
-            error.classList.add('hidden');
-            button.disabled = true;
-            button.textContent = 'Logowanie…';
-
-            try {
-                const response = await fetch(form.action, {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-                    body: JSON.stringify({
-                        email: form.elements.email.value.trim(),
-                        password: form.elements.password.value
-                    })
-                });
-                const data = await response.json();
-
-                if (!response.ok || data.success !== true) {
-                    error.textContent = data.error || 'Nie udało się zalogować.';
-                    error.classList.remove('hidden');
-                    return;
-                }
-
-                const target = rolePaths[data.rola];
-
-                if (typeof target !== 'string') {
-                    error.textContent = 'Nie udało się zalogować.';
-                    error.classList.remove('hidden');
-                    return;
-                }
-
-                window.location.href = target;
-            } catch {
-                error.textContent = 'Nie udało się połączyć z serwerem. Spróbuj ponownie.';
-                error.classList.remove('hidden');
-            } finally {
-                button.disabled = false;
-                button.textContent = 'Zaloguj się';
-            }
-        });
-    </script>
-<?php layout_foot(); ?>
+<?php
+layout_script('login.js');
+layout_foot();
+?>
