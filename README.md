@@ -589,8 +589,9 @@ W środowisku Docker wartość `DB_HOST` musi wynosić `mariadb`; w środowisku 
 ## Testy integracyjne i CI
 
 Testy znajdują się w katalogu [`tests/`](tests/) i sprawdzają aplikację przez HTTP
-na izolowanej bazie testowej (domyślnie `wefixit_test`). Nie korzystają z bazy
-deweloperskiej ani z wolumenu Dockera.
+na bazie wskazanej przez `DB_NAME` (domyślnie `wefixit_test`). Przed każdym
+uruchomieniem zestaw usuwa i ponownie tworzy tabele w tej bazie. Nie wskazuj
+w `DB_NAME` bazy deweloperskiej (np. `wefixit`) ani bazy z danymi do zachowania.
 
 Zestaw obejmuje testy Etapów 1–3 i uruchamia się przez `php tests/run.php`.
 Aktualny wynik — liczbę testów poprawnych i niepoprawnych oraz kontrolę logu
