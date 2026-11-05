@@ -151,8 +151,8 @@ erDiagram
 
 ### Opis tabel nieobecnosci i log_zdarzen
 
-- `nieobecnosci` przechowuje urlopy, choroby i inne nieobecności pracowników w zakresie dat. Status `oczekujaca` oznacza wniosek przed decyzją, a `zatwierdzona`, `odrzucona` lub `anulowana` — jego rozstrzygnięcie. Przy zatwierdzeniu lub odrzuceniu zapisywane są `rozpatrzyl_id` i `rozpatrzono`.
-- `log_zdarzen` jest dziennikiem audytowym istotnych operacji. Zapisuje aktora, akcję, typ i identyfikator obiektu, poziom (`info`, `warning`, `critical`), opis oraz opcjonalne szczegóły w formacie JSON. Nie zastępuje danych biznesowych, tylko dokumentuje zmiany.
+- `nieobecnosci` przechowuje urlopy, choroby i inne nieobecności pracowników w zakresie dat. Status `oczekujaca` oznacza wniosek przed decyzją, a `zatwierdzona`, `odrzucona` lub `anulowana` — jego rozstrzygnięcie. Pełny workflow (wniosek, zatwierdzenie, odrzucenie, anulowanie) obsługuje panel: `POST` tworzy zawsze status `oczekujaca`, a `PATCH` wykonuje wyłącznie dozwolone przejścia. Przy zatwierdzeniu lub odrzuceniu `rozpatrzyl_id` pochodzi z sesji administratora i jest zapisywany razem z `rozpatrzono`; przy anulowaniu oba pola są zerowane. `CHECK chk_nieobecnosci_rozpatrzenie` wymaga obu pól dla `zatwierdzona`/`odrzucona` i obu pustych dla `oczekujaca`/`anulowana`. Anulowanie nie usuwa wniosku.
+- `log_zdarzen` jest dziennikiem audytowym operacji administracyjnych. Zapisuje aktora, akcję, typ i identyfikator obiektu, poziom (`info`, `warning`, `critical`), opis oraz opcjonalne szczegóły w formacie JSON. Widok dziennika pokazuje aktora tylko jako imię i nazwisko — bez e-maila i telefonu. Kolumny `obiekt_typ` i `obiekt_id` są wypełniane razem albo oba pozostają puste; pilnuje tego `CHECK chk_log_zdarzen_obiekt`, a `log_event()` normalizuje niepełną parę do dwóch wartości `NULL`. Filtry akcji, poziomu i typu obiektu pochodzą z allowlist w `app/log_view.php`. Dziennik nie zastępuje danych biznesowych, tylko dokumentuje zmiany i nie zawiera haseł ani tokenów.
 
 ### Wersja pusta
 Pusta edycja bazy danych jak sama nazwa wskazuje nie zawiera żadnych danych w sobie. Zalecane użycie w środowisku produkcyjnym.
@@ -364,6 +364,105 @@ pustego wyniku. `kierunek` przyjmuje `asc` lub `desc` (domyślnie `desc`).
 `szukaj` obejmuje nazwisko klienta i pracownika. `LIMIT` i `OFFSET` są
 budowane jako literały z wartości już zwalidowanych, ponieważ PDO i MariaDB
 nie przyjmują ich jako parametrów prepared statement.
+
+#### Reguły walidacji i obsługa zależności
+
+Panel preferuje dezaktywację zamiast usuwania, bo schemat chroni historię
+kluczami obcymi `ON DELETE RESTRICT`:
+
+- `uslugi.kategoria_id` → `kategorie_uslug.id`;
+- `pracownicy.uzytkownik_id` → `uzytkownicy.id`;
+- `uslugi_pracownikow.pracownik_id` → `pracownicy.id` oraz
+  `uslugi_pracownikow.usluga_id` → `uslugi.id`;
+- `godziny_pracy.pracownik_id` → `pracownicy.id`;
+- `nieobecnosci.pracownik_id` → `pracownicy.id` oraz
+  `nieobecnosci.rozpatrzyl_id` → `uzytkownicy.id`;
+- `rezerwacje.uzytkownik_id` → `uzytkownicy.id` oraz para
+  `(rezerwacje.pracownik_id, rezerwacje.usluga_id)` →
+  `uslugi_pracownikow (pracownik_id, usluga_id)`;
+- `log_zdarzen.aktor_id` → `uzytkownicy.id`.
+
+Dzięki tym ograniczeniom nie da się usunąć konta, które ma profil pracownika,
+rezerwację, nieobecność lub wpis w logu, ani usługi, do której istnieje
+przypisanie lub rezerwacja. `rezerwacje.cena_historyczna` zapisuje cenę z
+chwili rezerwacji, więc późniejsza zmiana ceny usługi nie zmienia historii.
+Dlatego panel dezaktywuje rekordy przez `aktywny`, `aktywna` lub `aktywne`.
+Wyjątki bez zależności mogą być usunięte fizycznie: kategoria bez usług,
+usługa bez przypisań i rezerwacji, profil pracownika bez powiązań oraz wpis
+grafiku, do którego nie prowadzi żaden klucz obcy.
+
+Serwer egzekwuje reguły, których nie da się wyrazić samym schematem:
+
+- **Nakładanie przedziałów grafiku.** `UNIQUE` `uq_godziny_pracy_przedzial`
+  obejmuje `pracownik_id`, `dzien_tygodnia`, `czas_rozpoczecia` i
+  `czas_zakonczenia`, więc blokuje tylko identyczny przedział. Nachodzące
+  przedziały sprawdza `pracownik_schedule_create()` oraz reaktywacja w
+  `pracownik_schedule_set_active()`: blokują profil `FOR UPDATE` i używają
+  warunku `existing.start < new.end AND existing.end > new.start`. Przedziały
+  stykające się granicami nie kolidują, a dokładny duplikat dostaje osobny
+  komunikat z naruszenia `UNIQUE`.
+- **Ostatni aktywny administrator.** Baza nie ma constraintu „co najmniej
+  jeden admin”. `uzytkownik_update()` blokuje wiersze administratorów w
+  kolejności `id`, sprawdza, czy operacja nie odbiera roli lub nie dezaktywuje
+  ostatniego aktywnego administratora, i blokuje też odebranie roli oraz
+  dezaktywację własnego konta.
+- **Niezmienny `uzytkownik_id` profilu pracownika.** `PATCH /api/admin/employees`
+  przyjmuje to pole, ale próba zmiany na inne konto kończy się 422
+  `Powiązanie konta jest niezmienne. Zmiana konta wymaga utworzenia nowego
+  profilu.` Baza ma tu tylko klucz obcy i `UNIQUE`, bez triggera pilnującego
+  historii powiązania.
+- **Brak przypisania usługi nieaktywnej.** `employee-services` przyjmuje
+  wyłącznie identyfikatory usług z `uslugi.aktywna = TRUE`. Usługa nieaktywna
+  może pozostać w historii przypisań, ale nie można jej przypisać ponownie;
+  schemat nie ma `CHECK` wiążącego `uslugi_pracownikow.aktywne` z
+  `uslugi.aktywna`.
+- **Nakładanie nieobecności.** `pracownik_absence_overlap_exists()` odrzuca
+  wniosek, jeśli w tym samym okresie istnieje nieobecność o statusie innym niż
+  `odrzucona` lub `anulowana`. Baza nie ma constraintu wykluczającego
+  nakładanie zakresów dat.
+- **Maszyny stanów.** Dozwolone przejścia rezerwacji i nieobecności są
+  zamkniętymi listami w `app/rezerwacje.php` i `app/pracownicy_dostepnosc.php`.
+  Baza dopuszcza każdy status z `ENUM`, więc to serwer pilnuje kolejności zmian.
+
+Rezerwacje mają następującą maszynę stanów:
+
+| Stan bieżący | Dozwolone przejścia |
+|--------------|---------------------|
+| `oczekujaca` | `potwierdzona`, `anulowana` |
+| `potwierdzona` | `w_trakcie`, `anulowana` |
+| `w_trakcie` | `zrealizowana`, `anulowana` |
+| `zrealizowana` | brak — stan końcowy |
+| `anulowana` | `oczekujaca` |
+
+`zrealizowana` jest stanem końcowym, bo usługa została wykonana i dalsza
+zmiana statusu zafałszowałaby historię. `anulowana` nie jest terminalna:
+można ją przywrócić wyłącznie do `oczekujaca`, żeby cofnięcie anulowania nie
+pomijało ponownego potwierdzenia.
+
+Nieobecności mają następującą maszynę stanów:
+
+| Stan bieżący | Dozwolone przejścia |
+|--------------|---------------------|
+| `oczekujaca` | `zatwierdzona`, `odrzucona`, `anulowana` |
+| `zatwierdzona` | `anulowana` |
+| `odrzucona` | brak — stan końcowy |
+| `anulowana` | brak — stan końcowy |
+
+`odrzucona` jest stanem końcowym, bo decyzja odmowna zamyka wniosek i ponowne
+rozpatrzenie wymaga nowego wniosku. `anulowana` również jest stanem końcowym,
+bo wycofany wniosek nie wraca do obiegu. `zatwierdzona` nie jest terminalna —
+można ją anulować.
+
+`CHECK chk_rezerwacje_anulowanie` wymaga, aby status `anulowana` miał niepuste
+`anulowano`, a każdy inny status miał `anulowano = NULL`. Dlatego
+`rezerwacja_set_status()` wykonuje jeden `UPDATE`, który ustawia
+`status_rezerwacji` i `anulowano` razem: `NOW()` przy anulowaniu i `NULL` przy
+pozostałych przejściach. Rozdzielenie tych zapisów na dwie instrukcje
+naruszyłoby CHECK po pierwszej z nich. Analogicznie
+`CHECK chk_nieobecnosci_rozpatrzenie` wymaga jednoczesnego zapisu
+`rozpatrzyl_id` i `rozpatrzono` dla `zatwierdzona`/`odrzucona` oraz obu
+wartości `NULL` dla `oczekujaca`/`anulowana`; `pracownik_absence_set_status()`
+zapisuje te pola w jednej instrukcji `UPDATE`.
 
 #### Eksport CSV
 
