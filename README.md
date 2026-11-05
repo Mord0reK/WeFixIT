@@ -17,10 +17,14 @@ System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników 
     - [Reguły walidacji i obsługa zależności](#reguły-walidacji-i-obsługa-zależności)
     - [Eksport CSV](#eksport-csv)
 - [Wymagania](#wymagania)
+  - [Konfiguracja środowiska](#konfiguracja-środowiska)
 - [Uruchomienie przez Docker](#uruchomienie-przez-docker)
 - [Uruchomienie przez XAMPP](#uruchomienie-przez-xampp)
 - [Testy integracyjne i CI](#testy-integracyjne-i-ci)
   - [Zakres plików testowych](#zakres-plików-testowych)
+  - [Wymagania testów](#wymagania-testów)
+  - [Konfiguracja](#konfiguracja)
+  - [Uruchomienie testów](#uruchomienie-testów)
 - [Autorzy](#autorzy)
 
 ## Technologie
@@ -371,9 +375,10 @@ i `szukaj`. Odpowiedź ma stały kształt:
 ```
 
 `size` należy do allowlisty `1`, `2`, `10`, `25`, `50`, `100` (domyślnie 25);
-niepoprawna wartość wraca do 25. Wartości `1` i `2` są dolną granicą techniczną
-i są używane w testach automatycznych; w interfejsie użytkownik wybiera rozmiar
-z pozostałych wartości. `page` mniejsze od 1 daje stronę 1, a strona
+niepoprawna wartość wraca do 25. Rozmiar strony jest parametrem adresu i nie ma
+na to kontrolki w interfejsie: wartość pochodzi z query stringu albo przyjmuje
+domyślne 25. Wartości `1` i `2` pozostają w allowliście jako dolna granica
+techniczna wykorzystywana przez testy. `page` mniejsze od 1 daje stronę 1, a strona
 powyżej zakresu jest sprowadzana do ostatniej. `stron` ma minimum 1, także dla
 pustego wyniku. `kierunek` przyjmuje `asc` lub `desc` (domyślnie `desc`).
 `szukaj` obejmuje nazwisko klienta i pracownika. `LIMIT` i `OFFSET` są
@@ -590,7 +595,7 @@ deweloperskiej ani z wolumenu Dockera.
 Zestaw obejmuje testy Etapów 1–3 i uruchamia się przez `php tests/run.php`.
 Aktualny wynik — liczbę testów poprawnych i niepoprawnych oraz kontrolę logu
 serwera — wypisuje samo uruchomienie. Polecenie znajduje się w sekcji
-[Uruchomienie](#uruchomienie).
+[Uruchomienie testów](#uruchomienie-testów).
 
 ### Zakres plików testowych
 
@@ -634,7 +639,7 @@ Baza o nazwie z `DB_NAME` jest importowana od zera z
 [database-czysta.sql](database/database-czysta.sql) przed każdą grupą testów,
 więc każde uruchomienie startuje z czystego stanu.
 
-### Uruchomienie
+### Uruchomienie testów
 
 Z katalogu głównego projektu:
 
