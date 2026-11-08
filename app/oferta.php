@@ -4,8 +4,10 @@ declare(strict_types=1);
 /*
     Warstwa danych publicznej oferty usług.
 
-    Zwraca wyłącznie aktywne usługi z aktywnych kategorii oraz aktywnych
-    pracowników przypisanych do usługi. Nie zawiera HTML ani logiki HTTP.
+    Zwraca wyłącznie aktywne usługi z aktywnych kategorii oraz pracowników
+    przypisanych do usługi. Aktywny pracownik to aktywny rekord w tabeli
+    pracownicy i aktywne konto w tabeli uzytkownicy. Nie zawiera HTML ani
+    logiki HTTP.
 */
 require_once __DIR__ . '/../public/config.php';
 
@@ -24,10 +26,10 @@ function oferta_db(): ?PDO
 // Filtr kategorii: 0 oznacza brak filtra, a błędna wartość nie może wywołać błędu.
 function oferta_category_filter(mixed $value): int
 {
-    return oferta_service_id_value($value) ?? 0;
+    return oferta_id_value($value) ?? 0;
 }
 
-function oferta_service_id_value(mixed $value): ?int
+function oferta_id_value(mixed $value): ?int
 {
     if (is_int($value)) {
         return $value > 0 ? $value : null;
@@ -99,9 +101,11 @@ function oferta_service_select_sql(): string
                     SELECT COUNT(*)
                     FROM uslugi_pracownikow up
                     JOIN pracownicy p ON p.id = up.pracownik_id
+                    JOIN uzytkownicy u2 ON u2.id = p.uzytkownik_id
                     WHERE up.usluga_id = u.id
                       AND up.aktywne = TRUE
                       AND p.aktywny = TRUE
+                      AND u2.aktywny = TRUE
                 ) AS pracownicy_active
              FROM uslugi u
              JOIN kategorie_uslug k ON k.id = u.kategoria_id';
@@ -205,6 +209,7 @@ function oferta_pracownicy_uslugi(int $serviceId): ?array
              WHERE up.usluga_id = :usluga_id
                AND up.aktywne = TRUE
                AND p.aktywny = TRUE
+               AND u.aktywny = TRUE
              ORDER BY u.nazwisko ASC, u.imie ASC, p.id ASC'
         );
         $statement->execute(['usluga_id' => $serviceId]);

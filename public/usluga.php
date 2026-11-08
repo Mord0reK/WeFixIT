@@ -12,7 +12,7 @@ require_once dirname(__DIR__) . '/app/panel_ui.php';
 require_once dirname(__DIR__) . '/app/oferta.php';
 
 $basePath = auth_base_path();
-$serviceId = oferta_service_id_value($_GET['id'] ?? null);
+$serviceId = oferta_id_value($_GET['id'] ?? null);
 $service = $serviceId !== null ? oferta_usluga_find($serviceId) : null;
 
 if ($service === null) {
