@@ -60,6 +60,9 @@ layout_head('Logowanie — WeFixIT');
         <p class="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
             Nie masz konta?
             <a href="register" class="font-medium text-zinc-900 underline-offset-4 hover:underline dark:text-zinc-100">Załóż konto</a>
+            <span class="text-zinc-400 dark:text-zinc-500" aria-hidden="true">·</span>
+            <a href="<?= htmlspecialchars(auth_base_path() . '/oferta', ENT_QUOTES, 'UTF-8') ?>"
+                class="font-medium text-zinc-900 underline-offset-4 hover:underline dark:text-zinc-100">Zobacz ofertę usług</a>
         </p>
 
         <noscript>
