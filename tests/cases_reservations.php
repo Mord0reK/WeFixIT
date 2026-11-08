@@ -103,6 +103,70 @@ function reservations_find_adjacent_slots(
     return null;
 }
 
+function reservations_find_overlap_pair(
+    array &$session,
+    int $employeeId,
+    int $serviceA,
+    int $serviceB,
+    int $gapMinutes
+): ?array {
+    for ($offset = 0; $offset < 14; $offset++) {
+        $date = date('Y-m-d', strtotime('+' . $offset . ' days'));
+        $responseA = reservations_availability_request(
+            $session['cookies'],
+            $employeeId,
+            $serviceA,
+            $date
+        );
+        $responseB = reservations_availability_request(
+            $session['cookies'],
+            $employeeId,
+            $serviceB,
+            $date
+        );
+
+        if ($responseA['status'] !== 200 || $responseB['status'] !== 200) {
+            continue;
+        }
+
+        $dataA = json_body($responseA);
+        $dataB = json_body($responseB);
+        $slotsA = is_array($dataA['sloty'] ?? null) ? $dataA['sloty'] : [];
+        $slotsB = is_array($dataB['sloty'] ?? null) ? $dataB['sloty'] : [];
+        $startsB = [];
+
+        foreach ($slotsB as $slotB) {
+            $start = $slotB['start'] ?? null;
+
+            if (is_string($start)) {
+                $startsB[$start] = $slotB;
+            }
+        }
+
+        foreach ($slotsA as $slotA) {
+            $start = $slotA['start'] ?? null;
+
+            if (!is_string($start)) {
+                continue;
+            }
+
+            $expectedStart = (new DateTimeImmutable($start))
+                ->modify('+' . $gapMinutes . ' minutes')
+                ->format('Y-m-d H:i:s');
+
+            if (isset($startsB[$expectedStart])) {
+                return [
+                    'date' => $date,
+                    'slot_a' => $slotA,
+                    'slot_b' => $startsB[$expectedStart],
+                ];
+            }
+        }
+    }
+
+    return null;
+}
+
 function reservations_slot_parts(array $slot): array
 {
     $start = (string) ($slot['start'] ?? '');
@@ -336,30 +400,58 @@ test('186. POST na termin stykający się granicą daje 201', function (): void 
     assert_status(201, $second, 'Rezerwacja stykająca się granicą powinna dać 201');
 });
 
+/*
+    Usługa 1 trwa 60 minut, a usługa 6 45 minut. Start usługi 6 przesunięty
+    o 45 minut od startu usługi 1 należy do siatki 15-minutowej, ale nakłada
+    się na rezerwację usługi 1. Sprawdzamy slot_b przed i po rezerwacji, żeby
+    dowieść, że 409 wynika z konfliktu, a nie z godziny spoza siatki.
+*/
 test('187. POST na termin częściowo kolidujący daje 409', function (): void {
     $session = reservations_client_session();
-    $found = reservations_find_slots($session, 1, 1);
-    assert_true($found !== null, 'Powinien istnieć wolny termin do rezerwacji');
+    $pair = reservations_find_overlap_pair($session, 1, 1, 6, 45);
+    assert_true(
+        $pair !== null,
+        'Dane seed powinny zawierać slot usługi 6 nakładający się na usługę 1'
+    );
 
-    $parts = reservations_slot_parts($found['slots'][0]);
+    if ($pair === null) {
+        return;
+    }
+
+    $partsA = reservations_slot_parts($pair['slot_a']);
+    $partsB = reservations_slot_parts($pair['slot_b']);
+    $slotBStart = $partsB['start'];
+
+    $before = reservations_availability_request($session['cookies'], 1, 6, $pair['date']);
+    assert_status(200, $before, 'Dostępność usługi 6 przed rezerwacją powinna zwrócić 200');
+    $beforeData = json_body($before);
+    $beforeStarts = array_column($beforeData['sloty'] ?? [], 'start');
+    assert_true(
+        in_array($slotBStart, $beforeStarts, true),
+        'Slot_b musi być wolny przed utworzeniem rezerwacji usługi 1'
+    );
+
     $first = post_json(
         $session['cookies'],
         '/api/reservations.php',
-        reservations_payload(1, 1, $parts['date'], $parts['time']),
+        reservations_payload(1, 1, $partsA['date'], $partsA['time']),
         $session['csrf']
     );
-    assert_status(201, $first, 'Rezerwacja bazowa powinna dać 201');
+    assert_status(201, $first, 'Rezerwacja bazowa usługi 1 powinna dać 201');
 
-    $partialStart = (new DateTimeImmutable($parts['start']))->modify('+15 minutes');
+    $after = reservations_availability_request($session['cookies'], 1, 6, $pair['date']);
+    assert_status(200, $after, 'Dostępność usługi 6 po rezerwacji powinna zwrócić 200');
+    $afterData = json_body($after);
+    $afterStarts = array_column($afterData['sloty'] ?? [], 'start');
+    assert_true(
+        !in_array($slotBStart, $afterStarts, true),
+        'Slot_b powinien zniknąć z dostępności po rezerwacji usługi 1'
+    );
+
     $partial = post_json(
         $session['cookies'],
         '/api/reservations.php',
-        reservations_payload(
-            1,
-            1,
-            $partialStart->format('Y-m-d'),
-            $partialStart->format('H:i:s')
-        ),
+        reservations_payload(1, 6, $partsB['date'], $partsB['time']),
         $session['csrf']
     );
 
