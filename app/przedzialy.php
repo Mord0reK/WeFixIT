@@ -73,8 +73,10 @@ function interval_seconds_time(int $seconds): string
     o krok siatki. Po zaakceptowaniu slotu kolejny kandydat z tego samego
     przedziału nie może zaczynać się przed jego końcem — dzięki temu usługa
     50-minutowa nie daje nachodzących slotów co 15 minut. Znacznik końca jest
-    resetowany dla każdego kolejnego przedziału grafiku. Czas z grafiku jest
-    zamieniany na pełny DATETIME przed porównaniem z zajętościami.
+    resetowany dla każdego kolejnego przedziału grafiku. Po zebraniu slotów
+    z wszystkich przedziałów odrzucamy też te, które kolidują z wcześniej
+    zaakceptowanym slotem z innego przedziału. Czas z grafiku jest zamieniany
+    na pełny DATETIME przed porównaniem z zajętościami.
 */
 function interval_slots_build(
     array $scheduleIntervals,
@@ -168,5 +170,27 @@ function interval_slots_build(
 
     ksort($slots, SORT_STRING);
 
-    return array_values($slots);
+    $filteredSlots = [];
+
+    foreach ($slots as $slot) {
+        $conflict = false;
+
+        foreach ($filteredSlots as $acceptedSlot) {
+            if (intervals_overlap(
+                $slot['start'],
+                $slot['end'],
+                $acceptedSlot['start'],
+                $acceptedSlot['end']
+            )) {
+                $conflict = true;
+                break;
+            }
+        }
+
+        if (!$conflict) {
+            $filteredSlots[] = $slot;
+        }
+    }
+
+    return $filteredSlots;
 }
