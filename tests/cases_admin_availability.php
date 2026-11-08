@@ -889,3 +889,59 @@ test('94. reaktywacja wpisu grafiku odrzuca kolizję z aktywnym przedziałem', f
     assert_same(0, (int) $secondRow['aktywne'], 'Drugi wpis powinien pozostać nieaktywny');
     assert_same(1, availability_active_schedule_count(1, 3), 'Dokładnie jeden wpis powinien być aktywny');
 });
+
+test('156. wpis kończący się o 24:00 nie wywołuje 500 przy tworzeniu ani reaktywacji', function (): void {
+    availability_clean_schedule(1, 6);
+    $insert = test_db()->prepare(
+        'INSERT INTO godziny_pracy
+            (pracownik_id, dzien_tygodnia, czas_rozpoczecia, czas_zakonczenia, aktywne)
+         VALUES
+            (:pracownik_id, :dzien_tygodnia, :czas_rozpoczecia, :czas_zakonczenia, :aktywne)'
+    );
+    $insert->execute([
+        'pracownik_id' => 1,
+        'dzien_tygodnia' => 6,
+        'czas_rozpoczecia' => '23:00:00',
+        'czas_zakonczenia' => '24:00:00',
+        'aktywne' => 1,
+    ]);
+    $insert->execute([
+        'pracownik_id' => 1,
+        'dzien_tygodnia' => 6,
+        'czas_rozpoczecia' => '22:30:00',
+        'czas_zakonczenia' => '23:30:00',
+        'aktywne' => 0,
+    ]);
+    $inactiveId = (int) test_db()->lastInsertId();
+
+    $session = availability_admin_session();
+
+    $overlap = availability_add_schedule($session, 1, 6, '23:30', '23:59');
+    assert_status(422, $overlap, 'Dodanie przedziału nachodzącego na wpis do 24:00 powinno dać 422');
+    $overlapData = json_body($overlap);
+    assert_true(
+        isset($overlapData['errors']['czas_rozpoczecia'])
+        && is_string($overlapData['errors']['czas_rozpoczecia'])
+        && $overlapData['errors']['czas_rozpoczecia'] !== '',
+        'Konflikt powinien zwrócić komunikat przy polu czas_rozpoczecia'
+    );
+
+    $reactivate = patch_json($session['cookies'], '/api/admin/employee-schedule.php', [
+        'id' => $inactiveId,
+        'pracownik_id' => 1,
+        'aktywne' => true,
+    ], $session['csrf']);
+    assert_status(422, $reactivate, 'Reaktywacja wpisu nachodzącego na wpis do 24:00 powinna dać 422');
+    $reactivateData = json_body($reactivate);
+    assert_true(
+        isset($reactivateData['errors']['aktywne'])
+        && is_string($reactivateData['errors']['aktywne'])
+        && $reactivateData['errors']['aktywne'] !== '',
+        'Reaktywacja powinna zwrócić komunikat przy polu aktywne'
+    );
+
+    $adjacent = availability_add_schedule($session, 1, 6, '22:00', '23:00');
+    assert_status(201, $adjacent, 'Przedział stykający się z wpisem do 24:00 powinien dać 201');
+
+    availability_clean_schedule(1, 6);
+});

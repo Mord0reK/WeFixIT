@@ -193,10 +193,10 @@ function pracownik_schedule_find(int $id): ?array
 
 /*
     Dodaje przedział w transakcji. Blokada profilu serializuje równoległe
-    zapisy grafiku tego pracownika. Konflikt sprawdzamy na aktywnych wpisach
-    warunkiem existing.start < new.end AND existing.end > new.start; stykające
-    się granicami przedziały nie kolidują. Dokładny duplikat celowo zostawiamy
-    do naruszenia UNIQUE, żeby dostał odrębny komunikat.
+    zapisy grafiku tego pracownika. Kolizję porównujemy w SQL natywnym dla
+    TIME, bo MariaDB dopuszcza wartości spoza zakresu 00-23 (np. 24:00:00),
+    a PHP-owa reguła obsługuje wyłącznie formaty dobowe. Dokładny duplikat
+    celowo zostawiamy do naruszenia UNIQUE, żeby dostał odrębny komunikat.
 */
 function pracownik_schedule_create(int $employeeId, array $data): array
 {
@@ -299,9 +299,10 @@ function pracownik_schedule_create(int $employeeId, array $data): array
 
 /*
     Reaktywacja musi sprawdzić kolizję, bo po dezaktywacji wpisu można dodać
-    nowy przedział w tym samym czasie. Blokada profilu serializuje równoległe
-    zmiany, a blokada wpisu stabilizuje jego godziny do czasu UPDATE.
-    Dezaktywacja nie wymaga sprawdzania kolizji.
+    nowy przedział w tym samym czasie. Kolizję porównujemy w SQL natywnym dla
+    TIME, żeby obsłużyć także istniejące wpisy z wartościami spoza 00-23.
+    Blokada profilu serializuje równoległe zmiany, a blokada wpisu stabilizuje
+    jego godziny do czasu UPDATE. Dezaktywacja nie wymaga sprawdzania kolizji.
 */
 function pracownik_schedule_set_active(int $employeeId, int $id, bool $active): array
 {
