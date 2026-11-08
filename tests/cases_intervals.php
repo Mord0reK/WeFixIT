@@ -304,3 +304,27 @@ test('155. dwa rozłączne przedziały grafiku dają sloty niezależnie', functi
         'Znacznik końca powinien resetować się między przedziałami grafiku'
     );
 });
+
+test('157. nachodzące przedziały grafiku nie dają nachodzących slotów', function (): void {
+    $slots = interval_slots_build(
+        [
+            ['start' => '08:00:00', 'end' => '10:00:00'],
+            ['start' => '08:30:00', 'end' => '10:30:00'],
+        ],
+        [],
+        '2026-05-11',
+        60,
+        15,
+        '2026-05-11 00:00:00'
+    );
+
+    assert_same(
+        [
+            ['start' => '2026-05-11 08:00:00', 'end' => '2026-05-11 09:00:00'],
+            ['start' => '2026-05-11 09:00:00', 'end' => '2026-05-11 10:00:00'],
+        ],
+        $slots,
+        'Sloty z drugiego przedziału nie mogą nachodzić na wcześniejsze'
+    );
+    assert_same(false, interval_slots_have_overlap($slots), 'Wynik nie może zawierać nachodzących slotów');
+});
