@@ -171,6 +171,13 @@ function reservation_pair_check(int $employeeId, int $serviceId): array
     return ['status' => 'ok'];
 }
 
+/*
+    Tworzy rezerwację w transakcji. Blokada wiersza pracownika jest pierwszą
+    instrukcją transakcji, przed jakimkolwiek odczytem niemodyfikującym:
+    dzięki temu stan dostępności jest czytany dopiero po przejęciu blokady
+    i dwie równoległe sesje nie mogą obie zobaczyć tego samego terminu jako
+    wolnego.
+*/
 function reservation_create(int $userId, array $data): array
 {
     $errors = reservation_field_errors($data);
