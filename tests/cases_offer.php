@@ -164,3 +164,73 @@ test('168. żądania GET oferty nie wymagają CSRF i nie zmieniają rezerwacji',
     $after = (int) test_db()->query('SELECT COUNT(*) FROM rezerwacje')->fetchColumn();
     assert_same($before, $after, 'Żądania GET oferty nie mogą zmieniać liczby rezerwacji');
 });
+
+test_group('Oferta — dane nieaktywne', 'database/database.sql');
+
+test('169. usługa w nieaktywnej kategorii nie pojawia się w ofercie', function (): void {
+    $statement = test_db()->prepare(
+        'UPDATE uslugi SET kategoria_id = :kategoria_id WHERE id = :id'
+    );
+    $statement->execute([
+        'kategoria_id' => 4,
+        'id' => 2,
+    ]);
+
+    $cookies = [];
+    $response = http_request($cookies, 'GET', '/oferta.php');
+
+    assert_status(200, $response, 'Oferta powinna zwrócić 200 także po zmianie kategorii usługi');
+    assert_true(
+        strpos($response['body'], 'Kompleksowa diagnostyka sprzętowa') === false,
+        'Aktywna usługa w nieaktywnej kategorii nie może pojawić się w ofercie'
+    );
+});
+
+test('170. usługa w nieaktywnej kategorii na szczegółach zwraca 404', function (): void {
+    $statement = test_db()->prepare(
+        'UPDATE uslugi SET kategoria_id = :kategoria_id WHERE id = :id'
+    );
+    $statement->execute([
+        'kategoria_id' => 4,
+        'id' => 2,
+    ]);
+
+    $cookies = [];
+    $response = http_request($cookies, 'GET', '/usluga.php?id=2');
+
+    assert_status(404, $response, 'Usługa w nieaktywnej kategorii powinna być nierozróżnialna od nieistniejącej');
+});
+
+test('171. nieaktywne konto pracownika oznacza brak dostępności usługi', function (): void {
+    $cookies = [];
+    $before = http_request($cookies, 'GET', '/usluga.php?id=4');
+    assert_status(200, $before, 'Usługa 4 powinna być widoczna przed dezaktywacją konta pracownika');
+    assert_true(
+        strpos($before['body'], 'Elektronik') !== false,
+        'Stan z seed danych powinien zawierać pracownika Elektronik'
+    );
+
+    $statement = test_db()->prepare('UPDATE uzytkownicy SET aktywny = FALSE WHERE id = :id');
+    $statement->execute(['id' => 3]);
+
+    $after = http_request($cookies, 'GET', '/usluga.php?id=4');
+    assert_status(200, $after, 'Usługa 4 powinna nadal zwracać 200 po dezaktywacji konta pracownika');
+
+    // Widok pokazuje dedykowany komunikat dopiero przy zerowej liczbie
+    // pracowników, więc jego obecność dowodzi spadku z 1 do 0.
+    assert_true(
+        strpos($after['body'], 'Elektronik') === false,
+        'Nieaktywne konto pracownika nie może pojawiać się na szczegółach usługi'
+    );
+    assert_true(
+        strpos($after['body'], 'Usługa jest chwilowo niedostępna') !== false,
+        'Brak aktywnego pracownika powinien pokazać komunikat o chwilowej niedostępności'
+    );
+
+    $offer = http_request($cookies, 'GET', '/oferta.php');
+    assert_status(200, $offer, 'Oferta powinna zwrócić 200 po dezaktywacji konta pracownika');
+    assert_true(
+        strpos($offer['body'], 'Elektronik') === false,
+        'Nazwisko nieaktywnego pracownika nie może pojawić się w ofercie'
+    );
+});
