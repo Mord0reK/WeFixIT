@@ -49,6 +49,10 @@ if ($pair['status'] === 'service_not_found') {
     json_response(404, ['error' => 'Nie znaleziono usługi.']);
 }
 
+if ($pair['status'] === 'employee_not_found') {
+    json_response(404, ['error' => 'Nie znaleziono pracownika.']);
+}
+
 if ($pair['status'] !== 'ok') {
     json_response(409, ['error' => 'Wybrany termin nie jest dostępny.']);
 }
