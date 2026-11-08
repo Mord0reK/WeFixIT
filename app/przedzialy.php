@@ -48,9 +48,17 @@ function intervals_overlap(string $startA, string $endA, string $startB, string 
     return $startA < $endB && $endA > $startB;
 }
 
-// Czas z grafiku jest zawsze zapisany jako MySQL TIME bez ułamków sekund.
+/*
+    Czas z grafiku jest zapisany jako MySQL TIME bez ułamków sekund.
+    Wartość 24:00:00 oznacza koniec dnia i zwracamy dla niej 86400 sekund.
+    Inne godziny z prefiksem 24 są niepoprawne.
+*/
 function interval_time_seconds(string $value): ?int
 {
+    if ($value === '24:00:00') {
+        return 86400;
+    }
+
     if (preg_match('/^(?:([01]\d|2[0-3])):([0-5]\d):([0-5]\d)$/D', $value, $matches) !== 1) {
         return null;
     }
@@ -69,6 +77,24 @@ function interval_seconds_time(int $seconds): string
 }
 
 /*
+    Zwraca pełny DATETIME dla dnia i sekund od północy. Nadmiar sekund
+    przechodzi na kolejne dni, więc koniec slotu o 24:00 ma postać
+    "następny dzień 00:00:00", którą interval_format() rozpoznaje jako DATETIME.
+*/
+function interval_slot_datetime(string $date, int $seconds): string
+{
+    $day = new DateTimeImmutable($date);
+    $daysToAdd = intdiv($seconds, 86400);
+    $secondsOfDay = $seconds % 86400;
+
+    if ($daysToAdd > 0) {
+        $day = $day->modify('+' . $daysToAdd . ' days');
+    }
+
+    return $day->format('Y-m-d') . ' ' . interval_seconds_time($secondsOfDay);
+}
+
+/*
     Buduje sloty od początku każdego przedziału grafiku, przesuwając kandydatów
     o krok siatki. Po zaakceptowaniu slotu kolejny kandydat z tego samego
     przedziału nie może zaczynać się przed jego końcem — dzięki temu usługa
@@ -76,7 +102,9 @@ function interval_seconds_time(int $seconds): string
     resetowany dla każdego kolejnego przedziału grafiku. Po zebraniu slotów
     z wszystkich przedziałów odrzucamy też te, które kolidują z wcześniej
     zaakceptowanym slotem z innego przedziału. Czas z grafiku jest zamieniany
-    na pełny DATETIME przed porównaniem z zajętościami.
+    na pełny DATETIME przed porównaniem z zajętościami. Koniec dnia zapisany
+    jako 24:00 staje się północą następnego dnia, więc nadal jest poprawnym
+    DATETIME dla interval_format().
 */
 function interval_slots_build(
     array $scheduleIntervals,
@@ -139,8 +167,8 @@ function interval_slots_build(
             $cursor + $durationSeconds <= $intervalEnd;
             $cursor += $stepSeconds
         ) {
-            $slotStart = $date . ' ' . interval_seconds_time($cursor);
-            $slotEnd = $date . ' ' . interval_seconds_time($cursor + $durationSeconds);
+            $slotStart = interval_slot_datetime($date, $cursor);
+            $slotEnd = interval_slot_datetime($date, $cursor + $durationSeconds);
 
             if ($slotStart <= $nowValue) {
                 continue;
