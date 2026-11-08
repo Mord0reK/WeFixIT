@@ -2,16 +2,38 @@
 declare(strict_types=1);
 
 /*
-    Testy czystej reguły nakładania przedziałów czasowych.
+    Testy czystych reguł przedziałów czasowych i budowy slotów.
 
-    Grupa nie wykonuje żądań HTTP ani nie korzysta bezpośrednio z bazy danych.
-    Sprawdza wyłącznie intervals_overlap() z app/przedzialy.php, w tym styk
-    granic, pokrycie, formaty TIME/DATETIME i odrzucanie mieszanych formatów.
+    Grupa nie używa bazy do asercji ani nie wykonuje żądań HTTP, ale mechanizm
+    test_group() wymaga wskazania pliku SQL i wykonuje reset bazy przed grupą.
+    Sprawdza intervals_overlap() oraz interval_slots_build() z
+    app/przedzialy.php, w tym styk granic, pokrycie, formaty TIME/DATETIME,
+    odrzucanie mieszanych formatów i brak nachodzenia slotów.
 */
 
 require_once __DIR__ . '/../app/przedzialy.php';
 
 test_group('Przedziały czasowe', 'database/database.sql');
+
+function interval_slots_have_overlap(array $slots): bool
+{
+    $count = count($slots);
+
+    for ($i = 0; $i < $count; $i++) {
+        for ($j = $i + 1; $j < $count; $j++) {
+            if (intervals_overlap(
+                (string) $slots[$i]['start'],
+                (string) $slots[$i]['end'],
+                (string) $slots[$j]['start'],
+                (string) $slots[$j]['end']
+            )) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
 
 test('142. całkowicie rozłączne przedziały nie kolidują', function (): void {
     assert_same(
@@ -143,4 +165,142 @@ test('149. mieszanie formatów TIME i DATETIME jest odrzucane', function (): voi
     }
 
     assert_true($thrown, 'Nieobsługiwany format HH:MM powinien rzucić InvalidArgumentException');
+});
+
+test('150. siatka 15 minut nie tworzy nachodzących slotów 60-minutowej usługi', function (): void {
+    $slots = interval_slots_build(
+        [['start' => '08:00:00', 'end' => '12:00:00']],
+        [],
+        '2026-05-11',
+        60,
+        15,
+        '2026-05-11 00:00:00'
+    );
+
+    assert_same(
+        [
+            ['start' => '2026-05-11 08:00:00', 'end' => '2026-05-11 09:00:00'],
+            ['start' => '2026-05-11 09:00:00', 'end' => '2026-05-11 10:00:00'],
+            ['start' => '2026-05-11 10:00:00', 'end' => '2026-05-11 11:00:00'],
+            ['start' => '2026-05-11 11:00:00', 'end' => '2026-05-11 12:00:00'],
+        ],
+        $slots,
+        'Kolejne sloty powinny zaczynać się po zakończeniu poprzedniego'
+    );
+    assert_same(false, interval_slots_have_overlap($slots), 'Sloty nie mogą na siebie nachodzić');
+});
+
+test('151. usługa 50 minut daje rzeczywistą przepustowość bez nachodzenia', function (): void {
+    $slots = interval_slots_build(
+        [['start' => '08:00:00', 'end' => '10:00:00']],
+        [],
+        '2026-05-11',
+        50,
+        15,
+        '2026-05-11 00:00:00'
+    );
+
+    assert_same(2, count($slots), 'Okno 08:00-10:00 powinno pomieścić dwa sloty 50-minutowe');
+    assert_same('2026-05-11 08:00:00', $slots[0]['start'] ?? null, 'Pierwszy slot powinien zaczynać się na początku grafiku');
+    assert_same('2026-05-11 08:50:00', $slots[0]['end'] ?? null, 'Pierwszy slot powinien trwać 50 minut');
+    assert_true(
+        ($slots[1]['start'] ?? '') >= ($slots[0]['end'] ?? ''),
+        'Drugi slot nie może zaczynać się przed końcem pierwszego'
+    );
+    assert_same(false, interval_slots_have_overlap($slots), 'Sloty 50-minutowe nie mogą na siebie nachodzić');
+});
+
+test('152. zajęty przedział usuwa kolidujące sloty, a styk granic zostaje', function (): void {
+    $slots = interval_slots_build(
+        [['start' => '08:00:00', 'end' => '12:00:00']],
+        [['start' => '2026-05-11 09:00:00', 'end' => '2026-05-11 10:00:00']],
+        '2026-05-11',
+        60,
+        15,
+        '2026-05-11 00:00:00'
+    );
+
+    assert_same(
+        [
+            ['start' => '2026-05-11 08:00:00', 'end' => '2026-05-11 09:00:00'],
+            ['start' => '2026-05-11 10:00:00', 'end' => '2026-05-11 11:00:00'],
+            ['start' => '2026-05-11 11:00:00', 'end' => '2026-05-11 12:00:00'],
+        ],
+        $slots,
+        'Slot kończący się o 09:00 i zaczynający się o 10:00 powinny zostać'
+    );
+});
+
+test('153. slot kończący się na końcu grafiku jest dozwolony, a wystający odrzucony', function (): void {
+    $slots = interval_slots_build(
+        [['start' => '08:00:00', 'end' => '09:00:00']],
+        [],
+        '2026-05-11',
+        30,
+        15,
+        '2026-05-11 00:00:00'
+    );
+
+    assert_same(2, count($slots), 'Okno 08:00-09:00 powinno pomieścić dwa sloty 30-minutowe');
+    assert_same(
+        '2026-05-11 09:00:00',
+        $slots[1]['end'] ?? null,
+        'Ostatni slot powinien kończyć się dokładnie na końcu grafiku'
+    );
+
+    foreach ($slots as $slot) {
+        assert_true(
+            $slot['end'] <= '2026-05-11 09:00:00',
+            'Slot nie może wystawać poza przedział grafiku'
+        );
+    }
+});
+
+test('154. slot zaczynający się teraz jest odrzucany', function (): void {
+    $slots = interval_slots_build(
+        [['start' => '08:00:00', 'end' => '10:00:00']],
+        [],
+        '2026-05-11',
+        30,
+        15,
+        '2026-05-11 08:00:00'
+    );
+
+    assert_same(
+        '2026-05-11 08:15:00',
+        $slots[0]['start'] ?? null,
+        'Slot równy bieżącemu czasowi nie może być zwrócony'
+    );
+
+    foreach ($slots as $slot) {
+        assert_true(
+            $slot['start'] > '2026-05-11 08:00:00',
+            'Każdy zwrócony slot musi zaczynać się po bieżącym czasie'
+        );
+    }
+});
+
+test('155. dwa rozłączne przedziały grafiku dają sloty niezależnie', function (): void {
+    $slots = interval_slots_build(
+        [
+            ['start' => '10:00:00', 'end' => '11:00:00'],
+            ['start' => '08:00:00', 'end' => '09:00:00'],
+        ],
+        [],
+        '2026-05-11',
+        30,
+        15,
+        '2026-05-11 00:00:00'
+    );
+
+    assert_same(
+        [
+            ['start' => '2026-05-11 08:00:00', 'end' => '2026-05-11 08:30:00'],
+            ['start' => '2026-05-11 08:30:00', 'end' => '2026-05-11 09:00:00'],
+            ['start' => '2026-05-11 10:00:00', 'end' => '2026-05-11 10:30:00'],
+            ['start' => '2026-05-11 10:30:00', 'end' => '2026-05-11 11:00:00'],
+        ],
+        $slots,
+        'Znacznik końca powinien resetować się między przedziałami grafiku'
+    );
 });
