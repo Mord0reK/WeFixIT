@@ -21,6 +21,9 @@ const LAYOUT_BUTTON_CLASS = 'inline-flex h-10 w-full items-center justify-center
 // Wyśrodkowane tło dla stron przed zalogowaniem (login, rejestracja).
 const LAYOUT_PAGE_BODY_CLASS = 'flex min-h-screen items-center justify-center bg-zinc-50 p-4 text-zinc-950 antialiased dark:bg-zinc-950 dark:text-zinc-50';
 
+// Zwykła strona publiczna: tło bez wyśrodkowania, inaczej niż strony logowania.
+const LAYOUT_PUBLIC_BODY_CLASS = 'min-h-screen bg-zinc-50 text-zinc-950 antialiased dark:bg-zinc-950 dark:text-zinc-50';
+
 // Znak serwisu jest stałym, zaufanym fragmentem SVG używanym w nawigacji i formularzach.
 function layout_logo(string $classes = 'h-5 w-5'): string
 {

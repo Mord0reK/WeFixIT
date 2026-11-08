@@ -105,6 +105,14 @@ function panel_menu_items(string $role): array
             'icon' => 'list',
         ],
         [
+            'key' => 'oferta',
+            'label' => 'Oferta usług',
+            'path' => '/oferta',
+            'roles' => ['klient'],
+            'group' => 'Rezerwacje',
+            'icon' => 'wrench',
+        ],
+        [
             'key' => 'profil',
             'label' => 'Mój profil',
             'path' => '/profil',
