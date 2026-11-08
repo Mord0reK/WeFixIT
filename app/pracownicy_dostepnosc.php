@@ -14,7 +14,6 @@ declare(strict_types=1);
     jawnej maszyny stanów. Moduł nie zawiera HTML ani logiki HTTP.
 */
 require_once __DIR__ . '/../public/config.php';
-require_once __DIR__ . '/przedzialy.php';
 
 // Wspólne komunikaty, żeby endpoint i widok nie powielały tych samych tekstów.
 const PRACOWNIK_GRAFIK_DAY_ERROR = 'Dzień tygodnia musi być liczbą całkowitą od 1 do 7.';
@@ -194,10 +193,10 @@ function pracownik_schedule_find(int $id): ?array
 
 /*
     Dodaje przedział w transakcji. Blokada profilu serializuje równoległe
-    zapisy grafiku tego pracownika. Konflikt sprawdzamy w PHP wspólną funkcją
-    intervals_overlap() na aktywnych wpisach, dzięki czemu grafik i przyszłe
-    rezerwacje używają tej samej reguły. Dokładny duplikat celowo zostawiamy
-    do naruszenia UNIQUE, żeby dostał odrębny komunikat.
+    zapisy grafiku tego pracownika. Kolizję porównujemy w SQL natywnym dla
+    TIME, bo MariaDB dopuszcza wartości spoza zakresu 00-23 (np. 24:00:00),
+    a PHP-owa reguła obsługuje wyłącznie formaty dobowe. Dokładny duplikat
+    celowo zostawiamy do naruszenia UNIQUE, żeby dostał odrębny komunikat.
 */
 function pracownik_schedule_create(int $employeeId, array $data): array
 {
@@ -226,34 +225,34 @@ function pracownik_schedule_create(int $employeeId, array $data): array
         }
 
         $statement = $pdo->prepare(
-            'SELECT czas_rozpoczecia, czas_zakonczenia
+            'SELECT id
              FROM godziny_pracy
              WHERE pracownik_id = :pracownik_id
                AND dzien_tygodnia = :dzien_tygodnia
                AND aktywne = TRUE
-             ORDER BY czas_rozpoczecia ASC, id ASC'
+               AND czas_rozpoczecia < :czas_zakonczenia
+               AND czas_zakonczenia > :czas_rozpoczecia
+               AND NOT (
+                   czas_rozpoczecia = :start_duplikatu
+                   AND czas_zakonczenia = :koniec_duplikatu
+               )
+             LIMIT 1'
         );
         $statement->execute([
             'pracownik_id' => $employeeId,
             'dzien_tygodnia' => $day,
+            'czas_rozpoczecia' => $start,
+            'czas_zakonczenia' => $end,
+            'start_duplikatu' => $start,
+            'koniec_duplikatu' => $end,
         ]);
 
-        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $existingStart = (string) $row['czas_rozpoczecia'];
-            $existingEnd = (string) $row['czas_zakonczenia'];
-
-            // Dokładny duplikat ma trafić do UNIQUE i dostać własny komunikat.
-            if ($existingStart === $start && $existingEnd === $end) {
-                continue;
-            }
-
-            if (intervals_overlap($start, $end, $existingStart, $existingEnd)) {
-                $pdo->rollBack();
-                return [
-                    'status' => 'invalid',
-                    'errors' => ['czas_rozpoczecia' => PRACOWNIK_GRAFIK_OVERLAP_ERROR],
-                ];
-            }
+        if ($statement->fetch(PDO::FETCH_ASSOC) !== false) {
+            $pdo->rollBack();
+            return [
+                'status' => 'invalid',
+                'errors' => ['czas_rozpoczecia' => PRACOWNIK_GRAFIK_OVERLAP_ERROR],
+            ];
         }
 
         $statement = $pdo->prepare(
@@ -300,10 +299,10 @@ function pracownik_schedule_create(int $employeeId, array $data): array
 
 /*
     Reaktywacja musi sprawdzić kolizję, bo po dezaktywacji wpisu można dodać
-    nowy przedział w tym samym czasie. Kolizję sprawdzamy wspólną funkcją
-    intervals_overlap(). Blokada profilu serializuje równoległe zmiany, a
-    blokada wpisu stabilizuje jego godziny do czasu UPDATE. Dezaktywacja nie
-    wymaga sprawdzania kolizji.
+    nowy przedział w tym samym czasie. Kolizję porównujemy w SQL natywnym dla
+    TIME, żeby obsłużyć także istniejące wpisy z wartościami spoza 00-23.
+    Blokada profilu serializuje równoległe zmiany, a blokada wpisu stabilizuje
+    jego godziny do czasu UPDATE. Dezaktywacja nie wymaga sprawdzania kolizji.
 */
 function pracownik_schedule_set_active(int $employeeId, int $id, bool $active): array
 {
@@ -343,35 +342,30 @@ function pracownik_schedule_set_active(int $employeeId, int $id, bool $active): 
 
         if ($active) {
             $statement = $pdo->prepare(
-                'SELECT czas_rozpoczecia, czas_zakonczenia
+                'SELECT id
                  FROM godziny_pracy
                  WHERE pracownik_id = :pracownik_id
                    AND dzien_tygodnia = :dzien_tygodnia
                    AND aktywne = TRUE
                    AND id <> :id
-                 ORDER BY czas_rozpoczecia ASC, id ASC'
+                   AND czas_rozpoczecia < :czas_zakonczenia
+                   AND czas_zakonczenia > :czas_rozpoczecia
+                 LIMIT 1'
             );
             $statement->execute([
                 'pracownik_id' => $employeeId,
                 'dzien_tygodnia' => (int) $row['dzien_tygodnia'],
                 'id' => $id,
+                'czas_rozpoczecia' => (string) $row['czas_rozpoczecia'],
+                'czas_zakonczenia' => (string) $row['czas_zakonczenia'],
             ]);
-            $currentStart = (string) $row['czas_rozpoczecia'];
-            $currentEnd = (string) $row['czas_zakonczenia'];
 
-            foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $activeRow) {
-                if (intervals_overlap(
-                    $currentStart,
-                    $currentEnd,
-                    (string) $activeRow['czas_rozpoczecia'],
-                    (string) $activeRow['czas_zakonczenia']
-                )) {
-                    $pdo->rollBack();
-                    return [
-                        'status' => 'invalid',
-                        'errors' => ['aktywne' => PRACOWNIK_GRAFIK_OVERLAP_ERROR],
-                    ];
-                }
+            if ($statement->fetch(PDO::FETCH_ASSOC) !== false) {
+                $pdo->rollBack();
+                return [
+                    'status' => 'invalid',
+                    'errors' => ['aktywne' => PRACOWNIK_GRAFIK_OVERLAP_ERROR],
+                ];
             }
         }
 
