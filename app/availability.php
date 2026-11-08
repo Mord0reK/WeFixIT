@@ -15,6 +15,9 @@ require_once __DIR__ . '/../public/config.php';
 require_once __DIR__ . '/przedzialy.php';
 
 const AVAILABILITY_SLOT_MINUTES = 15;
+
+// Horyzont ogranicza liczbę generowanych slotów i zapobiega rezerwacjom
+// odległym w czasie, dla których grafik może się jeszcze zmienić.
 const AVAILABILITY_HORIZON_DAYS = 14;
 
 function availability_db(): ?PDO
@@ -51,31 +54,13 @@ function availability_date_value(mixed $value): ?string
     return $value;
 }
 
-// Czas z grafiku jest zawsze zapisany jako MySQL TIME bez ułamków sekund.
-function availability_time_seconds(string $value): ?int
-{
-    if (preg_match('/^(?:([01]\d|2[0-3])):([0-5]\d):([0-5]\d)$/D', $value, $matches) !== 1) {
-        return null;
-    }
-
-    return (int) $matches[1] * 3600 + (int) $matches[2] * 60 + (int) $matches[3];
-}
-
-function availability_seconds_time(int $seconds): string
-{
-    return sprintf(
-        '%02d:%02d:%02d',
-        intdiv($seconds, 3600),
-        intdiv($seconds % 3600, 60),
-        $seconds % 60
-    );
-}
-
 /*
-    Zwraca status ok z listą slotów albo error, gdy dane wejściowe są błędne
-    lub zapytanie do bazy się nie powiodło. Pusta lista slotów jest poprawnym
-    wynikiem. Sloty są wyrównane do AVAILABILITY_SLOT_MINUTES od początku
-    przedziału grafiku i muszą w całości mieścić się w jednym przedziale.
+    Zwraca status ok z listą slotów, not_found gdy usługa nie istnieje, albo
+    error przy błędnych danych wejściowych lub błędzie bazy. Endpoint rezerwacji
+    musi zmapować not_found na 404 lub 422, a error na 500. Pusta lista slotów
+    jest poprawnym wynikiem. Sloty buduje interval_slots_build(), więc są
+    wyrównane do AVAILABILITY_SLOT_MINUTES od początku przedziału grafiku,
+    mieszczą się w całości w jednym przedziale i nie nachodzą na siebie.
 */
 function availability_day(int $employeeId, int $serviceId, string $date): array
 {
@@ -101,7 +86,7 @@ function availability_day(int $employeeId, int $serviceId, string $date): array
     }
 
     if (!is_array($service)) {
-        return ['status' => 'error'];
+        return ['status' => 'not_found'];
     }
 
     $duration = (int) $service['czas_trwania_minuty'];
@@ -191,57 +176,32 @@ function availability_day(int $employeeId, int $serviceId, string $date): array
         return ['status' => 'error'];
     }
 
-    $reservations = [];
+    $scheduleIntervals = [];
 
-    foreach ($reservationRows as $row) {
-        $reservations[] = [
-            (string) $row['czas_rozpoczecia'],
-            (string) $row['czas_zakonczenia'],
+    foreach ($scheduleRows as $row) {
+        $scheduleIntervals[] = [
+            'start' => (string) $row['czas_rozpoczecia'],
+            'end' => (string) $row['czas_zakonczenia'],
         ];
     }
 
-    $nowValue = $now->format('Y-m-d H:i:s');
-    $durationSeconds = $duration * 60;
-    $stepSeconds = AVAILABILITY_SLOT_MINUTES * 60;
-    $slots = [];
+    $busyIntervals = [];
 
-    foreach ($scheduleRows as $row) {
-        $intervalStart = availability_time_seconds((string) $row['czas_rozpoczecia']);
-        $intervalEnd = availability_time_seconds((string) $row['czas_zakonczenia']);
-
-        if ($intervalStart === null || $intervalEnd === null || $intervalStart >= $intervalEnd) {
-            continue;
-        }
-
-        for (
-            $cursor = $intervalStart;
-            $cursor + $durationSeconds <= $intervalEnd;
-            $cursor += $stepSeconds
-        ) {
-            $slotStart = $dateValue . ' ' . availability_seconds_time($cursor);
-            $slotEnd = $dateValue . ' ' . availability_seconds_time($cursor + $durationSeconds);
-
-            if ($slotStart <= $nowValue) {
-                continue;
-            }
-
-            $conflict = false;
-
-            foreach ($reservations as [$reservationStart, $reservationEnd]) {
-                if (intervals_overlap($slotStart, $slotEnd, $reservationStart, $reservationEnd)) {
-                    $conflict = true;
-                    break;
-                }
-            }
-
-            if (!$conflict) {
-                $slots[$slotStart] = ['start' => $slotStart, 'end' => $slotEnd];
-            }
-        }
+    foreach ($reservationRows as $row) {
+        $busyIntervals[] = [
+            'start' => (string) $row['czas_rozpoczecia'],
+            'end' => (string) $row['czas_zakonczenia'],
+        ];
     }
 
-    ksort($slots, SORT_STRING);
-    $result['sloty'] = array_values($slots);
+    $result['sloty'] = interval_slots_build(
+        $scheduleIntervals,
+        $busyIntervals,
+        $dateValue,
+        $duration,
+        AVAILABILITY_SLOT_MINUTES,
+        $now->format('Y-m-d H:i:s')
+    );
 
     return $result;
 }
