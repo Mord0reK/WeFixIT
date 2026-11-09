@@ -42,6 +42,7 @@ require_once __DIR__ . '/cases_reservations.php';
 require_once __DIR__ . '/cases_reservation_form.php';
 require_once __DIR__ . '/cases_client_panel.php';
 require_once __DIR__ . '/cases_employee_panel.php';
+require_once __DIR__ . '/cases_stage4_regression.php';
 
 // Najpierw przygotowujemy bazę, żeby pierwsze żądanie nie logowało błędu połączenia.
 reset_database('database/database.sql');
