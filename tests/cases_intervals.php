@@ -369,6 +369,8 @@ test('173. zajętość 23:00-24:00 usuwa ostatni slot grafiku do 24:00', functio
 
 test('174. tylko dokładnie 24:00:00 jest poprawnym końcem dnia', function (): void {
     assert_same(86400, interval_time_seconds('24:00:00'), '24:00:00 powinno zwrócić 86400 sekund');
+    assert_same(null, interval_time_seconds('24:00:01'), '24:00:01 powinno być odrzucone');
+    assert_same(null, interval_time_seconds('24:30:00'), '24:30:00 powinno być odrzucone');
     assert_same(null, interval_time_seconds('25:00:00'), '25:00:00 powinno być odrzucone');
     assert_same(
         '2026-05-12 00:00:00',

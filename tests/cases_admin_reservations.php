@@ -546,3 +546,56 @@ test('118. odpowiedzi nie ujawniają danych technicznych, a log nie ma błędów
     assert_true(is_string($logFile) && $logFile !== '', 'Brak ścieżki logu serwera testowego');
     assert_same([], server_log_errors($logFile), 'Log serwera nie powinien zawierać błędów PHP');
 });
+
+test('191. reaktywacja anulowanej rezerwacji odrzuca konflikt terminu', function (): void {
+    admin_reservations_reset_base();
+    $pdo = test_db();
+    $start = '2035-01-01 10:00:00';
+    $end = '2035-01-01 11:00:00';
+
+    $statement = $pdo->prepare(
+        "UPDATE rezerwacje
+         SET czas_rozpoczecia = :czas_rozpoczecia,
+             czas_zakonczenia = :czas_zakonczenia,
+             status_rezerwacji = 'anulowana',
+             anulowano = NOW()
+         WHERE id = 5"
+    );
+    $statement->execute([
+        'czas_rozpoczecia' => $start,
+        'czas_zakonczenia' => $end,
+    ]);
+
+    $statement = $pdo->prepare(
+        "INSERT INTO rezerwacje (
+            uzytkownik_id, pracownik_id, usluga_id, czas_rozpoczecia,
+            czas_zakonczenia, cena_historyczna, status_rezerwacji, komentarz_klienta, anulowano
+         ) VALUES (
+            :uzytkownik_id, :pracownik_id, :usluga_id, :czas_rozpoczecia,
+            :czas_zakonczenia, :cena_historyczna, 'oczekujaca', NULL, NULL
+         )"
+    );
+    $statement->execute([
+        'uzytkownik_id' => 4,
+        'pracownik_id' => 1,
+        'usluga_id' => 1,
+        'czas_rozpoczecia' => $start,
+        'czas_zakonczenia' => $end,
+        'cena_historyczna' => '150.00',
+    ]);
+    $conflictingId = (int) $pdo->lastInsertId();
+
+    $session = admin_reservations_admin_session();
+    $response = admin_reservations_patch($session, [
+        'id' => 5,
+        'status' => 'oczekujaca',
+    ]);
+
+    assert_status(409, $response, 'Reaktywacja kolidującej rezerwacji powinna dać 409');
+    $row = admin_reservations_row(5);
+    assert_same('anulowana', (string) $row['status_rezerwacji'], 'Konflikt nie może zmienić statusu rezerwacji');
+    assert_true($row['anulowano'] !== null, 'Anulowana rezerwacja powinna zachować datę anulowania');
+
+    $delete = $pdo->prepare('DELETE FROM rezerwacje WHERE id = :id');
+    $delete->execute(['id' => $conflictingId]);
+});
