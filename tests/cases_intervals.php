@@ -328,3 +328,53 @@ test('157. nachodzące przedziały grafiku nie dają nachodzących slotów', fun
     );
     assert_same(false, interval_slots_have_overlap($slots), 'Wynik nie może zawierać nachodzących slotów');
 });
+
+test('172. grafik do 24:00 daje sloty do końca dnia i północ następnego dnia', function (): void {
+    $slots = interval_slots_build(
+        [['start' => '08:00:00', 'end' => '24:00:00']],
+        [],
+        '2026-05-11',
+        60,
+        15,
+        '2026-05-11 00:00:00'
+    );
+
+    assert_same(16, count($slots), 'Grafik 08:00-24:00 powinien pomieścić 16 slotów godzinnych');
+    assert_same('2026-05-11 08:00:00', $slots[0]['start'] ?? null, 'Pierwszy slot powinien zaczynać się o 08:00');
+    assert_same('2026-05-11 23:00:00', $slots[15]['start'] ?? null, 'Ostatni slot powinien zaczynać się o 23:00');
+    assert_same(
+        '2026-05-12 00:00:00',
+        $slots[15]['end'] ?? null,
+        'Slot 23:00-24:00 powinien kończyć się północą następnego dnia'
+    );
+});
+
+test('173. zajętość 23:00-24:00 usuwa ostatni slot grafiku do 24:00', function (): void {
+    $slots = interval_slots_build(
+        [['start' => '08:00:00', 'end' => '24:00:00']],
+        [['start' => '2026-05-11 23:00:00', 'end' => '2026-05-12 00:00:00']],
+        '2026-05-11',
+        60,
+        15,
+        '2026-05-11 00:00:00'
+    );
+
+    assert_same(15, count($slots), 'Zajęty koniec dnia powinien usunąć jeden slot');
+    assert_same(
+        false,
+        in_array('2026-05-11 23:00:00', array_column($slots, 'start'), true),
+        'Slot 23:00-24:00 nie może pojawić się, gdy jest zajęty'
+    );
+});
+
+test('174. tylko dokładnie 24:00:00 jest poprawnym końcem dnia', function (): void {
+    assert_same(86400, interval_time_seconds('24:00:00'), '24:00:00 powinno zwrócić 86400 sekund');
+    assert_same(null, interval_time_seconds('24:00:01'), '24:00:01 powinno być odrzucone');
+    assert_same(null, interval_time_seconds('24:30:00'), '24:30:00 powinno być odrzucone');
+    assert_same(null, interval_time_seconds('25:00:00'), '25:00:00 powinno być odrzucone');
+    assert_same(
+        '2026-05-12 00:00:00',
+        interval_slot_datetime('2026-05-11', 86400),
+        'Nadmiar sekund powinien przejść na kolejny dzień'
+    );
+});

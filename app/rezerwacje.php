@@ -13,6 +13,7 @@ declare(strict_types=1);
 */
 require_once __DIR__ . '/../public/config.php';
 require_once __DIR__ . '/pagination.php';
+require_once __DIR__ . '/availability.php';
 
 const REZERWACJA_STATUSES = [
     'oczekujaca',
@@ -402,6 +403,11 @@ function rezerwacja_find_by_id(int $id): ?array
     CHECK chk_rezerwacje_anulowanie wymaga, aby anulowana miała anulowano,
     a każdy inny status miało puste. Dlatego status i anulowano zapisujemy
     zawsze w jednej instrukcji UPDATE, także przy zwykłej zmianie statusu.
+
+    Przywrócenie anulowanej rezerwacji blokuje wiersz pracownika i sprawdza
+    aktywność pracownika i usługi, przypisanie, grafik, nieobecności oraz
+    konflikty z pozostałymi rezerwacjami — w międzyczasie ten termin mógł
+    zostać zajęty albo stracić dostępność.
 */
 function rezerwacja_set_status(int $id, string $targetStatus): array
 {
@@ -419,7 +425,7 @@ function rezerwacja_set_status(int $id, string $targetStatus): array
         $pdo->beginTransaction();
 
         $statement = $pdo->prepare(
-            'SELECT id, status_rezerwacji
+            'SELECT id, pracownik_id, usluga_id, czas_rozpoczecia, czas_zakonczenia, status_rezerwacji
              FROM rezerwacje
              WHERE id = :id
              FOR UPDATE'
@@ -437,6 +443,80 @@ function rezerwacja_set_status(int $id, string $targetStatus): array
         if (!rezerwacja_transition_allowed($currentStatus, $targetStatus)) {
             $pdo->rollBack();
             return ['status' => 'invalid_transition'];
+        }
+
+        if ($currentStatus === 'anulowana' && $targetStatus === 'oczekujaca') {
+            $employeeId = (int) $row['pracownik_id'];
+            $serviceId = (int) $row['usluga_id'];
+            $start = (string) $row['czas_rozpoczecia'];
+            $end = (string) $row['czas_zakonczenia'];
+
+            $statement = $pdo->prepare(
+                'SELECT p.id, p.aktywny, u.aktywny AS konto_aktywne
+                 FROM pracownicy p
+                 JOIN uzytkownicy u ON u.id = p.uzytkownik_id
+                 WHERE p.id = :id
+                 FOR UPDATE'
+            );
+            $statement->execute(['id' => $employeeId]);
+            $employee = $statement->fetch(PDO::FETCH_ASSOC);
+
+            if (!is_array($employee)) {
+                $pdo->rollBack();
+                return ['status' => 'not_found'];
+            }
+
+            if ((int) $employee['aktywny'] !== 1 || (int) $employee['konto_aktywne'] !== 1) {
+                $pdo->rollBack();
+                return ['status' => 'conflict'];
+            }
+
+            $statement = $pdo->prepare(
+                'SELECT
+                    u.aktywna AS usluga_aktywna,
+                    k.aktywna AS kategoria_aktywna,
+                    up.aktywne AS przypisanie_aktywne
+                 FROM uslugi u
+                 JOIN kategorie_uslug k ON k.id = u.kategoria_id
+                 LEFT JOIN uslugi_pracownikow up
+                    ON up.usluga_id = u.id AND up.pracownik_id = :pracownik_id
+                 WHERE u.id = :usluga_id
+                 LIMIT 1'
+            );
+            $statement->execute([
+                'pracownik_id' => $employeeId,
+                'usluga_id' => $serviceId,
+            ]);
+            $service = $statement->fetch(PDO::FETCH_ASSOC);
+
+            if (
+                !is_array($service)
+                || (int) $service['usluga_aktywna'] !== 1
+                || (int) $service['kategoria_aktywna'] !== 1
+                || $service['przypisanie_aktywne'] === null
+                || (int) $service['przypisanie_aktywne'] !== 1
+            ) {
+                $pdo->rollBack();
+                return ['status' => 'conflict'];
+            }
+
+            $intervalFree = availability_interval_is_free(
+                $employeeId,
+                substr($start, 0, 10),
+                $start,
+                $end,
+                false
+            );
+
+            if ($intervalFree === null) {
+                $pdo->rollBack();
+                return ['status' => 'error'];
+            }
+
+            if (!$intervalFree) {
+                $pdo->rollBack();
+                return ['status' => 'conflict'];
+            }
         }
 
         if ($targetStatus === 'anulowana') {

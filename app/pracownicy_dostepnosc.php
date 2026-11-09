@@ -400,8 +400,13 @@ function pracownik_schedule_set_active(int $employeeId, int $id, bool $active): 
     }
 }
 
-// Fizyczne DELETE jest bezpieczne, bo rezerwacje nie mają klucza obcego do godziny_pracy.
-// Istnienie wpisu i ownership sprawdza wcześniej pracownik_schedule_find() w endpointcie.
+/*
+    Fizyczne DELETE jest bezpieczne, bo rezerwacje nie mają klucza obcego do
+    godziny_pracy. Blokada wiersza pracownika serializuje usunięcie grafiku
+    z tworzeniem rezerwacji, żeby klient nie zapisał terminu po usunięciu
+    przedziału, na podstawie którego wcześniej sprawdzono dostępność.
+    Istnienie wpisu i ownership sprawdza wcześniej pracownik_schedule_find().
+*/
 function pracownik_schedule_delete(int $employeeId, int $id): array
 {
     $pdo = pracownicy_dostepnosc_db();
@@ -411,6 +416,16 @@ function pracownik_schedule_delete(int $employeeId, int $id): array
     }
 
     try {
+        $pdo->beginTransaction();
+
+        $statement = $pdo->prepare('SELECT id FROM pracownicy WHERE id = :id FOR UPDATE');
+        $statement->execute(['id' => $employeeId]);
+
+        if ($statement->fetch(PDO::FETCH_ASSOC) === false) {
+            $pdo->rollBack();
+            return ['status' => 'not_found'];
+        }
+
         $statement = $pdo->prepare(
             'DELETE FROM godziny_pracy
              WHERE id = :id AND pracownik_id = :pracownik_id'
@@ -419,7 +434,13 @@ function pracownik_schedule_delete(int $employeeId, int $id): array
             'id' => $id,
             'pracownik_id' => $employeeId,
         ]);
-    } catch (PDOException $e) {
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
         error_log('Nie udało się usunąć wpisu grafiku: ' . $e->getMessage());
         return ['status' => 'error'];
     }
