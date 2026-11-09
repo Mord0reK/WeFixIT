@@ -37,6 +37,12 @@ function layout_logo(string $classes = 'h-5 w-5'): string
 
 function layout_head(string $title, string $bodyClass = LAYOUT_PAGE_BODY_CLASS): void
 {
+    // Polityka obejmuje wyłącznie odpowiedzi HTML. Endpointy JSON korzystają
+    // z json_response() i nie dostają CSP, żeby nie zmieniać ich kontraktu.
+    header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: same-origin');
+
     $cssHref = htmlspecialchars(auth_base_path() . '/assets/css/app.css', ENT_QUOTES, 'UTF-8');
     $faviconHref = htmlspecialchars(auth_base_path() . '/favicon.svg', ENT_QUOTES, 'UTF-8');
     $toastJsHref = htmlspecialchars(auth_base_path() . '/assets/js/toast.js', ENT_QUOTES, 'UTF-8');
