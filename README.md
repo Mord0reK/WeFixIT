@@ -226,8 +226,8 @@ WeFixIT to system rezerwacji dla serwisu komputerowego z trzema rolami: klient, 
 |------|--------|
 | Niezalogowany | `/login`, `/register`, `/oferta`, `/usluga?id=…`, `POST /api/auth/login`, `POST /api/auth/register` |
 | Klient (`klient`) | `/oferta`, `/usluga?id=…`, `/rezerwacja`, `/panel`, `/profil`, `GET /api/me`, `PATCH /api/profile`, `GET /api/availability`, `POST /api/reservations`, `PATCH /api/client-reservations` |
-| Pracownik (`pracownik`) | `/oferta`, `/usluga?id=…`, `/rezerwacja`, `/panel`, `/pracownik`, `/profil`, `GET /api/me`, `PATCH /api/profile`, `GET /api/availability`, `PATCH /api/employee-reservations` |
-| Administrator (`admin`) | jak pracownik oraz `/admin`, `/kategorie`, `/uslugi`, `/pracownicy`, `/pracownicy-uslugi?id=…`, `/pracownicy-dostepnosc?id=…`, `/uzytkownicy`, `/rezerwacje`, `/log`, `/eksport?typ=rezerwacje`, `/eksport?typ=uzytkownicy` i `/api/admin/*` |
+| Pracownik (`pracownik`) | `/oferta`, `/usluga?id=…`, `/panel`, `/pracownik`, `/profil`, `GET /api/me`, `PATCH /api/profile`, `GET /api/availability`, `PATCH /api/employee-reservations` |
+| Administrator (`admin`) | jak pracownik oraz `/rezerwacja`, `/admin`, `/kategorie`, `/uslugi`, `/pracownicy`, `/pracownicy-uslugi?id=…`, `/pracownicy-dostepnosc?id=…`, `/uzytkownicy`, `/rezerwacje`, `/log`, `/eksport?typ=rezerwacje`, `/eksport?typ=uzytkownicy` i `/api/admin/*` |
 
 Rola jest sprawdzana po stronie serwera na każdej chronionej stronie przez
 `require_role()` i na każdym chronionym endpointcie przez `require_api_login()`
@@ -521,7 +521,7 @@ pozostaje świadomie bez zmian.
 |-------------------|--------|--------|
 | `/oferta` | publiczny | Lista aktywnych usług w aktywnych kategoriach z filtrem kategorii, czasem trwania, ceną i informacją o dostępności aktywnego wykonawcy. |
 | `/usluga?id=N` | publiczny | Szczegóły pojedynczej aktywnej usługi, lista przypisanych aktywnych pracowników oraz warunkowy przycisk CTA zależny od sesji i roli. |
-| `/rezerwacja` | zalogowany użytkownik (`require_login()`) | Formularz wyboru usługi, pracownika, daty, godziny i komentarza; mapa pracowników przekazywana jest w `data-employees`, a wolne terminy pobierane są przez AJAX. Pozycja w menu bocznym jest widoczna dla `klient` i `admin`. |
+| `/rezerwacja` | `klient`, `admin` (`require_role(['klient', 'admin'])`) | Formularz wyboru usługi, pracownika, daty, godziny i komentarza; mapa pracowników przekazywana jest w `data-employees`, a wolne terminy pobierane są przez AJAX. Pozycja w menu bocznym jest widoczna dla `klient` i `admin`. |
 | `/panel` | zalogowany użytkownik (`require_login()`) | Panel klienta z rozłącznymi sekcjami „Nadchodzące” i „Historia”, przyciskiem anulowania przyszłych rezerwacji (`oczekujaca`, `potwierdzona`) oraz rozwijaną historią zmian `<details>`. |
 | `/pracownik` | `pracownik`, `admin` | Panel pracownika z rozłącznymi sekcjami „Dzisiaj”, „Nadchodzące” i „Historia”, danymi kontaktowymi klienta, przyciskami maszyny stanów przypisanych wizyt i historią zmian `<details>`. Dla administratora wyświetla kartę informacyjną o braku profilu pracownika z linkiem do `/rezerwacje`. |
 
