@@ -57,8 +57,11 @@ function availability_date_value(mixed $value): ?string
 /*
     Sprawdza bezpośrednio żądany przedział DATETIME. Weryfikuje aktywny grafik,
     wyrównanie do siatki, zatwierdzone nieobecności i konflikty rezerwacji.
-    Opcjonalne $rejectPast pozwala administratorowi przywrócić historyczną
-    rezerwację, ale nadal sprawdza jej grafik, nieobecności i konflikty.
+    Przedział może objąć kilka kolejnych wpisów grafiku tylko wtedy, gdy każdy
+    następny zaczyna się dokładnie w chwili zakończenia poprzedniego; przerwa
+    większa od zera przerywa ciągłość. Opcjonalne $rejectPast pozwala
+    administratorowi przywrócić historyczną rezerwację, ale nadal sprawdza jej
+    grafik, nieobecności i konflikty.
 */
 function availability_interval_is_free(
     int $employeeId,
@@ -122,7 +125,7 @@ function availability_interval_is_free(
             'dzien_tygodnia' => $dayOfWeek,
         ]);
 
-        $insideSchedule = false;
+        $schedule = [];
 
         foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $intervalStart = interval_time_seconds((string) $row['czas_rozpoczecia']);
@@ -132,20 +135,50 @@ function availability_interval_is_free(
                 continue;
             }
 
-            if ($startSeconds < $intervalStart || $endSeconds > $intervalEnd) {
-                continue;
-            }
-
-            if (($startSeconds - $intervalStart) % $stepSeconds !== 0) {
-                continue;
-            }
-
-            $insideSchedule = true;
-            break;
+            $schedule[] = ['start' => $intervalStart, 'end' => $intervalEnd];
         }
 
-        if (!$insideSchedule) {
+        /*
+            Wizyta może obejmować kilka kolejnych wpisów grafiku, ale wyłącznie
+            wtedy, gdy stykają się granicami. Przerwa większa od zera przerywa
+            ciągłość i dyskwalifikuje przedział. Wyrównanie do siatki liczymy
+            od początku pierwszego wpisu użytego przez wizytę, dzięki czemu
+            pojedynczy wpis zachowuje dotychczasowe zachowanie.
+        */
+        $firstIntervalStart = null;
+        $coveredUntil = null;
+
+        foreach ($schedule as $interval) {
+            if ($startSeconds >= $interval['start'] && $startSeconds < $interval['end']) {
+                $firstIntervalStart = $interval['start'];
+                $coveredUntil = $interval['end'];
+                break;
+            }
+        }
+
+        if ($firstIntervalStart === null) {
             return false;
+        }
+
+        if (($startSeconds - $firstIntervalStart) % $stepSeconds !== 0) {
+            return false;
+        }
+
+        while ($coveredUntil < $endSeconds) {
+            $nextEnd = null;
+
+            foreach ($schedule as $interval) {
+                if ($interval['start'] === $coveredUntil && $interval['end'] > $coveredUntil) {
+                    $nextEnd = $interval['end'];
+                    break;
+                }
+            }
+
+            if ($nextEnd === null) {
+                return false;
+            }
+
+            $coveredUntil = $nextEnd;
         }
 
         $statement = $pdo->prepare(
