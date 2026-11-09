@@ -172,117 +172,6 @@ function reservation_pair_check(int $employeeId, int $serviceId): array
 }
 
 /*
-    Sprawdza bezpośrednio żądany przedział, niezależnie od listy kandydatów
-    generowanej przez availability_day(). Dzięki temu terminy wypadające
-    z siatki po wcześniejszej rezerwacji nadal mogą zostać przyjęte, jeśli
-    mieszczą się w grafiku, są wyrównane do siatki i nie kolidują z niczym.
-*/
-function reservation_interval_is_free(
-    int $employeeId,
-    string $date,
-    string $time,
-    int $durationMinutes
-): ?bool {
-    $pdo = rezerwacje_klienta_db();
-    $startSeconds = interval_time_seconds($time);
-
-    if ($employeeId <= 0 || $durationMinutes <= 0 || $startSeconds === null || $pdo === null) {
-        return null;
-    }
-
-    $endSeconds = $startSeconds + $durationMinutes * 60;
-    $dayOfWeek = (int) (new DateTimeImmutable($date))->format('N');
-    $stepSeconds = AVAILABILITY_SLOT_MINUTES * 60;
-
-    try {
-        $statement = $pdo->prepare(
-            'SELECT czas_rozpoczecia, czas_zakonczenia
-             FROM godziny_pracy
-             WHERE pracownik_id = :pracownik_id
-               AND dzien_tygodnia = :dzien_tygodnia
-               AND aktywne = TRUE
-             ORDER BY czas_rozpoczecia ASC, id ASC'
-        );
-        $statement->execute([
-            'pracownik_id' => $employeeId,
-            'dzien_tygodnia' => $dayOfWeek,
-        ]);
-
-        $insideSchedule = false;
-
-        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $intervalStart = interval_time_seconds((string) $row['czas_rozpoczecia']);
-            $intervalEnd = interval_time_seconds((string) $row['czas_zakonczenia']);
-
-            if ($intervalStart === null || $intervalEnd === null || $intervalStart >= $intervalEnd) {
-                continue;
-            }
-
-            if ($startSeconds < $intervalStart || $endSeconds > $intervalEnd) {
-                continue;
-            }
-
-            if (($startSeconds - $intervalStart) % $stepSeconds !== 0) {
-                continue;
-            }
-
-            $insideSchedule = true;
-            break;
-        }
-
-        if (!$insideSchedule) {
-            return false;
-        }
-
-        $startValue = interval_slot_datetime($date, $startSeconds);
-        $endValue = interval_slot_datetime($date, $endSeconds);
-        $nowValue = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
-
-        if ($startValue <= $nowValue) {
-            return false;
-        }
-
-        $statement = $pdo->prepare(
-            "SELECT 1
-             FROM nieobecnosci
-             WHERE pracownik_id = :pracownik_id
-               AND status = 'zatwierdzona'
-               AND data_od <= :data
-               AND data_do >= :data
-             LIMIT 1"
-        );
-        $statement->execute([
-            'pracownik_id' => $employeeId,
-            'data' => $date,
-        ]);
-
-        if ($statement->fetchColumn() !== false) {
-            return false;
-        }
-
-        $statement = $pdo->prepare(
-            "SELECT 1
-             FROM rezerwacje
-             WHERE pracownik_id = :pracownik_id
-               AND status_rezerwacji <> 'anulowana'
-               AND czas_rozpoczecia < :czas_zakonczenia
-               AND czas_zakonczenia > :czas_rozpoczecia
-             LIMIT 1"
-        );
-        $statement->execute([
-            'pracownik_id' => $employeeId,
-            'czas_rozpoczecia' => $startValue,
-            'czas_zakonczenia' => $endValue,
-        ]);
-
-        return $statement->fetchColumn() === false;
-    } catch (PDOException $e) {
-        error_log('Nie udało się sprawdzić przedziału rezerwacji: ' . $e->getMessage());
-        return null;
-    }
-}
-
-/*
     Tworzy rezerwację w transakcji. Blokada wiersza pracownika jest pierwszą
     instrukcją transakcji, przed jakimkolwiek odczytem niemodyfikującym:
     dzięki temu stan dostępności jest czytany dopiero po przejęciu blokady
@@ -404,7 +293,7 @@ function reservation_create(int $userId, array $data): array
             return ['status' => 'out_of_horizon'];
         }
 
-        $intervalFree = reservation_interval_is_free($employeeId, $date, $time, $duration);
+        $intervalFree = availability_interval_is_free($employeeId, $date, $startValue, $endValue);
 
         if ($intervalFree === null) {
             $pdo->rollBack();

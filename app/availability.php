@@ -55,6 +55,140 @@ function availability_date_value(mixed $value): ?string
 }
 
 /*
+    Sprawdza bezpośrednio żądany przedział DATETIME. Weryfikuje aktywny grafik,
+    wyrównanie do siatki, zatwierdzone nieobecności i konflikty rezerwacji.
+    Opcjonalne $rejectPast pozwala administratorowi przywrócić historyczną
+    rezerwację, ale nadal sprawdza jej grafik, nieobecności i konflikty.
+*/
+function availability_interval_is_free(
+    int $employeeId,
+    string $date,
+    string $start,
+    string $end,
+    bool $rejectPast = true
+): ?bool {
+    $pdo = availability_db();
+    $startDate = substr($start, 0, 10);
+    $startTime = substr($start, 11, 8);
+    $endDate = substr($end, 0, 10);
+    $endTime = substr($end, 11, 8);
+    $startSeconds = interval_time_seconds($startTime);
+    $endSeconds = interval_time_seconds($endTime);
+
+    if (
+        $employeeId <= 0
+        || $pdo === null
+        || interval_format($start) !== 'datetime'
+        || interval_format($end) !== 'datetime'
+        || $startDate !== $date
+        || $startSeconds === null
+        || $endSeconds === null
+    ) {
+        return null;
+    }
+
+    if ($endDate !== $date) {
+        $nextDate = (new DateTimeImmutable($date))->modify('+1 day')->format('Y-m-d');
+
+        if ($endDate !== $nextDate || $endSeconds !== 0) {
+            return false;
+        }
+
+        $endSeconds = 86400;
+    }
+
+    if ($endSeconds <= $startSeconds) {
+        return false;
+    }
+
+    if ($rejectPast && $start <= (new DateTimeImmutable('now'))->format('Y-m-d H:i:s')) {
+        return false;
+    }
+
+    $dayOfWeek = (int) (new DateTimeImmutable($date))->format('N');
+    $stepSeconds = AVAILABILITY_SLOT_MINUTES * 60;
+
+    try {
+        $statement = $pdo->prepare(
+            'SELECT czas_rozpoczecia, czas_zakonczenia
+             FROM godziny_pracy
+             WHERE pracownik_id = :pracownik_id
+               AND dzien_tygodnia = :dzien_tygodnia
+               AND aktywne = TRUE
+             ORDER BY czas_rozpoczecia ASC, id ASC'
+        );
+        $statement->execute([
+            'pracownik_id' => $employeeId,
+            'dzien_tygodnia' => $dayOfWeek,
+        ]);
+
+        $insideSchedule = false;
+
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $intervalStart = interval_time_seconds((string) $row['czas_rozpoczecia']);
+            $intervalEnd = interval_time_seconds((string) $row['czas_zakonczenia']);
+
+            if ($intervalStart === null || $intervalEnd === null || $intervalStart >= $intervalEnd) {
+                continue;
+            }
+
+            if ($startSeconds < $intervalStart || $endSeconds > $intervalEnd) {
+                continue;
+            }
+
+            if (($startSeconds - $intervalStart) % $stepSeconds !== 0) {
+                continue;
+            }
+
+            $insideSchedule = true;
+            break;
+        }
+
+        if (!$insideSchedule) {
+            return false;
+        }
+
+        $statement = $pdo->prepare(
+            "SELECT 1
+             FROM nieobecnosci
+             WHERE pracownik_id = :pracownik_id
+               AND status = 'zatwierdzona'
+               AND data_od <= :data
+               AND data_do >= :data
+             LIMIT 1"
+        );
+        $statement->execute([
+            'pracownik_id' => $employeeId,
+            'data' => $date,
+        ]);
+
+        if ($statement->fetchColumn() !== false) {
+            return false;
+        }
+
+        $statement = $pdo->prepare(
+            "SELECT 1
+             FROM rezerwacje
+             WHERE pracownik_id = :pracownik_id
+               AND status_rezerwacji <> 'anulowana'
+               AND czas_rozpoczecia < :czas_zakonczenia
+               AND czas_zakonczenia > :czas_rozpoczecia
+             LIMIT 1"
+        );
+        $statement->execute([
+            'pracownik_id' => $employeeId,
+            'czas_rozpoczecia' => $start,
+            'czas_zakonczenia' => $end,
+        ]);
+
+        return $statement->fetchColumn() === false;
+    } catch (PDOException $e) {
+        error_log('Nie udało się sprawdzić przedziału dostępności: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/*
     Zwraca status ok z listą slotów, not_found gdy usługa nie istnieje, albo
     error przy błędnych danych wejściowych lub błędzie bazy. Endpoint rezerwacji
     musi zmapować not_found na 404 lub 422, a error na 500. Pusta lista slotów
