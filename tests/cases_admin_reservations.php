@@ -599,3 +599,56 @@ test('191. reaktywacja anulowanej rezerwacji odrzuca konflikt terminu', function
     $delete = $pdo->prepare('DELETE FROM rezerwacje WHERE id = :id');
     $delete->execute(['id' => $conflictingId]);
 });
+
+test('195. reaktywacja rezerwacji stykającej się granicą daje 200', function (): void {
+    admin_reservations_reset_base();
+    $pdo = test_db();
+    $start = '2035-01-01 10:00:00';
+    $end = '2035-01-01 11:00:00';
+
+    $statement = $pdo->prepare(
+        "UPDATE rezerwacje
+         SET czas_rozpoczecia = :czas_rozpoczecia,
+             czas_zakonczenia = :czas_zakonczenia,
+             status_rezerwacji = 'anulowana',
+             anulowano = NOW()
+         WHERE id = 5"
+    );
+    $statement->execute([
+        'czas_rozpoczecia' => $start,
+        'czas_zakonczenia' => $end,
+    ]);
+
+    $statement = $pdo->prepare(
+        "INSERT INTO rezerwacje (
+            uzytkownik_id, pracownik_id, usluga_id, czas_rozpoczecia,
+            czas_zakonczenia, cena_historyczna, status_rezerwacji, komentarz_klienta, anulowano
+         ) VALUES (
+            :uzytkownik_id, :pracownik_id, :usluga_id, :czas_rozpoczecia,
+            :czas_zakonczenia, :cena_historyczna, 'oczekujaca', NULL, NULL
+         )"
+    );
+    $statement->execute([
+        'uzytkownik_id' => 4,
+        'pracownik_id' => 1,
+        'usluga_id' => 2,
+        'czas_rozpoczecia' => '2035-01-01 11:00:00',
+        'czas_zakonczenia' => '2035-01-01 12:00:00',
+        'cena_historyczna' => '80.00',
+    ]);
+    $adjacentId = (int) $pdo->lastInsertId();
+
+    $session = admin_reservations_admin_session();
+    $response = admin_reservations_patch($session, [
+        'id' => 5,
+        'status' => 'oczekujaca',
+    ]);
+
+    assert_status(200, $response, 'Reaktywacja przedziału stykającego się granicą powinna dać 200');
+    $row = admin_reservations_row(5);
+    assert_same('oczekujaca', (string) $row['status_rezerwacji'], 'Status powinien zostać przywrócony');
+    assert_same(null, $row['anulowano'], 'Pole anulowano powinno zostać wyzerowane');
+
+    $delete = $pdo->prepare('DELETE FROM rezerwacje WHERE id = :id');
+    $delete->execute(['id' => $adjacentId]);
+});

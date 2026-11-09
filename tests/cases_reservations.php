@@ -11,9 +11,9 @@ declare(strict_types=1);
 
 test_group('Rezerwacje klienta', 'database/database.sql');
 
-function reservations_client_session(): array
+function reservations_client_session(string $email = 'jan.kowalski@example.com'): array
 {
-    $session = login_as('jan.kowalski@example.com');
+    $session = login_as($email);
     assert_status(200, $session['response'], 'Logowanie klienta powinno się udać');
     $session['csrf'] = csrf_from_page($session['cookies'], '/profil.php');
 
@@ -423,6 +423,7 @@ test('184. POST tworzy rezerwację z ceną i statusem z serwera', function (): v
     assert_same(null, $row['anulowano'], 'Nowa rezerwacja nie może mieć ustawionego anulowania');
 });
 
+// Test 194 sprawdza wariant równoległy; ten scenariusz pozostaje sekwencyjny.
 test('185. POST na ten sam termin drugi raz daje 409', function (): void {
     $session = reservations_client_session();
     $found = reservations_find_slots($session, 1, 1);
@@ -658,24 +659,31 @@ test('193. administrator i pracownik nie mogą tworzyć rezerwacji klienta', fun
     }
 });
 
-test('194. równoległe POST tworzą dokładnie jedną rezerwację', function (): void {
-    $sessionA = reservations_client_session();
-    $sessionB = reservations_client_session();
-    $found = reservations_find_slots($sessionA, 1, 1);
-    assert_true($found !== null, 'Powinien istnieć wolny termin do testu równoległego');
+test('194. równoległe POST różnych klientów nie przekraczają blokady pracownika', function (): void {
+    $sessionA = reservations_client_session('jan.kowalski@example.com');
+    $sessionB = reservations_client_session('anna.nowak@example.com');
+    $pair = reservations_find_overlap_pair($sessionA, 1, 1, 2, 0);
+    assert_true(
+        $pair !== null,
+        'Dane seed powinny zawierać wspólny start usług 1 i 2 dla pracownika 1'
+    );
 
-    $parts = reservations_slot_parts($found['slots'][0]);
-    $payload = reservations_payload(1, 1, $parts['date'], $parts['time']);
+    if ($pair === null) {
+        return;
+    }
+
+    $partsA = reservations_slot_parts($pair['slot_a']);
+    $partsB = reservations_slot_parts($pair['slot_b']);
     $responses = reservations_parallel_posts([
         [
             'cookies' => $sessionA['cookies'],
             'csrf' => $sessionA['csrf'],
-            'payload' => $payload,
+            'payload' => reservations_payload(1, 1, $partsA['date'], $partsA['time']),
         ],
         [
             'cookies' => $sessionB['cookies'],
             'csrf' => $sessionB['csrf'],
-            'payload' => $payload,
+            'payload' => reservations_payload(1, 2, $partsB['date'], $partsB['time']),
         ],
     ]);
 
@@ -690,10 +698,13 @@ test('194. równoległe POST tworzą dokładnie jedną rezerwację', function ()
         "SELECT COUNT(*)
          FROM rezerwacje
          WHERE pracownik_id = 1
-           AND usluga_id = 1
-           AND czas_rozpoczecia = :czas_rozpoczecia
-           AND status_rezerwacji <> 'anulowana'"
+           AND status_rezerwacji <> 'anulowana'
+           AND czas_rozpoczecia < :czas_zakonczenia
+           AND czas_zakonczenia > :czas_rozpoczecia"
     );
-    $statement->execute(['czas_rozpoczecia' => $parts['start']]);
-    assert_same(1, (int) $statement->fetchColumn(), 'W bazie powinna powstać dokładnie jedna rezerwacja');
+    $statement->execute([
+        'czas_rozpoczecia' => $partsA['start'],
+        'czas_zakonczenia' => $partsA['end'],
+    ]);
+    assert_same(1, (int) $statement->fetchColumn(), 'W bazie powinna być dokładnie jedna kolidująca rezerwacja');
 });
