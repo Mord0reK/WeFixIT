@@ -22,6 +22,7 @@ System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników 
     - [Proces rezerwacji i reguły dostępności](#proces-rezerwacji-i-reguły-dostępności)
     - [Endpointy Etapu 4](#endpointy-etapu-4)
     - [Historia zmian statusu](#historia-zmian-statusu)
+  - [Funkcje dodatkowe](#funkcje-dodatkowe)
 - [Wymagania](#wymagania)
   - [Konfiguracja środowiska](#konfiguracja-środowiska)
 - [Uruchomienie przez Docker](#uruchomienie-przez-docker)
@@ -616,6 +617,34 @@ dla wszystkich rezerwacji widocznych na stronie (bez problemu N+1) i dekodują
 szczegóły przez `log_view_details_decode()`. Widoki renderują sekcję `<details>`
 tylko wtedy, gdy rezerwacja ma zapisane zdarzenia.
 
+### Funkcje dodatkowe
+
+Poniższe funkcje wykraczają poza minimalny zakres projektu i są zaimplementowane
+w kodzie:
+
+- Asynchroniczne pobieranie wolnych terminów przez `GET /api/availability` —
+  formularz nie blokuje strony i odrzuca spóźnione odpowiedzi sieciowe dzięki
+  licznikowi żądań w `public/assets/js/reservation-form.js`.
+- Historia zmian statusu rezerwacji z tabeli `log_zdarzen`, pobierana batchowo
+  bez N+1 przez `app/rezerwacje_historia.php` i wyświetlana w panelach klienta
+  i pracownika.
+- Dziennik zdarzeń administratora z filtrami akcji, poziomu i typu obiektu,
+  zaimplementowany w `app/log_view.php` i `public/log.php`.
+- Eksport CSV rezerwacji i użytkowników z neutralizacją formuł arkusza
+  kalkulacyjnego w `public/eksport.php`.
+- Wyszukiwanie, filtrowanie i paginacja list administracyjnych wspólne dla
+  kategorii, usług, pracowników, użytkowników i rezerwacji.
+- Rozbudowany system uprawnień: rola sprawdzana serwerowo, ownership rezerwacji
+  oraz maszyna stanów rezerwacji i nieobecności.
+- Nieobecności pracowników z pełnym workflow wniosku (`oczekujaca`,
+  `zatwierdzona`, `odrzucona`, `anulowana`).
+- REST API pod `/api/*` obsługujące AJAX i używające tych samych modułów
+  domenowych co widoki SSR.
+- 253 automatycznie uruchamiane testy HTTP w CI na MariaDB 11.4, w tym test
+  równoległego zajęcia terminu (test 194).
+- Wspólna reguła nakładania przedziałów wydzielona do `app/przedzialy.php`
+  i używana zarówno przez grafik pracowników, jak i przez rezerwacje.
+
 ## Wymagania
 
 Do uruchomienia aplikacji należy wybrać jedną z poniższych metod:
@@ -709,10 +738,12 @@ na bazie wskazanej przez `DB_NAME` (domyślnie `wefixit_test`). Przed każdym
 uruchomieniem zestaw usuwa i ponownie tworzy tabele w tej bazie. Nie wskazuj
 w `DB_NAME` bazy deweloperskiej (np. `wefixit`) ani bazy z danymi do zachowania.
 
-Zestaw obejmuje testy Etapów 1–3 i uruchamia się przez `php tests/run.php`.
-Aktualny wynik — liczbę testów poprawnych i niepoprawnych oraz kontrolę logu
-serwera — wypisuje samo uruchomienie. Polecenie znajduje się w sekcji
-[Uruchomienie testów](#uruchomienie-testów).
+Zestaw obejmuje testy Etapów 1–4 i uruchamia się przez `php tests/run.php`.
+Repozytorium zawiera 253 przypadki testowe w plikach `tests/cases_*.php`, od
+`cases_registration.php` do `cases_stage4_regression.php`; pełna lista znajduje
+się w tabeli poniżej. Aktualny wynik — liczbę testów poprawnych i niepoprawnych
+oraz kontrolę logu serwera — wypisuje samo uruchomienie. Polecenie znajduje się
+w sekcji [Uruchomienie testów](#uruchomienie-testów).
 
 ### Zakres plików testowych
 
