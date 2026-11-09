@@ -113,6 +113,14 @@ function panel_menu_items(string $role): array
             'icon' => 'wrench',
         ],
         [
+            'key' => 'rezerwacja',
+            'label' => 'Nowa rezerwacja',
+            'path' => '/rezerwacja',
+            'roles' => ['klient'],
+            'group' => 'Rezerwacje',
+            'icon' => 'calendar',
+        ],
+        [
             'key' => 'profil',
             'label' => 'Mój profil',
             'path' => '/profil',
