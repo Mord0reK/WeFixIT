@@ -83,6 +83,10 @@ if ($result['status'] === 'invalid_transition') {
     ]);
 }
 
+if ($result['status'] === 'conflict') {
+    json_response(409, ['error' => 'Termin rezerwacji jest już zajęty.']);
+}
+
 if ($result['status'] !== 'ok') {
     json_response(500, ['error' => 'Nie udało się zmienić statusu rezerwacji. Wystąpił problem z serwerem.']);
 }

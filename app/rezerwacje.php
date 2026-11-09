@@ -402,6 +402,10 @@ function rezerwacja_find_by_id(int $id): ?array
     CHECK chk_rezerwacje_anulowanie wymaga, aby anulowana miała anulowano,
     a każdy inny status miało puste. Dlatego status i anulowano zapisujemy
     zawsze w jednej instrukcji UPDATE, także przy zwykłej zmianie statusu.
+
+    Przywrócenie anulowanej rezerwacji blokuje wiersz pracownika i sprawdza
+    konflikty z pozostałymi rezerwacjami, bo w międzyczasie ten termin mógł
+    zostać zajęty przez inną rezerwację.
 */
 function rezerwacja_set_status(int $id, string $targetStatus): array
 {
@@ -419,7 +423,7 @@ function rezerwacja_set_status(int $id, string $targetStatus): array
         $pdo->beginTransaction();
 
         $statement = $pdo->prepare(
-            'SELECT id, status_rezerwacji
+            'SELECT id, pracownik_id, czas_rozpoczecia, czas_zakonczenia, status_rezerwacji
              FROM rezerwacje
              WHERE id = :id
              FOR UPDATE'
@@ -437,6 +441,38 @@ function rezerwacja_set_status(int $id, string $targetStatus): array
         if (!rezerwacja_transition_allowed($currentStatus, $targetStatus)) {
             $pdo->rollBack();
             return ['status' => 'invalid_transition'];
+        }
+
+        if ($currentStatus === 'anulowana' && $targetStatus === 'oczekujaca') {
+            $statement = $pdo->prepare('SELECT id FROM pracownicy WHERE id = :id FOR UPDATE');
+            $statement->execute(['id' => (int) $row['pracownik_id']]);
+
+            if ($statement->fetch(PDO::FETCH_ASSOC) === false) {
+                $pdo->rollBack();
+                return ['status' => 'not_found'];
+            }
+
+            $statement = $pdo->prepare(
+                "SELECT id
+                 FROM rezerwacje
+                 WHERE pracownik_id = :pracownik_id
+                   AND status_rezerwacji <> 'anulowana'
+                   AND id <> :id
+                   AND czas_rozpoczecia < :czas_zakonczenia
+                   AND czas_zakonczenia > :czas_rozpoczecia
+                 LIMIT 1"
+            );
+            $statement->execute([
+                'pracownik_id' => (int) $row['pracownik_id'],
+                'id' => $id,
+                'czas_rozpoczecia' => (string) $row['czas_rozpoczecia'],
+                'czas_zakonczenia' => (string) $row['czas_zakonczenia'],
+            ]);
+
+            if ($statement->fetch(PDO::FETCH_ASSOC) !== false) {
+                $pdo->rollBack();
+                return ['status' => 'conflict'];
+            }
         }
 
         if ($targetStatus === 'anulowana') {
