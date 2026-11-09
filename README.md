@@ -16,6 +16,11 @@ System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników 
     - [Endpointy administracyjne](#endpointy-administracyjne)
     - [Reguły walidacji i obsługa zależności](#reguły-walidacji-i-obsługa-zależności)
     - [Eksport CSV](#eksport-csv)
+  - [Zrealizowano w Etapie 4 — klient i rezerwacje](#zrealizowano-w-etapie-4--klient-i-rezerwacje)
+    - [Strony i panele Etapu 4](#strony-i-panele-etapu-4)
+    - [Proces rezerwacji i reguły dostępności](#proces-rezerwacji-i-reguły-dostępności)
+    - [Endpointy Etapu 4](#endpointy-etapu-4)
+    - [Historia zmian statusu](#historia-zmian-statusu)
 - [Wymagania](#wymagania)
   - [Konfiguracja środowiska](#konfiguracja-środowiska)
 - [Uruchomienie przez Docker](#uruchomienie-przez-docker)
@@ -219,9 +224,10 @@ WeFixIT to system rezerwacji dla serwisu komputerowego z trzema rolami: klient, 
 
 | Rola | Dostęp |
 |------|--------|
-| Klient (`klient`) | `/panel`, `/profil`, `GET /api/me`, `PATCH /api/profile` |
-| Pracownik (`pracownik`) | jak klient oraz `/pracownik` |
-| Administrator (`admin`) | jak pracownik oraz `/admin`, `/kategorie`, `/uslugi`, `/pracownicy`, `/pracownicy-uslugi?id=…`, `/pracownicy-dostepnosc?id=…`, `/uzytkownicy`, `/rezerwacje`, `/log`, `/eksport?typ=rezerwacje` i `/eksport?typ=uzytkownicy` |
+| Niezalogowany | `/login`, `/register`, `/oferta`, `/usluga?id=…`, `POST /api/auth/login`, `POST /api/auth/register` |
+| Klient (`klient`) | `/oferta`, `/usluga?id=…`, `/rezerwacja`, `/panel`, `/profil`, `GET /api/me`, `PATCH /api/profile`, `GET /api/availability`, `POST /api/reservations`, `PATCH /api/client-reservations` |
+| Pracownik (`pracownik`) | `/oferta`, `/usluga?id=…`, `/rezerwacja`, `/panel`, `/pracownik`, `/profil`, `GET /api/me`, `PATCH /api/profile`, `GET /api/availability`, `PATCH /api/employee-reservations` |
+| Administrator (`admin`) | jak pracownik oraz `/admin`, `/kategorie`, `/uslugi`, `/pracownicy`, `/pracownicy-uslugi?id=…`, `/pracownicy-dostepnosc?id=…`, `/uzytkownicy`, `/rezerwacje`, `/log`, `/eksport?typ=rezerwacje`, `/eksport?typ=uzytkownicy` i `/api/admin/*` |
 
 Rola jest sprawdzana po stronie serwera na każdej chronionej stronie przez
 `require_role()` i na każdym chronionym endpointcie przez `require_api_login()`
@@ -500,6 +506,93 @@ danych. Eksport jest wyłącznie odczytem: nie wymaga CSRF i nie zapisuje wpisu
 w dzienniku zdarzeń. Eksport użytkowników nie zawiera telefonu ani hasła;
 eksport rezerwacji zawiera e-mail klienta jako część dokumentu rezerwacji.
 
+### Zrealizowano w Etapie 4 — klient i rezerwacje
+
+Etap 4 domyka ścieżkę klienta i pracownika: publiczną ofertę usług, wyliczanie
+wolnych terminów, formularz tworzenia rezerwacji, panel klienta z anulowaniem
+własnej przyszłej wizyty, panel pracownika ze zmianą statusu przypisanych
+rezerwacji oraz prezentację historii zmian statusu. Schemat bazy danych nie
+zmienił się względem wcześniejszych etapów, dlatego diagram ERD powyżej
+pozostaje świadomie bez zmian.
+
+#### Strony i panele Etapu 4
+
+| Ścieżka publiczna | Dostęp | Zakres |
+|-------------------|--------|--------|
+| `/oferta` | publiczny | Lista aktywnych usług w aktywnych kategoriach z filtrem kategorii, czasem trwania, ceną i informacją o dostępności aktywnego wykonawcy. |
+| `/usluga?id=N` | publiczny | Szczegóły pojedynczej aktywnej usługi, lista przypisanych aktywnych pracowników oraz warunkowy przycisk CTA zależny od sesji i roli. |
+| `/rezerwacja` | zalogowany użytkownik (`require_login()`) | Formularz wyboru usługi, pracownika, daty, godziny i komentarza; mapa pracowników przekazywana jest w `data-employees`, a wolne terminy pobierane są przez AJAX. Pozycja w menu bocznym jest widoczna dla `klient` i `admin`. |
+| `/panel` | zalogowany użytkownik (`require_login()`) | Panel klienta z rozłącznymi sekcjami „Nadchodzące” i „Historia”, przyciskiem anulowania przyszłych rezerwacji (`oczekujaca`, `potwierdzona`) oraz rozwijaną historią zmian `<details>`. |
+| `/pracownik` | `pracownik`, `admin` | Panel pracownika z rozłącznymi sekcjami „Dzisiaj”, „Nadchodzące” i „Historia”, danymi kontaktowymi klienta, przyciskami maszyny stanów przypisanych wizyt i historią zmian `<details>`. Dla administratora wyświetla kartę informacyjną o braku profilu pracownika z linkiem do `/rezerwacje`. |
+
+#### Proces rezerwacji i reguły dostępności
+
+Proces składania rezerwacji przebiega w stałej kolejności:
+**usługa → pracownik → data → godzina → potwierdzenie**.
+
+1. Wybór usługi zawęża listę pracowników do aktywnych wykonawców przypisanych
+   do tej usługi (`data-employees` przebudowywane w JavaScripcie bez duplikatów
+   i bez polegania na `option[hidden]`).
+2. Wybór pracownika i daty uruchamia żądanie `GET /api/availability`, które
+   zwraca wolne przedziały czasowe; licznik żądań w skrypcie odrzuca spóźnione
+   odpowiedzi sieciowe.
+3. Wybór godziny odblokowuje wysłanie formularza przez `POST /api/reservations`
+   z nagłówkiem `X-CSRF-Token`. Formularz rezerwacji wymaga włączonego
+   JavaScriptu — strona `/rezerwacja` nie obsługuje klasycznego `POST` ani
+   fallbacku bez JS.
+
+Wyliczanie dostępności i zapis rezerwacji opierają się na wspólnych regułach:
+
+- **Horyzont 14 dni i siatka 15 minut.** Rezerwacje można składać wyłącznie od
+  bieżącego dnia do 13 dni naprzód (łącznie 14 dni kalendarzowych), co zapobiega
+  blokowaniu odległych terminów przed ustaleniem urlopów. Krok siatki wynosi
+  15 minut, ale po każdym wygenerowanym slocie kursor przesuwa się o pełny czas
+  trwania usługi, dzięki czemu zwracane propozycje nie nachodzą na siebie i
+  odzwierciedlają rzeczywistą przepustowość pracownika. Sloty zaczynające się
+  w przeszłości lub dokładnie w bieżącej chwili (`start <= now`) są odrzucane.
+- **Reguła konfliktu przedziałów.** Dwa przedziały `[start, end)` kolidują wtedy
+  i tylko wtedy, gdy zachodzi warunek:
+
+  ```text
+  existing.start < new.end AND existing.end > new.start
+  ```
+
+  Przedziały stykające się granicami (`existing.end = new.start` lub
+  `existing.start = new.end`) nie kolidują. Ta sama funkcja sprawdza nakładanie
+  z istniejącymi rezerwacjami (o statusie innym niż `anulowana`) oraz
+  mieszczanie się wizyty wewnątrz aktywnego przedziału `godziny_pracy` przy
+  braku zatwierdzonej lub oczekującej `nieobecnosci` w danym dniu.
+- **Blokada wiersza i rewalidacja w transakcji.** Samo `BEGIN` nie chroni przed
+  wyścigiem dwóch równoległych żądań na ten sam wolny termin. Dlatego
+  `reservation_create()` jako pierwszą instrukcję po `beginTransaction()`
+  wykonuje `SELECT id FROM pracownicy WHERE id = :id FOR UPDATE` (oraz blokuje
+  wiersz klienta i usługi), a dopiero po przejęciu blokady ponownie sprawdza
+  aktywność konta klienta, pracownika i usługi, przypisanie w
+  `uslugi_pracownikow`, grafik, nieobecności i brak konfliktu terminów. Cenę
+  historyczną (`cena_historyczna`), status początkowy (`oczekujaca`) i godzinę
+  zakończenia zawsze wylicza serwer.
+
+#### Endpointy Etapu 4
+
+| Metoda i adres | CSRF | Najważniejsze kody odpowiedzi |
+|----------------|------|-------------------------------|
+| `GET /api/availability` | nie | 200 lista wolnych slotów, 401 brak sesji, 404 brak pracownika lub usługi, 409 nieaktywny wykonawca/usługa lub brak przypisania, 422 błędne parametry lub data poza horyzontem 14 dni |
+| `POST /api/reservations` | tak | 201 utworzona rezerwacja, 400 zły JSON, 401 brak sesji, 403 rola inna niż `klient` lub brak CSRF, 409 zajęty/niedostępny termin, 415 zły `Content-Type`, 422 błędy walidacji pól lub data poza horyzontem |
+| `PATCH /api/client-reservations` | tak | 200 anulowano rezerwację, 400 zły JSON, 401 brak sesji, 403 rola inna niż `klient`, cudza rezerwacja lub brak CSRF, 404 brak rezerwacji, 409 status lub czas nie pozwala na anulowanie, 415 zły `Content-Type`, 422 błędne `id` |
+| `PATCH /api/employee-reservations` | tak | 200 zmieniono status, 400 zły JSON, 401 brak sesji, 403 rola `klient`, brak profilu pracownika lub brak CSRF, 404 brak rezerwacji lub wizyta innego pracownika, 415 zły `Content-Type`, 422 błędy walidacji lub niedozwolone przejście |
+
+#### Historia zmian statusu
+
+Historia zmian statusu rezerwacji w `/panel` i `/pracownik` korzysta wyłącznie z
+istniejącej tabeli `log_zdarzen` (`obiekt_typ = 'rezerwacja'`) bez dodawania
+nowych tabel ani kolumn w schemacie. Moduł `app/rezerwacje_historia.php`
+udostępnia `reservation_history()` oraz `reservation_history_batch()`, które
+pobierają zdarzenia `rezerwacja_utworzona`, `rezerwacja_status_zmieniony`,
+`rezerwacja_anulowana` i `rezerwacja_anulowana_klient` jednym zapytaniem `IN`
+dla wszystkich rezerwacji widocznych na stronie (bez problemu N+1) i dekodują
+szczegóły przez `log_view_details_decode()`. Widoki renderują sekcję `<details>`
+tylko wtedy, gdy rezerwacja ma zapisane zdarzenia.
+
 ## Wymagania
 
 Do uruchomienia aplikacji należy wybrać jedną z poniższych metod:
@@ -617,6 +710,13 @@ serwera — wypisuje samo uruchomienie. Polecenie znajduje się w sekcji
 | [`tests/cases_admin_reservations.php`](tests/cases_admin_reservations.php) | Lista rezerwacji, filtry, maszyna stanów, anulowanie w jednym `UPDATE` i tylko GET/PATCH. |
 | [`tests/cases_admin_pagination.php`](tests/cases_admin_pagination.php) | Allowlista `page`/`size`, metadane paginacji, wyszukiwanie i linki zachowujące filtry. |
 | [`tests/cases_admin_log_export.php`](tests/cases_admin_log_export.php) | Filtry dziennika, prywatność aktora, BOM i filtry CSV oraz neutralizacja formuł. |
+| [`tests/cases_intervals.php`](tests/cases_intervals.php) | Reguła konfliktu przedziałów, siatka slotów 15 minut, brak nachodzenia i obsługa końca dnia `24:00:00`. |
+| [`tests/cases_offer.php`](tests/cases_offer.php) | Publiczna oferta i szczegóły usługi, filtry kategorii oraz ukrywanie nieaktywnych danych. |
+| [`tests/cases_reservations.php`](tests/cases_reservations.php) | `GET /api/availability` i `POST /api/reservations`: walidacja, konflikty, cena z serwera i równoległe żądania pod blokadą `FOR UPDATE`. |
+| [`tests/cases_reservation_form.php`](tests/cases_reservation_form.php) | Widok `/rezerwacja`, mapa `data-employees`, wstępny wybór usługi, menu ról i warunkowe CTA. |
+| [`tests/cases_client_panel.php`](tests/cases_client_panel.php) | Panel klienta `/panel` i `PATCH /api/client-reservations`: izolacja danych, ownership, statusy i przenoszenie do historii. |
+| [`tests/cases_employee_panel.php`](tests/cases_employee_panel.php) | Panel pracownika `/pracownik` i `PATCH /api/employee-reservations`: izolacja wizyt, maszyna stanów i rozłączność sekcji. |
+| [`tests/cases_stage4_regression.php`](tests/cases_stage4_regression.php) | Regresja Etapu 4: wpisy `log_zdarzen`, `reservation_history_batch()` bez N+1 oraz historia `<details>` w panelach. |
 
 ### Wymagania testów
 
