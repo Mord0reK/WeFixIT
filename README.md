@@ -560,8 +560,15 @@ Wyliczanie dostępności i zapis rezerwacji opierają się na wspólnych reguła
   Przedziały stykające się granicami (`existing.end = new.start` lub
   `existing.start = new.end`) nie kolidują. Ta sama funkcja sprawdza nakładanie
   z istniejącymi rezerwacjami (o statusie innym niż `anulowana`) oraz
-  mieszczanie się wizyty wewnątrz aktywnego przedziału `godziny_pracy` przy
-  braku zatwierdzonej lub oczekującej `nieobecnosci` w danym dniu.
+  pokrycie wizyty przez jeden aktywny przedział `godziny_pracy` albo ciąg
+  przedziałów stykających się granicami; przerwa większa od zera jest
+  niedozwolona. Wizyta jest odrzucana także przy zatwierdzonej nieobecności
+  pracownika w danym dniu.
+- **Ciągłość grafiku.** Wizyta może objąć kilka kolejnych wpisów grafiku tylko
+  wtedy, gdy każdy następny zaczyna się dokładnie w chwili zakończenia
+  poprzedniego. Wyrównanie do siatki 15 minut liczy się od początku pierwszego
+  wpisu użytego przez wizytę, a przerwa większa od zera nadal dyskwalifikuje
+  termin.
 - **Blokada wiersza i rewalidacja w transakcji.** Samo `BEGIN` nie chroni przed
   wyścigiem dwóch równoległych żądań na ten sam wolny termin. Dlatego
   `reservation_create()` jako pierwszą instrukcję po `beginTransaction()`
