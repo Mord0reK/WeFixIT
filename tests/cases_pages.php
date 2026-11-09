@@ -147,6 +147,38 @@ test('Dodatkowo: formularze administracyjne są osadzone w panelach bocznych', f
     }
 });
 
+test('Dodatkowo: strony HTML wysyłają nagłówki bezpieczeństwa', function (): void {
+    $cookies = [];
+    $page = http_request($cookies, 'GET', '/login.php');
+    assert_status(200, $page, 'Strona logowania powinna zwrócić 200');
+
+    $csp = header_value($page, 'content-security-policy');
+    assert_true(is_string($csp) && $csp !== '', 'Strona HTML powinna zawierać nagłówek Content-Security-Policy');
+    assert_true(
+        strpos($csp, "default-src 'self'") !== false
+        && strpos($csp, "script-src 'self'") !== false
+        && strpos($csp, "connect-src 'self'") !== false
+        && strpos($csp, "frame-ancestors 'none'") !== false,
+        'CSP powinno zawierać wymagane dyrektywy'
+    );
+    assert_same('nosniff', header_value($page, 'x-content-type-options'), 'Powinien być nagłówek X-Content-Type-Options');
+    assert_same('same-origin', header_value($page, 'referrer-policy'), 'Powinien być nagłówek Referrer-Policy');
+
+    $apiCookies = [];
+    $api = http_request($apiCookies, 'GET', '/api/me.php');
+    assert_status(401, $api, 'API bez sesji powinno zwrócić 401');
+    assert_same(
+        'application/json; charset=utf-8',
+        header_value($api, 'content-type'),
+        'Endpoint JSON powinien zachować kontrakt Content-Type'
+    );
+    assert_same(
+        null,
+        header_value($api, 'content-security-policy'),
+        'Endpoint JSON nie może otrzymywać nagłówka CSP'
+    );
+});
+
 test('Dodatkowo: administrator widzi właściwą aktywną pozycję menu na podglądach', function (): void {
     $session = login_as('admin@wefixit.pl');
     assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
