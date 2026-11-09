@@ -502,3 +502,89 @@ function reservation_client_row(array $row): array
         'pracownik_nazwisko' => (string) $row['pracownik_nazwisko'],
     ];
 }
+
+/*
+    Klient anuluje wyłącznie własną, przyszłą rezerwację oczekującą lub
+    potwierdzoną. Wiersz blokujemy od razu, żeby sprawdzenie właściciela,
+    statusu i czasu dotyczyło tego samego stanu, który zapisujemy. Właściciela
+    porównujemy w PHP po pobraniu wiersza po id, bo dopiero to pozwala odróżnić
+    cudzą rezerwację (forbidden) od nieistniejącej (not_found).
+
+    Status i anulowano zapisujemy jedną instrukcją UPDATE, ponieważ CHECK
+    chk_rezerwacje_anulowanie wymaga ich spójności w każdym momencie.
+*/
+function reservation_client_cancel(int $userId, int $reservationId): array
+{
+    $pdo = rezerwacje_klienta_db();
+
+    if ($userId <= 0 || $reservationId <= 0 || $pdo === null) {
+        return ['status' => 'error'];
+    }
+
+    try {
+        $pdo->beginTransaction();
+
+        $statement = $pdo->prepare(
+            'SELECT id, uzytkownik_id, status_rezerwacji, czas_rozpoczecia
+             FROM rezerwacje
+             WHERE id = :id
+             FOR UPDATE'
+        );
+        $statement->execute(['id' => $reservationId]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+
+        if (!is_array($row)) {
+            $pdo->rollBack();
+            return ['status' => 'not_found'];
+        }
+
+        if ((int) $row['uzytkownik_id'] !== $userId) {
+            $pdo->rollBack();
+            return ['status' => 'forbidden'];
+        }
+
+        $currentStatus = (string) $row['status_rezerwacji'];
+        $start = new DateTimeImmutable((string) $row['czas_rozpoczecia']);
+        $now = new DateTimeImmutable('now');
+
+        if (
+            !in_array($currentStatus, ['oczekujaca', 'potwierdzona'], true)
+            || $start <= $now
+        ) {
+            $pdo->rollBack();
+            return ['status' => 'not_cancellable'];
+        }
+
+        $statement = $pdo->prepare(
+            "UPDATE rezerwacje
+             SET status_rezerwacji = 'anulowana', anulowano = NOW()
+             WHERE id = :id"
+        );
+        $statement->execute(['id' => $reservationId]);
+
+        $statement = $pdo->prepare('SELECT anulowano FROM rezerwacje WHERE id = :id');
+        $statement->execute(['id' => $reservationId]);
+        $cancelledAt = $statement->fetchColumn();
+
+        if (!is_string($cancelledAt) || $cancelledAt === '') {
+            $pdo->rollBack();
+            return ['status' => 'error'];
+        }
+
+        $pdo->commit();
+
+        return [
+            'status' => 'ok',
+            'id' => $reservationId,
+            'anulowano' => $cancelledAt,
+            'poprzedni_status' => $currentStatus,
+        ];
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        error_log('Nie udało się anulować rezerwacji klienta: ' . $e->getMessage());
+        return ['status' => 'error'];
+    }
+}
