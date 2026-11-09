@@ -428,7 +428,10 @@ function start_test_server(): array
     ];
 
     $command = [PHP_BINARY, '-S', '127.0.0.1:' . $port, '-t', $documentRoot];
-    $process = proc_open($command, $descriptors, $pipes, $documentRoot);
+    $environment = getenv();
+    $environment = is_array($environment) ? $environment : [];
+    $environment['PHP_CLI_SERVER_WORKERS'] = '2';
+    $process = proc_open($command, $descriptors, $pipes, $documentRoot, $environment);
 
     if (!is_resource($process)) {
         throw new RuntimeException('Nie udało się uruchomić wbudowanego serwera PHP.');

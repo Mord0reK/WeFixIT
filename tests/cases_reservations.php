@@ -201,6 +201,67 @@ function reservations_payload(
     return array_merge($data, $extra);
 }
 
+function reservations_parallel_posts(array $requests): array
+{
+    $multi = curl_multi_init();
+    $handles = [];
+
+    foreach ($requests as $index => $request) {
+        $cookies = is_array($request['cookies'] ?? null) ? $request['cookies'] : [];
+        $payload = is_array($request['payload'] ?? null) ? $request['payload'] : [];
+        $csrf = (string) ($request['csrf'] ?? '');
+        $headers = [
+            'Content-Type: application/json',
+            'X-CSRF-Token: ' . $csrf,
+        ];
+        $cookiePairs = [];
+
+        foreach ($cookies as $name => $value) {
+            $cookiePairs[] = $name . '=' . $value;
+        }
+
+        if ($cookiePairs !== []) {
+            $headers[] = 'Cookie: ' . implode('; ', $cookiePairs);
+        }
+
+        $handle = curl_init(test_base_url() . '/api/reservations.php');
+        curl_setopt_array($handle, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_TIMEOUT => 10,
+        ]);
+        curl_multi_add_handle($multi, $handle);
+        $handles[$index] = $handle;
+    }
+
+    do {
+        $multiStatus = curl_multi_exec($multi, $active);
+
+        if ($active) {
+            if (curl_multi_select($multi, 1.0) === -1) {
+                usleep(10000);
+            }
+        }
+    } while ($active && $multiStatus === CURLM_OK);
+
+    $responses = [];
+
+    foreach ($handles as $index => $handle) {
+        $responses[$index] = [
+            'status' => (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE),
+            'body' => (string) curl_multi_getcontent($handle),
+        ];
+        curl_multi_remove_handle($multi, $handle);
+        curl_close($handle);
+    }
+
+    curl_multi_close($multi);
+
+    return $responses;
+}
+
 test('175. GET /api/availability bez logowania daje 401', function (): void {
     $cookies = [];
     $response = http_request(
@@ -534,4 +595,105 @@ test('190. POST ignoruje cenę i status przysłane w body', function (): void {
         (string) ($row['status_rezerwacji'] ?? ''),
         'Status musi być ustawiony przez serwer na oczekująca'
     );
+});
+
+test('192. POST przyjmuje wolny termin poza przesuniętą listą slotów', function (): void {
+    $session = reservations_client_session();
+    $pair = reservations_find_overlap_pair($session, 1, 6, 1, 60);
+    assert_true(
+        $pair !== null,
+        'Dane seed powinny zawierać parę slotów usług 6 i 1 przesuniętych o 60 minut'
+    );
+
+    if ($pair === null) {
+        return;
+    }
+
+    $partsA = reservations_slot_parts($pair['slot_a']);
+    $partsB = reservations_slot_parts($pair['slot_b']);
+    $first = post_json(
+        $session['cookies'],
+        '/api/reservations.php',
+        reservations_payload(1, 6, $partsA['date'], $partsA['time']),
+        $session['csrf']
+    );
+    assert_status(201, $first, 'Rezerwacja usługi 6 powinna dać 201');
+
+    $after = reservations_availability_request($session['cookies'], 1, 1, $pair['date']);
+    assert_status(200, $after, 'Dostępność usługi 1 powinna zwrócić 200');
+    $afterData = json_body($after);
+    $afterStarts = array_column($afterData['sloty'] ?? [], 'start');
+    assert_true(
+        !in_array($partsB['start'], $afterStarts, true),
+        'Żądany termin powinien wypaść z przesuniętej listy slotów'
+    );
+
+    $second = post_json(
+        $session['cookies'],
+        '/api/reservations.php',
+        reservations_payload(1, 1, $partsB['date'], $partsB['time']),
+        $session['csrf']
+    );
+    assert_status(201, $second, 'Wolny termin poza listą nadal powinien dać 201');
+});
+
+test('193. administrator i pracownik nie mogą tworzyć rezerwacji klienta', function (): void {
+    $accounts = [
+        ['email' => 'admin@wefixit.pl', 'label' => 'administratora'],
+        ['email' => 'tomasz.serwisant@wefixit.pl', 'label' => 'pracownika'],
+    ];
+
+    foreach ($accounts as $account) {
+        $session = login_as($account['email']);
+        assert_status(200, $session['response'], 'Logowanie ' . $account['label'] . ' powinno się udać');
+        $csrf = csrf_from_page($session['cookies'], '/profil.php');
+        $response = post_json(
+            $session['cookies'],
+            '/api/reservations.php',
+            reservations_payload(1, 1, date('Y-m-d'), '09:00:00'),
+            $csrf
+        );
+
+        assert_status(403, $response, 'Konto ' . $account['label'] . ' nie może tworzyć rezerwacji');
+    }
+});
+
+test('194. równoległe POST tworzą dokładnie jedną rezerwację', function (): void {
+    $sessionA = reservations_client_session();
+    $sessionB = reservations_client_session();
+    $found = reservations_find_slots($sessionA, 1, 1);
+    assert_true($found !== null, 'Powinien istnieć wolny termin do testu równoległego');
+
+    $parts = reservations_slot_parts($found['slots'][0]);
+    $payload = reservations_payload(1, 1, $parts['date'], $parts['time']);
+    $responses = reservations_parallel_posts([
+        [
+            'cookies' => $sessionA['cookies'],
+            'csrf' => $sessionA['csrf'],
+            'payload' => $payload,
+        ],
+        [
+            'cookies' => $sessionB['cookies'],
+            'csrf' => $sessionB['csrf'],
+            'payload' => $payload,
+        ],
+    ]);
+
+    $statuses = [
+        (int) ($responses[0]['status'] ?? 0),
+        (int) ($responses[1]['status'] ?? 0),
+    ];
+    sort($statuses);
+    assert_same([201, 409], $statuses, 'Równoległe żądania powinny dać jedną rezerwację i jeden konflikt');
+
+    $statement = test_db()->prepare(
+        "SELECT COUNT(*)
+         FROM rezerwacje
+         WHERE pracownik_id = 1
+           AND usluga_id = 1
+           AND czas_rozpoczecia = :czas_rozpoczecia
+           AND status_rezerwacji <> 'anulowana'"
+    );
+    $statement->execute(['czas_rozpoczecia' => $parts['start']]);
+    assert_same(1, (int) $statement->fetchColumn(), 'W bazie powinna powstać dokładnie jedna rezerwacja');
 });
