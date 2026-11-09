@@ -5,6 +5,8 @@ services:
     image: ghcr.io/mord0rek/wefixit:${IMAGE_TAG:-latest}
     ports:
       - "127.0.0.1:8080:80"
+    environment:
+      TZ: Europe/Warsaw
     env_file:
       - ../.env
     restart: unless-stopped
@@ -17,6 +19,7 @@ services:
     volumes:
       - db_data:/var/lib/mysql
     environment:
+      TZ: Europe/Warsaw
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD must be set}
       MARIADB_DATABASE: ${DB_NAME:?DB_NAME must be set}
       MARIADB_USER: ${DB_USER:?DB_USER must be set}

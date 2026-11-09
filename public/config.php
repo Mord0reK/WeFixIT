@@ -7,6 +7,12 @@ declare(strict_types=1);
     Udostępnia globalne $pdo oraz flagę $bazaErr opisującą stan połączenia.
     Ścieżki budujemy względem __DIR__, więc działają także w podkatalogu.
 */
+
+// Baza danych i PHP muszą używać tej samej strefy czasowej, żeby godziny
+// grafiku, dostępnych slotów, rezerwacji i wpisów dziennika zgadzały się
+// z czasem lokalnym serwisu.
+date_default_timezone_set('Europe/Warsaw');
+
 require_once __DIR__ . '/../app/session.php';
 
 // Sesja może już być uruchomiona, np. przez walidację tokenu CSRF przed wejściem w config.
