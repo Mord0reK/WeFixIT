@@ -10,6 +10,7 @@ declare(strict_types=1);
 */
 require_once dirname(__DIR__) . '/app/panel_layout.php';
 require_once dirname(__DIR__) . '/app/rezerwacje_pracownika.php';
+require_once dirname(__DIR__) . '/app/rezerwacje_historia.php';
 
 $user = require_role(['pracownik', 'admin']);
 $basePath = auth_base_path();
@@ -19,11 +20,23 @@ $reservations = $employeeId !== null ? employee_reservations($employeeId) : null
 $today = [];
 $upcoming = [];
 $history = [];
+$historyByReservation = [];
 
 if (is_array($reservations)) {
     $today = is_array($reservations['dzis'] ?? null) ? $reservations['dzis'] : [];
     $upcoming = is_array($reservations['przyszle'] ?? null) ? $reservations['przyszle'] : [];
     $history = is_array($reservations['historia'] ?? null) ? $reservations['historia'] : [];
+    $visibleIds = [];
+
+    foreach (array_merge($today, $upcoming, $history) as $reservation) {
+        $visibleIds[] = (int) $reservation['id'];
+    }
+
+    $historyBatch = reservation_history_batch($visibleIds);
+
+    if (is_array($historyBatch)) {
+        $historyByReservation = $historyBatch;
+    }
 }
 
 $statusMeta = [
@@ -49,7 +62,8 @@ $targetLabels = [
 function employee_panel_reservation_table(
     array $reservations,
     array $statusMeta,
-    array $targetLabels
+    array $targetLabels,
+    array $historyByReservation
 ): void {
     ?>
     <div class="<?= PANEL_TABLE_WRAP_CLASS ?>">
@@ -89,6 +103,9 @@ function employee_panel_reservation_table(
                         ? mb_substr($comment, 0, 120) . '…'
                         : $comment;
                     $targets = rezerwacja_transition_targets($status);
+                    $historyEvents = is_array($historyByReservation[$reservationId] ?? null)
+                        ? $historyByReservation[$reservationId]
+                        : [];
                     ?>
                     <tr class="<?= PANEL_TR_CLASS ?>" data-employee-reservation-row
                         data-reservation-id="<?= $reservationId ?>">
@@ -148,6 +165,55 @@ function employee_panel_reservation_table(
                             </div>
                         </td>
                     </tr>
+                    <?php if ($historyEvents !== []): ?>
+                        <tr>
+                            <td colspan="6" class="<?= PANEL_TD_CLASS ?> text-xs text-zinc-500 dark:text-zinc-400">
+                                <details>
+                                    <summary class="cursor-pointer font-medium text-zinc-700 dark:text-zinc-300">
+                                        Historia zmian (<?= count($historyEvents) ?>)
+                                    </summary>
+                                    <ul class="mt-2 space-y-2">
+                                        <?php foreach ($historyEvents as $event): ?>
+                                            <?php
+                                            $eventTime = (new DateTimeImmutable((string) $event['utworzono']))
+                                                ->format('d.m.Y H:i');
+                                            $actor = trim(
+                                                ((string) ($event['aktor_imie'] ?? ''))
+                                                . ' '
+                                                . ((string) ($event['aktor_nazwisko'] ?? ''))
+                                            );
+                                            $details = is_array($event['szczegoly'] ?? null)
+                                                ? $event['szczegoly']
+                                                : null;
+                                            $statusDiff = is_array($details['status'] ?? null)
+                                                ? $details['status']
+                                                : null;
+                                            $transition = is_array($statusDiff)
+                                                && is_string($statusDiff['przed'] ?? null)
+                                                && is_string($statusDiff['po'] ?? null)
+                                                ? $statusDiff['przed'] . ' → ' . $statusDiff['po']
+                                                : '';
+                                            ?>
+                                            <li>
+                                                <span class="font-medium text-zinc-700 dark:text-zinc-300">
+                                                    <?= htmlspecialchars($eventTime, ENT_QUOTES, 'UTF-8') ?>
+                                                </span>
+                                                — <?= htmlspecialchars((string) $event['opis'], ENT_QUOTES, 'UTF-8') ?>
+                                                <?php if ($actor !== ''): ?>
+                                                    (<?= htmlspecialchars($actor, ENT_QUOTES, 'UTF-8') ?>)
+                                                <?php endif; ?>
+                                                <?php if ($transition !== ''): ?>
+                                                    <span class="font-medium text-zinc-700 dark:text-zinc-300">
+                                                        [<?= htmlspecialchars($transition, ENT_QUOTES, 'UTF-8') ?>]
+                                                    </span>
+                                                <?php endif; ?>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </details>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
                 <?php endforeach; ?>
             </tbody>
         </table>
@@ -194,7 +260,7 @@ panel_layout_head($user, 'Panel pracownika — WeFixIT', $isAdmin ? 'employee_pa
                             Brak wizyt zaplanowanych na dzisiaj.
                         </p>
                     <?php else: ?>
-                        <?php employee_panel_reservation_table($today, $statusMeta, $targetLabels); ?>
+                        <?php employee_panel_reservation_table($today, $statusMeta, $targetLabels, $historyByReservation); ?>
                     <?php endif; ?>
                 </section>
 
@@ -207,7 +273,7 @@ panel_layout_head($user, 'Panel pracownika — WeFixIT', $isAdmin ? 'employee_pa
                             Brak nadchodzących wizyt.
                         </p>
                     <?php else: ?>
-                        <?php employee_panel_reservation_table($upcoming, $statusMeta, $targetLabels); ?>
+                        <?php employee_panel_reservation_table($upcoming, $statusMeta, $targetLabels, $historyByReservation); ?>
                     <?php endif; ?>
                 </section>
 
@@ -220,7 +286,7 @@ panel_layout_head($user, 'Panel pracownika — WeFixIT', $isAdmin ? 'employee_pa
                             Brak historycznych wizyt.
                         </p>
                     <?php else: ?>
-                        <?php employee_panel_reservation_table($history, $statusMeta, $targetLabels); ?>
+                        <?php employee_panel_reservation_table($history, $statusMeta, $targetLabels, $historyByReservation); ?>
                     <?php endif; ?>
                 </section>
             </div>
