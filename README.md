@@ -9,6 +9,7 @@ System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników 
 - [Technologie](#technologie)
 - [Baza danych](#baza-danych)
   - [Opis tabel nieobecnosci i log_zdarzen](#opis-tabel-nieobecnosci-i-log_zdarzen)
+  - [Tabela proby_logowania](#tabela-proby_logowania)
 - [Zakres projektu](#zakres-projektu)
   - [Zrealizowano w Etapie 1](#zrealizowano-w-etapie-1)
   - [Zrealizowano w Etapie 2 - Użytkownicy i logowanie](#zrealizowano-w-etapie-2---użytkownicy-i-logowanie)
@@ -21,6 +22,7 @@ System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników 
     - [Proces rezerwacji i reguły dostępności](#proces-rezerwacji-i-reguły-dostępności)
     - [Endpointy Etapu 4](#endpointy-etapu-4)
     - [Historia zmian statusu](#historia-zmian-statusu)
+  - [Funkcje dodatkowe](#funkcje-dodatkowe)
 - [Wymagania](#wymagania)
   - [Konfiguracja środowiska](#konfiguracja-środowiska)
 - [Uruchomienie przez Docker](#uruchomienie-przez-docker)
@@ -160,6 +162,13 @@ erDiagram
         JSON szczegoly
         DATETIME utworzono
     }
+
+    proby_logowania {
+        INT id PK
+        CHAR email_hash
+        CHAR ip_hash
+        DATETIME utworzono
+    }
 ```
 
 Diagram pokazuje logiczne typy i relacje. W schemacie wszystkie typy całkowite
@@ -172,6 +181,15 @@ Diagram pokazuje logiczne typy i relacje. W schemacie wszystkie typy całkowite
 
 - `nieobecnosci` przechowuje urlopy, choroby i inne nieobecności pracowników w zakresie dat. Status `oczekujaca` oznacza wniosek przed decyzją, a `zatwierdzona`, `odrzucona` lub `anulowana` — jego rozstrzygnięcie. Pełny workflow (wniosek, zatwierdzenie, odrzucenie, anulowanie) obsługuje panel: `POST` tworzy zawsze status `oczekujaca`, a `PATCH` wykonuje wyłącznie dozwolone przejścia. Przy zatwierdzeniu lub odrzuceniu `rozpatrzyl_id` pochodzi z sesji administratora i jest zapisywany razem z `rozpatrzono`; przy anulowaniu oba pola są zerowane. `CHECK chk_nieobecnosci_rozpatrzenie` wymaga obu pól dla `zatwierdzona`/`odrzucona` i obu pustych dla `oczekujaca`/`anulowana`. Anulowanie nie usuwa wniosku.
 - `log_zdarzen` jest dziennikiem audytowym operacji administracyjnych. Zapisuje aktora, akcję, typ i identyfikator obiektu, poziom (`info`, `warning`, `critical`), opis oraz opcjonalne szczegóły w formacie JSON. Widok dziennika pokazuje aktora tylko jako imię i nazwisko — bez e-maila i telefonu. Kolumny `obiekt_typ` i `obiekt_id` są wypełniane razem albo oba pozostają puste; pilnuje tego `CHECK chk_log_zdarzen_obiekt`, a `log_event()` normalizuje niepełną parę do dwóch wartości `NULL`. Filtry akcji, poziomu i typu obiektu pochodzą z allowlist w `app/log_view.php`. Dziennik nie zastępuje danych biznesowych, tylko dokumentuje zmiany i nie zawiera haseł ani tokenów.
+
+### Tabela proby_logowania
+
+`proby_logowania` przechowuje wyłącznie SHA-256 znormalizowanego adresu e-mail
+(`email_hash`) i adresu IP (`ip_hash`) oraz znacznik `utworzono`. Nie ma klucza
+obcego do `uzytkownicy`, ponieważ nieudana próba może dotyczyć nieistniejącego
+konta. Limit wynosi 10 prób dla e-maila lub 20 dla IP w oknie 15 minut; starsze
+wpisy są usuwane przez `rate_limit_cleanup()`. Tabela nie zawiera jawnych
+e-maili, adresów IP ani haseł.
 
 ### Wersja pusta
 Pusta edycja bazy danych jak sama nazwa wskazuje nie zawiera żadnych danych w sobie. Zalecane użycie w środowisku produkcyjnym.
@@ -204,7 +222,7 @@ WeFixIT to system rezerwacji dla serwisu komputerowego z trzema rolami: klient, 
 
 ### Zrealizowano w Etapie 1
 
-- Schemat bazy MariaDB 11.4: 9 tabel (`uzytkownicy`, `pracownicy`, `kategorie_uslug`, `uslugi`, `uslugi_pracownikow`, `godziny_pracy`, `nieobecnosci`, `rezerwacje`, `log_zdarzen`).
+- Schemat bazy MariaDB 11.4: 10 tabel (`uzytkownicy`, `pracownicy`, `kategorie_uslug`, `uslugi`, `uslugi_pracownikow`, `godziny_pracy`, `nieobecnosci`, `rezerwacje`, `log_zdarzen`, `proby_logowania`).
 - Relacje 1:N oraz relacja N:M pracownik–usługa przez `uslugi_pracownikow`.
 - Integralność: klucze obce, `UNIQUE` na e-mail, `CHECK` na ceny / czasy / statusy, `ON DELETE RESTRICT`.
 - Aktualny diagram ERD w Mermaid powyżej.
@@ -226,8 +244,8 @@ WeFixIT to system rezerwacji dla serwisu komputerowego z trzema rolami: klient, 
 |------|--------|
 | Niezalogowany | `/login`, `/register`, `/oferta`, `/usluga?id=…`, `POST /api/auth/login`, `POST /api/auth/register` |
 | Klient (`klient`) | `/oferta`, `/usluga?id=…`, `/rezerwacja`, `/panel`, `/profil`, `GET /api/me`, `PATCH /api/profile`, `GET /api/availability`, `POST /api/reservations`, `PATCH /api/client-reservations` |
-| Pracownik (`pracownik`) | `/oferta`, `/usluga?id=…`, `/rezerwacja`, `/panel`, `/pracownik`, `/profil`, `GET /api/me`, `PATCH /api/profile`, `GET /api/availability`, `PATCH /api/employee-reservations` |
-| Administrator (`admin`) | jak pracownik oraz `/admin`, `/kategorie`, `/uslugi`, `/pracownicy`, `/pracownicy-uslugi?id=…`, `/pracownicy-dostepnosc?id=…`, `/uzytkownicy`, `/rezerwacje`, `/log`, `/eksport?typ=rezerwacje`, `/eksport?typ=uzytkownicy` i `/api/admin/*` |
+| Pracownik (`pracownik`) | `/oferta`, `/usluga?id=…`, `/panel`, `/pracownik`, `/profil`, `GET /api/me`, `PATCH /api/profile`, `GET /api/availability`, `PATCH /api/employee-reservations` |
+| Administrator (`admin`) | jak pracownik oraz `/rezerwacja`, `/admin`, `/kategorie`, `/uslugi`, `/pracownicy`, `/pracownicy-uslugi?id=…`, `/pracownicy-dostepnosc?id=…`, `/uzytkownicy`, `/rezerwacje`, `/log`, `/eksport?typ=rezerwacje`, `/eksport?typ=uzytkownicy` i `/api/admin/*` |
 
 Rola jest sprawdzana po stronie serwera na każdej chronionej stronie przez
 `require_role()` i na każdym chronionym endpointcie przez `require_api_login()`
@@ -253,7 +271,7 @@ decyzji administratora.
 | Metoda i adres | CSRF | Najważniejsze kody odpowiedzi |
 |----------------|------|-------------------------------|
 | `POST /api/auth/register` | tak | 201 sukces, 409 zajęty e-mail, 422 błędy walidacji, 415 zły `Content-Type` |
-| `POST /api/auth/login` | tak | 200 sukces z rolą, 401 błędne dane logowania, 422 błędy walidacji, 415 zły `Content-Type` |
+| `POST /api/auth/login` | tak | 200 sukces z rolą, 401 błędne dane logowania, 422 błędy walidacji, 415 zły `Content-Type`, 429 zbyt wiele nieudanych prób |
 | `POST /api/auth/logout` | tak | 200 sukces, 403 brak CSRF, 405 zła metoda |
 | `GET /api/me` | nie | 200 dane zalogowanego użytkownika, 401 brak sesji |
 | `PATCH /api/profile` | tak | 200 sukces, 401 brak sesji, 403 brak CSRF, 409 zajęty e-mail, 422 błędy walidacji |
@@ -286,6 +304,12 @@ rozszerzenia `.php`; Apache mapuje je na pliki w `public/` zgodnie z
 Token CSRF przesyłany jest w nagłówku `X-CSRF-Token`. Body żądań i odpowiedzi
 są w formacie JSON (`Content-Type: application/json`). `GET /api/me` nigdy nie
 zwraca `haslo_hash` ani `aktywny`.
+
+Logowanie ogranicza liczbę nieudanych prób: 10 dla danego e-maila lub 20 dla
+adresu IP w oknie 15 minut. Przekroczenie limitu zwraca `429` z nagłówkiem
+`Retry-After`, a udane logowanie czyści wpisy dla danego e-maila. W tabeli
+`proby_logowania` przechowywane są wyłącznie hashe SHA-256, nigdy jawne adresy
+e-mail ani IP.
 
 #### Sesja i CSRF
 
@@ -521,7 +545,7 @@ pozostaje świadomie bez zmian.
 |-------------------|--------|--------|
 | `/oferta` | publiczny | Lista aktywnych usług w aktywnych kategoriach z filtrem kategorii, czasem trwania, ceną i informacją o dostępności aktywnego wykonawcy. |
 | `/usluga?id=N` | publiczny | Szczegóły pojedynczej aktywnej usługi, lista przypisanych aktywnych pracowników oraz warunkowy przycisk CTA zależny od sesji i roli. |
-| `/rezerwacja` | zalogowany użytkownik (`require_login()`) | Formularz wyboru usługi, pracownika, daty, godziny i komentarza; mapa pracowników przekazywana jest w `data-employees`, a wolne terminy pobierane są przez AJAX. Pozycja w menu bocznym jest widoczna dla `klient` i `admin`. |
+| `/rezerwacja` | `klient`, `admin` (`require_role(['klient', 'admin'])`) | Formularz wyboru usługi, pracownika, daty, godziny i komentarza; mapa pracowników przekazywana jest w `data-employees`, a wolne terminy pobierane są przez AJAX. Pozycja w menu bocznym jest widoczna dla `klient` i `admin`. |
 | `/panel` | zalogowany użytkownik (`require_login()`) | Panel klienta z rozłącznymi sekcjami „Nadchodzące” i „Historia”, przyciskiem anulowania przyszłych rezerwacji (`oczekujaca`, `potwierdzona`) oraz rozwijaną historią zmian `<details>`. |
 | `/pracownik` | `pracownik`, `admin` | Panel pracownika z rozłącznymi sekcjami „Dzisiaj”, „Nadchodzące” i „Historia”, danymi kontaktowymi klienta, przyciskami maszyny stanów przypisanych wizyt i historią zmian `<details>`. Dla administratora wyświetla kartę informacyjną o braku profilu pracownika z linkiem do `/rezerwacje`. |
 
@@ -599,6 +623,34 @@ pobierają zdarzenia `rezerwacja_utworzona`, `rezerwacja_status_zmieniony`,
 dla wszystkich rezerwacji widocznych na stronie (bez problemu N+1) i dekodują
 szczegóły przez `log_view_details_decode()`. Widoki renderują sekcję `<details>`
 tylko wtedy, gdy rezerwacja ma zapisane zdarzenia.
+
+### Funkcje dodatkowe
+
+Poniższe funkcje wykraczają poza minimalny zakres projektu i są zaimplementowane
+w kodzie:
+
+- Asynchroniczne pobieranie wolnych terminów przez `GET /api/availability` —
+  formularz nie blokuje strony i odrzuca spóźnione odpowiedzi sieciowe dzięki
+  licznikowi żądań w `public/assets/js/reservation-form.js`.
+- Historia zmian statusu rezerwacji z tabeli `log_zdarzen`, pobierana batchowo
+  bez N+1 przez `app/rezerwacje_historia.php` i wyświetlana w panelach klienta
+  i pracownika.
+- Dziennik zdarzeń administratora z filtrami akcji, poziomu i typu obiektu,
+  zaimplementowany w `app/log_view.php` i `public/log.php`.
+- Eksport CSV rezerwacji i użytkowników z neutralizacją formuł arkusza
+  kalkulacyjnego w `public/eksport.php`.
+- Wyszukiwanie, filtrowanie i paginacja list administracyjnych wspólne dla
+  kategorii, usług, pracowników, użytkowników i rezerwacji.
+- Rozbudowany system uprawnień: rola sprawdzana serwerowo, ownership rezerwacji
+  oraz maszyna stanów rezerwacji i nieobecności.
+- Nieobecności pracowników z pełnym workflow wniosku (`oczekujaca`,
+  `zatwierdzona`, `odrzucona`, `anulowana`).
+- REST API pod `/api/*` obsługujące AJAX i używające tych samych modułów
+  domenowych co widoki SSR.
+- 253 automatycznie uruchamiane testy HTTP w CI na MariaDB 11.4, w tym test
+  równoległego zajęcia terminu (test 194).
+- Wspólna reguła nakładania przedziałów wydzielona do `app/przedzialy.php`
+  i używana zarówno przez grafik pracowników, jak i przez rezerwacje.
 
 ## Wymagania
 
@@ -693,10 +745,12 @@ na bazie wskazanej przez `DB_NAME` (domyślnie `wefixit_test`). Przed każdym
 uruchomieniem zestaw usuwa i ponownie tworzy tabele w tej bazie. Nie wskazuj
 w `DB_NAME` bazy deweloperskiej (np. `wefixit`) ani bazy z danymi do zachowania.
 
-Zestaw obejmuje testy Etapów 1–3 i uruchamia się przez `php tests/run.php`.
-Aktualny wynik — liczbę testów poprawnych i niepoprawnych oraz kontrolę logu
-serwera — wypisuje samo uruchomienie. Polecenie znajduje się w sekcji
-[Uruchomienie testów](#uruchomienie-testów).
+Zestaw obejmuje testy Etapów 1–4 i uruchamia się przez `php tests/run.php`.
+Repozytorium zawiera 253 przypadki testowe w plikach `tests/cases_*.php`, od
+`cases_registration.php` do `cases_stage4_regression.php`; pełna lista znajduje
+się w tabeli poniżej. Aktualny wynik — liczbę testów poprawnych i niepoprawnych
+oraz kontrolę logu serwera — wypisuje samo uruchomienie. Polecenie znajduje się
+w sekcji [Uruchomienie testów](#uruchomienie-testów).
 
 ### Zakres plików testowych
 
@@ -724,6 +778,7 @@ serwera — wypisuje samo uruchomienie. Polecenie znajduje się w sekcji
 | [`tests/cases_client_panel.php`](tests/cases_client_panel.php) | Panel klienta `/panel` i `PATCH /api/client-reservations`: izolacja danych, ownership, statusy i przenoszenie do historii. |
 | [`tests/cases_employee_panel.php`](tests/cases_employee_panel.php) | Panel pracownika `/pracownik` i `PATCH /api/employee-reservations`: izolacja wizyt, maszyna stanów i rozłączność sekcji. |
 | [`tests/cases_stage4_regression.php`](tests/cases_stage4_regression.php) | Regresja Etapu 4: wpisy `log_zdarzen`, `reservation_history_batch()` bez N+1 oraz historia `<details>` w panelach. |
+| [`tests/cases_rate_limit.php`](tests/cases_rate_limit.php) | Limit nieudanych prób logowania: blokada e-maila i IP, `Retry-After`, czyszczenie po sukcesie i stare wpisy. |
 
 ### Wymagania testów
 

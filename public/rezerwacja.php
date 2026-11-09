@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /*
-    Formularz rezerwacji dla zalogowanego użytkownika.
+    Formularz rezerwacji dla klienta lub administratora.
 
     Usługi renderuje serwer, mapa pracowników trafia do JavaScriptu przez
     data-employees, a wolne terminy są doładowywane przez AJAX. Wysłanie
@@ -12,7 +12,7 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/app/panel_layout.php';
 require_once dirname(__DIR__) . '/app/rezerwacje_klienta.php';
 
-$user = require_login();
+$user = require_role(['klient', 'admin']);
 $basePath = auth_base_path();
 $services = reservation_form_services();
 $preselectedId = reservation_id_value($_GET['usluga'] ?? null);
