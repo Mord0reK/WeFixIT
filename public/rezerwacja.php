@@ -2,11 +2,12 @@
 declare(strict_types=1);
 
 /*
-    Formularz rezerwacji dla zalogowanego klienta.
+    Formularz rezerwacji dla zalogowanego użytkownika.
 
-    Usługi i przypisanych pracowników renderuje serwer, a wolne terminy są
-    doładowywane przez AJAX. Wysłanie rezerwacji obsługuje reservation-form.js;
-    strona nie zawiera fallbacku bez JavaScriptu.
+    Usługi renderuje serwer, mapa pracowników trafia do JavaScriptu przez
+    data-employees, a wolne terminy są doładowywane przez AJAX. Wysłanie
+    rezerwacji obsługuje reservation-form.js; strona nie zawiera fallbacku
+    bez JavaScriptu.
 */
 require_once dirname(__DIR__) . '/app/panel_layout.php';
 require_once dirname(__DIR__) . '/app/rezerwacje_klienta.php';
@@ -17,22 +18,30 @@ $services = reservation_form_services();
 $preselectedId = reservation_id_value($_GET['usluga'] ?? null);
 $preselectId = 0;
 $servicesByCategory = [];
-$employeeOptions = [];
+$employeesByService = [];
 $availableServiceIds = [];
 
 foreach ($services ?? [] as $service) {
     $availableServiceIds[$service['id']] = true;
     $servicesByCategory[$service['kategoria_nazwa']][] = $service;
+    $employeesByService[$service['id']] = [];
 
     foreach ($service['pracownicy'] as $employee) {
-        $employeeOptions[] = [
+        $employeesByService[$service['id']][] = [
             'id' => $employee['id'],
-            'imie' => $employee['imie'],
-            'nazwisko' => $employee['nazwisko'],
-            'usluga_id' => $service['id'],
+            'label' => $employee['imie'] . ' ' . $employee['nazwisko'],
         ];
     }
 }
+
+$employeesJson = htmlspecialchars(
+    json_encode(
+        $employeesByService,
+        JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+    ),
+    ENT_QUOTES,
+    'UTF-8'
+);
 
 if ($preselectedId !== null && isset($availableServiceIds[$preselectedId])) {
     $preselectId = $preselectedId;
@@ -71,6 +80,7 @@ panel_layout_head($user, 'Nowa rezerwacja — WeFixIT', 'rezerwacja');
             data-api-reservations="<?= htmlspecialchars($basePath . '/api/reservations', ENT_QUOTES, 'UTF-8') ?>"
             data-api-availability="<?= htmlspecialchars($basePath . '/api/availability', ENT_QUOTES, 'UTF-8') ?>"
             data-usluga-preselect="<?= $preselectId > 0 ? $preselectId : '' ?>"
+            data-employees="<?= $employeesJson ?>"
             data-login-url="<?= htmlspecialchars($basePath . '/login', ENT_QUOTES, 'UTF-8') ?>"
             data-panel-url="<?= htmlspecialchars($basePath . '/panel', ENT_QUOTES, 'UTF-8') ?>">
 
@@ -99,12 +109,6 @@ panel_layout_head($user, 'Nowa rezerwacja — WeFixIT', 'rezerwacja');
                 <select id="reservation-pracownik" name="pracownik_id" class="<?= LAYOUT_INPUT_CLASS ?>"
                     aria-describedby="reservation-error-pracownik" disabled required>
                     <option value="">Najpierw wybierz usługę</option>
-                    <?php foreach ($employeeOptions as $employee): ?>
-                        <option value="<?= $employee['id'] ?>" data-usluga-id="<?= $employee['usluga_id'] ?>"
-                            hidden disabled>
-                            <?= htmlspecialchars($employee['imie'] . ' ' . $employee['nazwisko'], ENT_QUOTES, 'UTF-8') ?>
-                        </option>
-                    <?php endforeach; ?>
                 </select>
                 <p id="reservation-error-pracownik" class="mt-1.5 hidden text-sm text-red-600 dark:text-red-400"></p>
             </div>

@@ -12,6 +12,18 @@
     const loginUrl = form.dataset.loginUrl || '';
     const panelUrl = form.dataset.panelUrl || '';
     const preselectedService = form.dataset.uslugaPreselect || '';
+    let employeesByService = {};
+
+    try {
+        const parsedEmployees = JSON.parse(form.dataset.employees || '{}');
+
+        if (parsedEmployees && typeof parsedEmployees === 'object') {
+            employeesByService = parsedEmployees;
+        }
+    } catch {
+        employeesByService = {};
+    }
+
     const serviceSelect = document.getElementById('reservation-usluga');
     const employeeSelect = document.getElementById('reservation-pracownik');
     const dateInput = document.getElementById('reservation-data');
@@ -98,20 +110,29 @@
 
     function syncEmployeeOptions() {
         const serviceId = serviceSelect.value;
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = serviceId === ''
+            ? 'Najpierw wybierz usługę'
+            : 'Wybierz pracownika';
 
-        for (const option of employeeSelect.querySelectorAll('option[data-usluga-id]')) {
-            const matches = serviceId !== '' && option.dataset.uslugaId === serviceId;
-
-            option.hidden = !matches;
-            option.disabled = !matches;
-        }
-
+        employeeSelect.replaceChildren(placeholder);
         employeeSelect.disabled = serviceId === '';
+        employeeSelect.value = '';
 
-        const selected = employeeSelect.selectedOptions[0];
+        if (serviceId === '') return;
 
-        if (!selected || selected.value === '' || selected.hidden) {
-            employeeSelect.value = '';
+        const employees = Array.isArray(employeesByService[serviceId])
+            ? employeesByService[serviceId]
+            : [];
+
+        for (const employee of employees) {
+            if (!employee || employee.id === undefined) continue;
+
+            const option = document.createElement('option');
+            option.value = String(employee.id);
+            option.textContent = String(employee.label);
+            employeeSelect.appendChild(option);
         }
     }
 
