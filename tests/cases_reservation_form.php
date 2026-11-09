@@ -99,10 +99,10 @@ test('201. pozycja menu nowej rezerwacji jest widoczna tylko dla klienta', funct
         $session = login_as($account['email']);
         assert_status(200, $session['response'], 'Logowanie ' . $account['label'] . ' powinno się udać');
         $page = http_request($session['cookies'], 'GET', '/rezerwacja.php');
-        assert_status(200, $page, 'Strona dla ' . $account['label'] . ' powinna zwrócić 200');
+        assert_status(403, $page, 'Strona dla ' . $account['label'] . ' powinna zwrócić 403');
         assert_true(
-            strpos($page['body'], 'href="/rezerwacja"') === false,
-            'Menu ' . $account['label'] . ' nie może zawierać nowej rezerwacji'
+            strpos($page['body'], 'Nie masz uprawnień do wyświetlenia tej strony.') !== false,
+            $account['label'] . ' powinien zobaczyć komunikat o braku uprawnień'
         );
     }
 });
@@ -139,5 +139,18 @@ test('203. CTA na stronie usługi zależy od roli użytkownika', function (): vo
     assert_true(
         strpos($anonymousPage['body'], '/rezerwacja') === false,
         'Niezalogowany użytkownik nie może dostać linku do rezerwacji'
+    );
+
+    $worker = login_as('tomasz.serwisant@wefixit.pl');
+    assert_status(200, $worker['response'], 'Logowanie pracownika powinno się udać');
+    $workerPage = http_request($worker['cookies'], 'GET', '/usluga.php?id=2');
+    assert_status(200, $workerPage, 'Szczegóły usługi dla pracownika powinny zwrócić 200');
+    assert_true(
+        strpos($workerPage['body'], '/pracownik') !== false,
+        'Pracownik powinien dostać link do swojego panelu'
+    );
+    assert_true(
+        strpos($workerPage['body'], '/login') === false,
+        'Pracownik nie powinien dostać linku do logowania'
     );
 });

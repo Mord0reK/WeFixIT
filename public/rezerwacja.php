@@ -11,7 +11,7 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/app/panel_layout.php';
 require_once dirname(__DIR__) . '/app/rezerwacje_klienta.php';
 
-$user = require_login();
+$user = require_role(['klient']);
 $basePath = auth_base_path();
 $services = reservation_form_services();
 $preselectedId = reservation_id_value($_GET['usluga'] ?? null);
