@@ -107,7 +107,7 @@ test('200. nieistniejąca usługa jest ignorowana w parametrze formularza', func
     );
 });
 
-test('201. pozycja menu nowej rezerwacji zależy od roli', function (): void {
+test('201. dostęp do formularza i pozycja menu zależą od roli', function (): void {
     $client = login_as('jan.kowalski@example.com');
     assert_status(200, $client['response'], 'Logowanie klienta powinno się udać');
     $clientPage = http_request($client['cookies'], 'GET', '/rezerwacja.php');
@@ -120,10 +120,10 @@ test('201. pozycja menu nowej rezerwacji zależy od roli', function (): void {
     $employee = login_as('tomasz.serwisant@wefixit.pl');
     assert_status(200, $employee['response'], 'Logowanie pracownika powinno się udać');
     $employeePage = http_request($employee['cookies'], 'GET', '/rezerwacja.php');
-    assert_status(200, $employeePage, 'Strona pracownika powinna zwrócić 200');
+    assert_status(403, $employeePage, 'Pracownik nie powinien mieć dostępu do formularza rezerwacji');
     assert_true(
-        strpos($employeePage['body'], 'href="/rezerwacja"') === false,
-        'Menu pracownika nie może zawierać nowej rezerwacji'
+        strpos($employeePage['body'], 'Nie masz uprawnień do wyświetlenia tej strony.') !== false,
+        'Pracownik powinien zobaczyć komunikat o braku uprawnień'
     );
 
     $admin = login_as('admin@wefixit.pl');
