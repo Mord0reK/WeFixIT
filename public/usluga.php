@@ -12,6 +12,8 @@ require_once dirname(__DIR__) . '/app/panel_ui.php';
 require_once dirname(__DIR__) . '/app/oferta.php';
 
 $basePath = auth_base_path();
+$user = current_user();
+$isClient = is_array($user) && (string) ($user['rola'] ?? '') === 'klient';
 $serviceId = oferta_id_value($_GET['id'] ?? null);
 $service = $serviceId !== null ? oferta_usluga_find($serviceId) : null;
 
@@ -103,10 +105,16 @@ layout_head($service['nazwa'] . ' — WeFixIT', LAYOUT_PUBLIC_BODY_CLASS);
                 <?php endif; ?>
             </section>
 
+            <?php
+            $reservationHref = $isClient
+                ? $basePath . '/rezerwacja?usluga=' . $service['id']
+                : $basePath . '/login';
+            $reservationLabel = $isClient ? 'Zarezerwuj termin' : 'Zaloguj się, aby zarezerwować';
+            ?>
             <div class="mt-6 flex flex-col gap-2 sm:flex-row">
-                <a href="<?= htmlspecialchars($basePath . '/login', ENT_QUOTES, 'UTF-8') ?>"
+                <a href="<?= htmlspecialchars($reservationHref, ENT_QUOTES, 'UTF-8') ?>"
                     class="<?= panel_button_classes('primary') ?>">
-                    Zaloguj się, aby zarezerwować
+                    <?= htmlspecialchars($reservationLabel, ENT_QUOTES, 'UTF-8') ?>
                 </a>
                 <a href="<?= htmlspecialchars($basePath . '/oferta', ENT_QUOTES, 'UTF-8') ?>"
                     class="<?= panel_button_classes('secondary') ?>">
