@@ -3,6 +3,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 
 DROP TABLE IF EXISTS log_zdarzen;
+DROP TABLE IF EXISTS proby_logowania;
 DROP TABLE IF EXISTS nieobecnosci;
 DROP TABLE IF EXISTS rezerwacje;
 DROP TABLE IF EXISTS godziny_pracy;
@@ -368,4 +369,16 @@ CREATE TABLE log_zdarzen (
     INDEX idx_log_zdarzen_aktor (aktor_id, utworzono),
     INDEX idx_log_zdarzen_poziom_czas (poziom, utworzono),
     INDEX idx_log_zdarzen_czas (utworzono)
+) ENGINE = InnoDB;
+
+CREATE TABLE proby_logowania (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    email_hash CHAR(64) NOT NULL,
+    ip_hash CHAR(64) NOT NULL,
+    utworzono DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+
+    INDEX idx_proby_logowania_email_czas (email_hash, utworzono),
+    INDEX idx_proby_logowania_ip_czas (ip_hash, utworzono)
 ) ENGINE = InnoDB;

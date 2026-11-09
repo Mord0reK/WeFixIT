@@ -10,6 +10,7 @@ declare(strict_types=1);
 */
 require_once __DIR__ . '/../../../app/json.php';
 require_once __DIR__ . '/../../../app/auth.php';
+require_once __DIR__ . '/../../../app/rate_limit.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Allow: POST');
@@ -60,6 +61,16 @@ if ($errors !== []) {
     json_response(422, ['error' => 'Nieprawidłowe dane logowania.', 'errors' => $errors]);
 }
 
+$emailHash = rate_limit_email_hash($email);
+$ipAddress = $_SERVER['REMOTE_ADDR'] ?? '';
+$ipHash = rate_limit_ip_hash(is_string($ipAddress) ? $ipAddress : '');
+rate_limit_cleanup();
+
+if (rate_limit_is_limited($emailHash, $ipHash)) {
+    header('Retry-After: ' . rate_limit_retry_after($emailHash, $ipHash));
+    json_response(429, ['error' => 'Zbyt wiele nieudanych prób logowania. Spróbuj ponownie później.']);
+}
+
 try {
     if ($bazaErr || !isset($pdo)) {
         json_response(500, ['error' => 'Nie udało się zalogować. Wystąpił problem z serwerem.']);
@@ -74,12 +85,15 @@ try {
 
     // Ten sam komunikat dla nieistniejącego e-maila, złego hasła i nieaktywnego konta.
     if (!is_array($user) || !password_verify($password, $user['haslo_hash']) || (int) $user['aktywny'] !== 1) {
+        rate_limit_record_failure($emailHash, $ipHash);
         json_response(401, ['error' => 'Nieprawidłowy e-mail lub hasło.']);
     }
 
     if (!auth_login_user((int) $user['id'])) {
         json_response(500, ['error' => 'Nie udało się zalogować. Wystąpił problem z serwerem.']);
     }
+
+    rate_limit_clear_email($emailHash);
 
     json_response(200, [
         'success' => true,

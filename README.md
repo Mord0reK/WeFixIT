@@ -9,6 +9,7 @@ System rezerwacji dla serwisu komputerowego. Obsługuje klientów, pracowników 
 - [Technologie](#technologie)
 - [Baza danych](#baza-danych)
   - [Opis tabel nieobecnosci i log_zdarzen](#opis-tabel-nieobecnosci-i-log_zdarzen)
+  - [Tabela proby_logowania](#tabela-proby_logowania)
 - [Zakres projektu](#zakres-projektu)
   - [Zrealizowano w Etapie 1](#zrealizowano-w-etapie-1)
   - [Zrealizowano w Etapie 2 - Użytkownicy i logowanie](#zrealizowano-w-etapie-2---użytkownicy-i-logowanie)
@@ -160,6 +161,13 @@ erDiagram
         JSON szczegoly
         DATETIME utworzono
     }
+
+    proby_logowania {
+        INT id PK
+        CHAR email_hash
+        CHAR ip_hash
+        DATETIME utworzono
+    }
 ```
 
 Diagram pokazuje logiczne typy i relacje. W schemacie wszystkie typy całkowite
@@ -172,6 +180,15 @@ Diagram pokazuje logiczne typy i relacje. W schemacie wszystkie typy całkowite
 
 - `nieobecnosci` przechowuje urlopy, choroby i inne nieobecności pracowników w zakresie dat. Status `oczekujaca` oznacza wniosek przed decyzją, a `zatwierdzona`, `odrzucona` lub `anulowana` — jego rozstrzygnięcie. Pełny workflow (wniosek, zatwierdzenie, odrzucenie, anulowanie) obsługuje panel: `POST` tworzy zawsze status `oczekujaca`, a `PATCH` wykonuje wyłącznie dozwolone przejścia. Przy zatwierdzeniu lub odrzuceniu `rozpatrzyl_id` pochodzi z sesji administratora i jest zapisywany razem z `rozpatrzono`; przy anulowaniu oba pola są zerowane. `CHECK chk_nieobecnosci_rozpatrzenie` wymaga obu pól dla `zatwierdzona`/`odrzucona` i obu pustych dla `oczekujaca`/`anulowana`. Anulowanie nie usuwa wniosku.
 - `log_zdarzen` jest dziennikiem audytowym operacji administracyjnych. Zapisuje aktora, akcję, typ i identyfikator obiektu, poziom (`info`, `warning`, `critical`), opis oraz opcjonalne szczegóły w formacie JSON. Widok dziennika pokazuje aktora tylko jako imię i nazwisko — bez e-maila i telefonu. Kolumny `obiekt_typ` i `obiekt_id` są wypełniane razem albo oba pozostają puste; pilnuje tego `CHECK chk_log_zdarzen_obiekt`, a `log_event()` normalizuje niepełną parę do dwóch wartości `NULL`. Filtry akcji, poziomu i typu obiektu pochodzą z allowlist w `app/log_view.php`. Dziennik nie zastępuje danych biznesowych, tylko dokumentuje zmiany i nie zawiera haseł ani tokenów.
+
+### Tabela proby_logowania
+
+`proby_logowania` przechowuje wyłącznie SHA-256 znormalizowanego adresu e-mail
+(`email_hash`) i adresu IP (`ip_hash`) oraz znacznik `utworzono`. Nie ma klucza
+obcego do `uzytkownicy`, ponieważ nieudana próba może dotyczyć nieistniejącego
+konta. Limit wynosi 10 prób dla e-maila lub 20 dla IP w oknie 15 minut; starsze
+wpisy są usuwane przez `rate_limit_cleanup()`. Tabela nie zawiera jawnych
+e-maili, adresów IP ani haseł.
 
 ### Wersja pusta
 Pusta edycja bazy danych jak sama nazwa wskazuje nie zawiera żadnych danych w sobie. Zalecane użycie w środowisku produkcyjnym.
@@ -204,7 +221,7 @@ WeFixIT to system rezerwacji dla serwisu komputerowego z trzema rolami: klient, 
 
 ### Zrealizowano w Etapie 1
 
-- Schemat bazy MariaDB 11.4: 9 tabel (`uzytkownicy`, `pracownicy`, `kategorie_uslug`, `uslugi`, `uslugi_pracownikow`, `godziny_pracy`, `nieobecnosci`, `rezerwacje`, `log_zdarzen`).
+- Schemat bazy MariaDB 11.4: 10 tabel (`uzytkownicy`, `pracownicy`, `kategorie_uslug`, `uslugi`, `uslugi_pracownikow`, `godziny_pracy`, `nieobecnosci`, `rezerwacje`, `log_zdarzen`, `proby_logowania`).
 - Relacje 1:N oraz relacja N:M pracownik–usługa przez `uslugi_pracownikow`.
 - Integralność: klucze obce, `UNIQUE` na e-mail, `CHECK` na ceny / czasy / statusy, `ON DELETE RESTRICT`.
 - Aktualny diagram ERD w Mermaid powyżej.
@@ -253,7 +270,7 @@ decyzji administratora.
 | Metoda i adres | CSRF | Najważniejsze kody odpowiedzi |
 |----------------|------|-------------------------------|
 | `POST /api/auth/register` | tak | 201 sukces, 409 zajęty e-mail, 422 błędy walidacji, 415 zły `Content-Type` |
-| `POST /api/auth/login` | tak | 200 sukces z rolą, 401 błędne dane logowania, 422 błędy walidacji, 415 zły `Content-Type` |
+| `POST /api/auth/login` | tak | 200 sukces z rolą, 401 błędne dane logowania, 422 błędy walidacji, 415 zły `Content-Type`, 429 zbyt wiele nieudanych prób |
 | `POST /api/auth/logout` | tak | 200 sukces, 403 brak CSRF, 405 zła metoda |
 | `GET /api/me` | nie | 200 dane zalogowanego użytkownika, 401 brak sesji |
 | `PATCH /api/profile` | tak | 200 sukces, 401 brak sesji, 403 brak CSRF, 409 zajęty e-mail, 422 błędy walidacji |
@@ -286,6 +303,12 @@ rozszerzenia `.php`; Apache mapuje je na pliki w `public/` zgodnie z
 Token CSRF przesyłany jest w nagłówku `X-CSRF-Token`. Body żądań i odpowiedzi
 są w formacie JSON (`Content-Type: application/json`). `GET /api/me` nigdy nie
 zwraca `haslo_hash` ani `aktywny`.
+
+Logowanie ogranicza liczbę nieudanych prób: 10 dla danego e-maila lub 20 dla
+adresu IP w oknie 15 minut. Przekroczenie limitu zwraca `429` z nagłówkiem
+`Retry-After`, a udane logowanie czyści wpisy dla danego e-maila. W tabeli
+`proby_logowania` przechowywane są wyłącznie hashe SHA-256, nigdy jawne adresy
+e-mail ani IP.
 
 #### Sesja i CSRF
 
@@ -717,6 +740,7 @@ serwera — wypisuje samo uruchomienie. Polecenie znajduje się w sekcji
 | [`tests/cases_client_panel.php`](tests/cases_client_panel.php) | Panel klienta `/panel` i `PATCH /api/client-reservations`: izolacja danych, ownership, statusy i przenoszenie do historii. |
 | [`tests/cases_employee_panel.php`](tests/cases_employee_panel.php) | Panel pracownika `/pracownik` i `PATCH /api/employee-reservations`: izolacja wizyt, maszyna stanów i rozłączność sekcji. |
 | [`tests/cases_stage4_regression.php`](tests/cases_stage4_regression.php) | Regresja Etapu 4: wpisy `log_zdarzen`, `reservation_history_batch()` bez N+1 oraz historia `<details>` w panelach. |
+| [`tests/cases_rate_limit.php`](tests/cases_rate_limit.php) | Limit nieudanych prób logowania: blokada e-maila i IP, `Retry-After`, czyszczenie po sukcesie i stare wpisy. |
 
 ### Wymagania testów
 
