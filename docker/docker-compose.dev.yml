@@ -10,6 +10,8 @@ services:
       - "127.0.0.1:8080:80"
     volumes:
       - ..:/var/www/html:z
+    environment:
+      TZ: Europe/Warsaw
     env_file:
       - ../.env
     depends_on:
@@ -22,6 +24,7 @@ services:
       - db_data:/var/lib/mysql
       - ../database/database.sql:/docker-entrypoint-initdb.d/database.sql:ro,z
     environment:
+      TZ: Europe/Warsaw
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD must be set}
       MARIADB_DATABASE: ${DB_NAME:?DB_NAME must be set}
       MARIADB_USER: ${DB_USER:?DB_USER must be set}
