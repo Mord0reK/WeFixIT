@@ -17,6 +17,10 @@ json_require_content_type();
 
 $user = require_api_login();
 
+if (($user['rola'] ?? '') !== 'klient') {
+    json_response(403, ['error' => 'Brak uprawnień do utworzenia rezerwacji.']);
+}
+
 if (!csrf_verify(csrf_token_from_request())) {
     json_response(403, ['error' => 'Sesja formularza wygasła. Odśwież stronę i spróbuj ponownie.']);
 }
@@ -29,6 +33,10 @@ if ($result['status'] === 'invalid') {
         'error' => 'Nieprawidłowe dane rezerwacji.',
         'errors' => $result['errors'],
     ]);
+}
+
+if ($result['status'] === 'forbidden') {
+    json_response(403, ['error' => 'Brak uprawnień do utworzenia rezerwacji.']);
 }
 
 if ($result['status'] === 'not_found') {
