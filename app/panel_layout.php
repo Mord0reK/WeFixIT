@@ -108,9 +108,17 @@ function panel_menu_items(string $role): array
             'key' => 'oferta',
             'label' => 'Oferta usług',
             'path' => '/oferta',
-            'roles' => ['klient'],
+            'roles' => ['klient', 'admin'],
             'group' => 'Rezerwacje',
             'icon' => 'wrench',
+        ],
+        [
+            'key' => 'rezerwacja',
+            'label' => 'Nowa rezerwacja',
+            'path' => '/rezerwacja',
+            'roles' => ['klient', 'admin'],
+            'group' => 'Rezerwacje',
+            'icon' => 'calendar',
         ],
         [
             'key' => 'profil',

@@ -171,6 +171,72 @@ function reservation_pair_check(int $employeeId, int $serviceId): array
     return ['status' => 'ok'];
 }
 
+function reservation_form_services(): ?array
+{
+    $pdo = rezerwacje_klienta_db();
+
+    if ($pdo === null) {
+        return null;
+    }
+
+    try {
+        $statement = $pdo->prepare(
+            'SELECT
+                u.id AS usluga_id,
+                u.nazwa AS usluga_nazwa,
+                u.cena,
+                u.czas_trwania_minuty,
+                k.nazwa AS kategoria_nazwa,
+                p.id AS pracownik_id,
+                pu.imie,
+                pu.nazwisko,
+                p.opis AS pracownik_opis
+             FROM uslugi u
+             JOIN kategorie_uslug k
+                ON k.id = u.kategoria_id AND k.aktywna = TRUE
+             JOIN uslugi_pracownikow up
+                ON up.usluga_id = u.id AND up.aktywne = TRUE
+             JOIN pracownicy p
+                ON p.id = up.pracownik_id AND p.aktywny = TRUE
+             JOIN uzytkownicy pu
+                ON pu.id = p.uzytkownik_id AND pu.aktywny = TRUE
+             WHERE u.aktywna = TRUE
+             ORDER BY k.nazwa ASC, u.nazwa ASC, pu.nazwisko ASC, pu.imie ASC, p.id ASC'
+        );
+        $statement->execute();
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('Nie udało się pobrać usług formularza rezerwacji: ' . $e->getMessage());
+        return null;
+    }
+
+    $services = [];
+
+    foreach ($rows as $row) {
+        $serviceId = (int) $row['usluga_id'];
+
+        if (!isset($services[$serviceId])) {
+            $services[$serviceId] = [
+                'id' => $serviceId,
+                'nazwa' => (string) $row['usluga_nazwa'],
+                'cena' => (string) $row['cena'],
+                'czas_trwania_minuty' => (int) $row['czas_trwania_minuty'],
+                'kategoria_nazwa' => (string) $row['kategoria_nazwa'],
+                'pracownicy' => [],
+            ];
+        }
+
+        $services[$serviceId]['pracownicy'][] = [
+            'id' => (int) $row['pracownik_id'],
+            'imie' => (string) $row['imie'],
+            'nazwisko' => (string) $row['nazwisko'],
+            'opis' => $row['pracownik_opis'] !== null ? (string) $row['pracownik_opis'] : null,
+        ];
+    }
+
+    return array_values($services);
+}
+
 /*
     Tworzy rezerwację w transakcji. Blokada wiersza pracownika jest pierwszą
     instrukcją transakcji, przed jakimkolwiek odczytem niemodyfikującym:
