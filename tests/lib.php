@@ -428,6 +428,13 @@ function start_test_server(): array
     ];
 
     $command = [PHP_BINARY, '-S', '127.0.0.1:' . $port, '-t', $documentRoot];
+    $processGroup = false;
+
+    if (PHP_OS_FAMILY !== 'Windows' && is_executable('/usr/bin/setsid')) {
+        array_unshift($command, '/usr/bin/setsid');
+        $processGroup = true;
+    }
+
     $environment = getenv();
     $environment = is_array($environment) ? $environment : [];
     $environment['PHP_CLI_SERVER_WORKERS'] = '2';
@@ -436,6 +443,9 @@ function start_test_server(): array
     if (!is_resource($process)) {
         throw new RuntimeException('Nie udało się uruchomić wbudowanego serwera PHP.');
     }
+
+    $processStatus = proc_get_status($process);
+    $processId = (int) ($processStatus['pid'] ?? 0);
 
     if (isset($pipes[0]) && is_resource($pipes[0])) {
         fclose($pipes[0]);
@@ -461,12 +471,25 @@ function start_test_server(): array
         }
     }
 
-    return ['process' => $process, 'port' => $port, 'log' => $logFile, 'ready' => $ready];
+    return [
+        'process' => $process,
+        'pid' => $processId,
+        'process_group' => $processGroup,
+        'port' => $port,
+        'log' => $logFile,
+        'ready' => $ready,
+    ];
 }
 
 function stop_test_server(array $server): void
 {
     $process = $server['process'] ?? null;
+    $processId = (int) ($server['pid'] ?? 0);
+    $processGroup = (bool) ($server['process_group'] ?? false);
+
+    if ($processGroup && $processId > 0 && function_exists('posix_kill')) {
+        @posix_kill(-$processId, 15);
+    }
 
     if (is_resource($process)) {
         proc_terminate($process);
