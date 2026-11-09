@@ -172,11 +172,124 @@ function reservation_pair_check(int $employeeId, int $serviceId): array
 }
 
 /*
+    Sprawdza bezpośrednio żądany przedział, niezależnie od listy kandydatów
+    generowanej przez availability_day(). Dzięki temu terminy wypadające
+    z siatki po wcześniejszej rezerwacji nadal mogą zostać przyjęte, jeśli
+    mieszczą się w grafiku, są wyrównane do siatki i nie kolidują z niczym.
+*/
+function reservation_interval_is_free(
+    int $employeeId,
+    string $date,
+    string $time,
+    int $durationMinutes
+): ?bool {
+    $pdo = rezerwacje_klienta_db();
+    $startSeconds = interval_time_seconds($time);
+
+    if ($employeeId <= 0 || $durationMinutes <= 0 || $startSeconds === null || $pdo === null) {
+        return null;
+    }
+
+    $endSeconds = $startSeconds + $durationMinutes * 60;
+    $dayOfWeek = (int) (new DateTimeImmutable($date))->format('N');
+    $stepSeconds = AVAILABILITY_SLOT_MINUTES * 60;
+
+    try {
+        $statement = $pdo->prepare(
+            'SELECT czas_rozpoczecia, czas_zakonczenia
+             FROM godziny_pracy
+             WHERE pracownik_id = :pracownik_id
+               AND dzien_tygodnia = :dzien_tygodnia
+               AND aktywne = TRUE
+             ORDER BY czas_rozpoczecia ASC, id ASC'
+        );
+        $statement->execute([
+            'pracownik_id' => $employeeId,
+            'dzien_tygodnia' => $dayOfWeek,
+        ]);
+
+        $insideSchedule = false;
+
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $intervalStart = interval_time_seconds((string) $row['czas_rozpoczecia']);
+            $intervalEnd = interval_time_seconds((string) $row['czas_zakonczenia']);
+
+            if ($intervalStart === null || $intervalEnd === null || $intervalStart >= $intervalEnd) {
+                continue;
+            }
+
+            if ($startSeconds < $intervalStart || $endSeconds > $intervalEnd) {
+                continue;
+            }
+
+            if (($startSeconds - $intervalStart) % $stepSeconds !== 0) {
+                continue;
+            }
+
+            $insideSchedule = true;
+            break;
+        }
+
+        if (!$insideSchedule) {
+            return false;
+        }
+
+        $startValue = interval_slot_datetime($date, $startSeconds);
+        $endValue = interval_slot_datetime($date, $endSeconds);
+        $nowValue = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
+
+        if ($startValue <= $nowValue) {
+            return false;
+        }
+
+        $statement = $pdo->prepare(
+            "SELECT 1
+             FROM nieobecnosci
+             WHERE pracownik_id = :pracownik_id
+               AND status = 'zatwierdzona'
+               AND data_od <= :data
+               AND data_do >= :data
+             LIMIT 1"
+        );
+        $statement->execute([
+            'pracownik_id' => $employeeId,
+            'data' => $date,
+        ]);
+
+        if ($statement->fetchColumn() !== false) {
+            return false;
+        }
+
+        $statement = $pdo->prepare(
+            "SELECT 1
+             FROM rezerwacje
+             WHERE pracownik_id = :pracownik_id
+               AND status_rezerwacji <> 'anulowana'
+               AND czas_rozpoczecia < :czas_zakonczenia
+               AND czas_zakonczenia > :czas_rozpoczecia
+             LIMIT 1"
+        );
+        $statement->execute([
+            'pracownik_id' => $employeeId,
+            'czas_rozpoczecia' => $startValue,
+            'czas_zakonczenia' => $endValue,
+        ]);
+
+        return $statement->fetchColumn() === false;
+    } catch (PDOException $e) {
+        error_log('Nie udało się sprawdzić przedziału rezerwacji: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/*
     Tworzy rezerwację w transakcji. Blokada wiersza pracownika jest pierwszą
     instrukcją transakcji, przed jakimkolwiek odczytem niemodyfikującym:
     dzięki temu stan dostępności jest czytany dopiero po przejęciu blokady
     i dwie równoległe sesje nie mogą obie zobaczyć tego samego terminu jako
-    wolnego.
+    wolnego. W tej samej transakcji blokujemy też konto klienta i wiersz
+    usługi, żeby ich dezaktywacja w trakcie żądania nie pozwoliła zapisać
+    rezerwacji.
 */
 function reservation_create(int $userId, array $data): array
 {
@@ -214,6 +327,38 @@ function reservation_create(int $userId, array $data): array
             return ['status' => 'not_found', 'reason' => 'employee_not_found'];
         }
 
+        $statement = $pdo->prepare(
+            'SELECT aktywny, rola
+             FROM uzytkownicy
+             WHERE id = :id
+             FOR UPDATE'
+        );
+        $statement->execute(['id' => $userId]);
+        $client = $statement->fetch(PDO::FETCH_ASSOC);
+
+        if (
+            !is_array($client)
+            || (int) $client['aktywny'] !== 1
+            || (string) $client['rola'] !== 'klient'
+        ) {
+            $pdo->rollBack();
+            return ['status' => 'forbidden'];
+        }
+
+        $statement = $pdo->prepare(
+            'SELECT czas_trwania_minuty, cena
+             FROM uslugi
+             WHERE id = :id
+             FOR UPDATE'
+        );
+        $statement->execute(['id' => $serviceId]);
+        $service = $statement->fetch(PDO::FETCH_ASSOC);
+
+        if (!is_array($service)) {
+            $pdo->rollBack();
+            return ['status' => 'not_found', 'reason' => 'service_not_found'];
+        }
+
         $pair = reservation_pair_check($employeeId, $serviceId);
 
         if ($pair['status'] === 'error') {
@@ -226,20 +371,6 @@ function reservation_create(int $userId, array $data): array
             return ['status' => 'not_found', 'reason' => $pair['status']];
         }
 
-        $statement = $pdo->prepare(
-            'SELECT czas_trwania_minuty, cena
-             FROM uslugi
-             WHERE id = :id
-             LIMIT 1'
-        );
-        $statement->execute(['id' => $serviceId]);
-        $service = $statement->fetch(PDO::FETCH_ASSOC);
-
-        if (!is_array($service)) {
-            $pdo->rollBack();
-            return ['status' => 'not_found', 'reason' => 'service_not_found'];
-        }
-
         $duration = (int) $service['czas_trwania_minuty'];
 
         if ($duration <= 0) {
@@ -248,10 +379,19 @@ function reservation_create(int $userId, array $data): array
         }
 
         $price = (string) $service['cena'];
-        $startDateTime = new DateTimeImmutable($date . ' ' . $time);
-        $endDateTime = $startDateTime->modify('+' . $duration . ' minutes');
-        $startValue = $startDateTime->format('Y-m-d H:i:s');
-        $endValue = $endDateTime->format('Y-m-d H:i:s');
+        $startSeconds = interval_time_seconds($time);
+
+        if ($startSeconds === null) {
+            $pdo->rollBack();
+            return [
+                'status' => 'invalid',
+                'errors' => ['godzina' => 'Podaj godzinę w formacie HH:MM lub HH:MM:SS.'],
+            ];
+        }
+
+        $endSeconds = $startSeconds + $duration * 60;
+        $startValue = interval_slot_datetime($date, $startSeconds);
+        $endValue = interval_slot_datetime($date, $endSeconds);
 
         $now = new DateTimeImmutable('now');
         $today = $now->format('Y-m-d');
@@ -264,28 +404,14 @@ function reservation_create(int $userId, array $data): array
             return ['status' => 'out_of_horizon'];
         }
 
-        $availability = availability_day($employeeId, $serviceId, $date);
+        $intervalFree = reservation_interval_is_free($employeeId, $date, $time, $duration);
 
-        if ($availability['status'] === 'not_found') {
-            $pdo->rollBack();
-            return ['status' => 'not_found', 'reason' => 'service_not_found'];
-        }
-
-        if ($availability['status'] === 'error') {
+        if ($intervalFree === null) {
             $pdo->rollBack();
             return ['status' => 'error'];
         }
 
-        $slotFound = false;
-
-        foreach ($availability['sloty'] ?? [] as $slot) {
-            if (($slot['start'] ?? null) === $startValue && ($slot['end'] ?? null) === $endValue) {
-                $slotFound = true;
-                break;
-            }
-        }
-
-        if (!$slotFound) {
+        if (!$intervalFree) {
             $pdo->rollBack();
             return ['status' => 'conflict'];
         }
@@ -322,14 +448,19 @@ function reservation_create(int $userId, array $data): array
         ]);
 
         $reservationId = (int) $pdo->lastInsertId();
-        $pdo->commit();
-
         $reservation = rezerwacja_find_by_id($reservationId);
+
+        if (!is_array($reservation)) {
+            $pdo->rollBack();
+            return ['status' => 'error'];
+        }
+
+        $pdo->commit();
 
         return [
             'status' => 'ok',
             'id' => $reservationId,
-            'rezerwacja' => $reservation ?? [],
+            'rezerwacja' => $reservation,
         ];
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
