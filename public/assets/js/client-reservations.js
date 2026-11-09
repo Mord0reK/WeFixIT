@@ -83,7 +83,11 @@
                 }
 
                 if (result.response.status === 403) {
-                    showError('Brak uprawnień do anulowania tej rezerwacji.');
+                    showError(
+                        typeof result.data.error === 'string' && result.data.error !== ''
+                            ? result.data.error
+                            : 'Brak uprawnień do anulowania tej rezerwacji.'
+                    );
                     return;
                 }
 
