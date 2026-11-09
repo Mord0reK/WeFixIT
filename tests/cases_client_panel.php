@@ -84,6 +84,48 @@ function client_panel_create_reservation(
     ];
 }
 
+function client_panel_past_reservation(int $userId, string $comment): int
+{
+    $statement = test_db()->prepare(
+        "INSERT INTO rezerwacje (
+            uzytkownik_id, pracownik_id, usluga_id, czas_rozpoczecia, czas_zakonczenia,
+            cena_historyczna, status_rezerwacji, komentarz_klienta
+         ) VALUES (
+            :uzytkownik_id, 1, 1,
+            DATE_SUB(NOW(), INTERVAL 2 DAY),
+            DATE_ADD(DATE_SUB(NOW(), INTERVAL 2 DAY), INTERVAL 1 HOUR),
+            150.00, 'oczekujaca', :komentarz
+         )"
+    );
+    $statement->execute([
+        'uzytkownik_id' => $userId,
+        'komentarz' => $comment,
+    ]);
+
+    return (int) test_db()->lastInsertId();
+}
+
+function client_panel_future_reservation_for(int $userId, string $comment): int
+{
+    $statement = test_db()->prepare(
+        "INSERT INTO rezerwacje (
+            uzytkownik_id, pracownik_id, usluga_id, czas_rozpoczecia, czas_zakonczenia,
+            cena_historyczna, status_rezerwacji, komentarz_klienta
+         ) VALUES (
+            :uzytkownik_id, 1, 1,
+            DATE_ADD(NOW(), INTERVAL 3 DAY),
+            DATE_ADD(DATE_ADD(NOW(), INTERVAL 3 DAY), INTERVAL 1 HOUR),
+            150.00, 'oczekujaca', :komentarz
+         )"
+    );
+    $statement->execute([
+        'uzytkownik_id' => $userId,
+        'komentarz' => $comment,
+    ]);
+
+    return (int) test_db()->lastInsertId();
+}
+
 // Wycinek HTML sekcji panelu; granicę nadchodzących wyznacza początek historii.
 function client_panel_section(string $html, string $sectionId): string
 {
@@ -331,18 +373,7 @@ test('219. przyszła rezerwacja przed anulowaniem jest tylko w nadchodzących', 
     $marker = 'Test panelu klienta 219 ' . uniqid();
     $pastMarker = 'Test panelu klienta 219 przeszła ' . uniqid();
     $reservation = client_panel_create_reservation($session, 1, 1, $marker);
-
-    $statement = test_db()->prepare(
-        "INSERT INTO rezerwacje (
-            uzytkownik_id, pracownik_id, usluga_id, czas_rozpoczecia, czas_zakonczenia,
-            cena_historyczna, status_rezerwacji, komentarz_klienta
-         ) VALUES (
-            4, 1, 1, DATE_SUB(NOW(), INTERVAL 2 DAY),
-            DATE_ADD(DATE_SUB(NOW(), INTERVAL 2 DAY), INTERVAL 1 HOUR),
-            150.00, 'oczekujaca', :komentarz
-         )"
-    );
-    $statement->execute(['komentarz' => $pastMarker]);
+    client_panel_past_reservation(4, $pastMarker);
 
     $response = http_request($session['cookies'], 'GET', '/panel.php');
     assert_status(200, $response, 'Panel przed anulowaniem powinien zwrócić 200');
@@ -373,4 +404,102 @@ test('219. przyszła rezerwacja przed anulowaniem jest tylko w nadchodzących', 
         $session['csrf']
     );
     assert_status(200, $cancel, 'Sprzątające anulowanie rezerwacji testowej powinno dać 200');
+});
+
+test('220. klient anuluje własną przyszłą rezerwację potwierdzoną', function (): void {
+    $session = client_panel_session();
+    $reservation = client_panel_create_reservation($session);
+    $statement = test_db()->prepare(
+        "UPDATE rezerwacje SET status_rezerwacji = 'potwierdzona' WHERE id = :id"
+    );
+    $statement->execute(['id' => $reservation['id']]);
+
+    $response = patch_json(
+        $session['cookies'],
+        '/api/client-reservations.php',
+        ['id' => $reservation['id']],
+        $session['csrf']
+    );
+
+    assert_status(200, $response, 'Anulowanie rezerwacji potwierdzonej powinno dać 200');
+    $data = json_body($response);
+    assert_same('anulowana', $data['status'] ?? null, 'Odpowiedź powinna zwrócić status anulowana');
+
+    $statement = test_db()->prepare(
+        'SELECT status_rezerwacji, anulowano FROM rezerwacje WHERE id = :id'
+    );
+    $statement->execute(['id' => $reservation['id']]);
+    $row = $statement->fetch();
+
+    assert_true(is_array($row), 'Rezerwacja powinna istnieć w bazie');
+    assert_same('anulowana', (string) $row['status_rezerwacji'], 'Status w bazie powinien być anulowana');
+    assert_true($row['anulowano'] !== null, 'Kolumna anulowano powinna być ustawiona');
+});
+
+test('221. anulowanie przeszłej rezerwacji daje 409 i nie zmienia stanu', function (): void {
+    $session = client_panel_session();
+    $reservationId = client_panel_past_reservation(
+        4,
+        'Test panelu klienta 221 ' . uniqid()
+    );
+
+    $response = patch_json(
+        $session['cookies'],
+        '/api/client-reservations.php',
+        ['id' => $reservationId],
+        $session['csrf']
+    );
+
+    assert_status(409, $response, 'Anulowanie przeszłej rezerwacji powinno dać 409');
+
+    $statement = test_db()->prepare(
+        'SELECT status_rezerwacji, anulowano FROM rezerwacje WHERE id = :id'
+    );
+    $statement->execute(['id' => $reservationId]);
+    $row = $statement->fetch();
+
+    assert_true(is_array($row), 'Rezerwacja powinna istnieć w bazie');
+    assert_same('oczekujaca', (string) $row['status_rezerwacji'], 'Przeszła rezerwacja nie może zmienić statusu');
+    assert_same(null, $row['anulowano'], 'Przeszła rezerwacja nie może dostać daty anulowania');
+});
+
+test('222. administrator i pracownik nie mogą anulować rezerwacji przez endpoint klienta', function (): void {
+    $accounts = [
+        ['email' => 'admin@wefixit.pl', 'label' => 'administratora', 'user_id' => 1],
+        ['email' => 'tomasz.serwisant@wefixit.pl', 'label' => 'pracownika', 'user_id' => 2],
+    ];
+
+    foreach ($accounts as $account) {
+        $reservationId = client_panel_future_reservation_for(
+            $account['user_id'],
+            'Rezerwacja ' . $account['label']
+        );
+        $session = login_as($account['email']);
+        assert_status(200, $session['response'], 'Logowanie ' . $account['label'] . ' powinno się udać');
+        $csrf = csrf_from_page($session['cookies'], '/profil.php');
+
+        $response = patch_json(
+            $session['cookies'],
+            '/api/client-reservations.php',
+            ['id' => $reservationId],
+            $csrf
+        );
+
+        assert_status(
+            403,
+            $response,
+            'Konto ' . $account['label'] . ' nie może anulować rezerwacji przez endpoint klienta'
+        );
+
+        $statement = test_db()->prepare(
+            'SELECT status_rezerwacji FROM rezerwacje WHERE id = :id'
+        );
+        $statement->execute(['id' => $reservationId]);
+
+        assert_same(
+            'oczekujaca',
+            (string) $statement->fetchColumn(),
+            'Rezerwacja ' . $account['label'] . ' nie może zmienić statusu'
+        );
+    }
 });
