@@ -20,6 +20,8 @@
     const csrfToken = csrfMeta ? csrfMeta.content : '';
     const generalError = document.getElementById('reservations-error');
     const classes = window.panelTableClasses();
+    const exportLink = page.querySelector('a[href*="eksport"]');
+    const exportBaseUrl = exportLink ? exportLink.getAttribute('href').split('?')[0] : '';
     let busy = false;
 
     // Parsuje datę z bazy bez zmieniania strefy czasowej.
@@ -206,6 +208,19 @@
         return row;
     }
 
+    // Eksport ma korzystać z filtrów widocznej listy, nie ze stanu z wejścia na stronę.
+    function buildExportUrl(params) {
+        const exportParams = new URLSearchParams();
+        exportParams.set('typ', 'rezerwacje');
+
+        for (const [key, value] of params) {
+            if (key === 'size' || key === 'page' || value === '' || value === '0') continue;
+            exportParams.append(key, value);
+        }
+
+        return exportBaseUrl + '?' + exportParams.toString();
+    }
+
     const list = window.panelList({
         section: page,
         api: reservationsApi,
@@ -214,6 +229,8 @@
         pageUrl: reservationsUrl,
         itemsKey: 'rezerwacje',
         paginationSlot: page.querySelector('[data-list-pagination]'),
+        exportLink: exportLink,
+        buildExportUrl: buildExportUrl,
         colspan: 7,
         renderRow: renderReservation,
         emptyState: function (hasFilters) {
@@ -319,6 +336,7 @@
         } catch {
             showGeneralError('Nie udało się połączyć z serwerem. Spróbuj ponownie.');
         } finally {
+            button.disabled = false;
             busy = false;
         }
     });

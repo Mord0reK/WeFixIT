@@ -310,6 +310,7 @@
         } catch {
             showGeneralError('Nie udało się połączyć z serwerem. Spróbuj ponownie.');
         } finally {
+            if (button) button.disabled = false;
             busy = false;
         }
     });
@@ -356,6 +357,7 @@
         } catch {
             showGeneralError('Nie udało się połączyć z serwerem. Spróbuj ponownie.');
         } finally {
+            button.disabled = false;
             busy = false;
         }
     });

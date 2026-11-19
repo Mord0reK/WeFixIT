@@ -319,7 +319,6 @@
 
         operationBusy = true;
         toggleButton.disabled = true;
-        let completed = false;
 
         try {
             const result = await sendCategoryRequest('PATCH', {
@@ -337,7 +336,6 @@
                 return;
             }
 
-            completed = true;
             window.showToast(
                 isActive ? 'Kategoria została dezaktywowana.' : 'Kategoria została aktywowana.',
                 'success'
@@ -346,10 +344,9 @@
         } catch {
             window.showToast('Nie udało się połączyć z serwerem. Spróbuj ponownie.', 'error');
         } finally {
-            if (!completed) {
-                toggleButton.disabled = false;
-            }
-
+            // Po udanym odświeżeniu przycisk jest odłączony, a po błędzie GET
+            // zostaje w starym wierszu — w obu przypadkach go zwalniamy.
+            toggleButton.disabled = false;
             operationBusy = false;
         }
     });

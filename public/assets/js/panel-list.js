@@ -73,7 +73,7 @@
         svg.setAttribute('stroke-linecap', 'round');
         svg.setAttribute('stroke-linejoin', 'round');
         svg.setAttribute('aria-hidden', 'true');
-        svg.className = classes || 'h-4 w-4 shrink-0';
+        svg.setAttribute('class', classes || 'h-4 w-4 shrink-0');
 
         const paths = ICON_PATHS[name] || '<circle cx="12" cy="12" r="9"/>';
 
@@ -186,13 +186,17 @@
         - renderRow: funkcja zwracająca <tr> (lub tablicę <tr>) dla rekordu,
         - emptyState: funkcja zwrająca element pustego stanu,
         - onError: funkcja przyjmująca komunikat błędu,
-        - onLoaded: funkcja wołana po udanym odświeżeniu z danymi odpowiedzi.
+        - onLoaded: funkcja wołana po udanym odświeżeniu z danymi odpowiedzi,
+        - exportLink: element odnośnika eksportu (opcjonalny),
+        - buildExportUrl: funkcja (params) => href budująca adres eksportu
+          z bieżących pól formularza.
     */
     window.panelList = function (options) {
         const section = options.section || null;
         const form = options.form || null;
         const table = options.table || null;
         const tbody = table !== null && table.tBodies.length > 0 ? table.tBodies[0] : null;
+        const exportLink = options.exportLink || null;
 
         if (section === null || form === null || table === null || tbody === null) {
             return null;
@@ -201,9 +205,20 @@
         const initialPage = Number(new URLSearchParams(window.location.search).get('page') || '1');
         let currentPage = initialPage >= 1 ? initialPage : 1;
         let pending = null;
+        let queued = false;
 
         function currentParams() {
             return new URLSearchParams(new FormData(form));
+        }
+
+        function buildParams() {
+            const params = currentParams();
+
+            if (currentPage > 1) {
+                params.set('page', String(currentPage));
+            }
+
+            return params;
         }
 
         function hasFilters() {
@@ -237,6 +252,14 @@
                 if (control.type === 'search' || control.type === 'text' || control.type === 'date') {
                     control.value = '';
                 }
+            }
+
+            updateExportLink();
+        }
+
+        function updateExportLink() {
+            if (exportLink !== null && typeof options.buildExportUrl === 'function') {
+                exportLink.href = options.buildExportUrl(currentParams());
             }
         }
 
@@ -397,6 +420,7 @@
             buildPagination(pagination);
             updateFilterDots();
             updateClearLinks(hasFilters());
+            updateExportLink();
 
             if (typeof options.onLoaded === 'function') {
                 options.onLoaded(lastData);
@@ -405,23 +429,35 @@
 
         let lastData = {};
 
-        async function fetchList() {
-            const params = currentParams();
+        async function fetchList(expectedKey) {
+            const params = buildParams();
+            let response;
 
-            if (currentPage > 1) {
-                params.set('page', String(currentPage));
+            // Błąd sieci musi dotrzeć do onError, inaczej tabela zostaje bez zmian.
+            try {
+                response = await fetch(options.api + '?' + params.toString(), {
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json' }
+                });
+            } catch {
+                if (typeof options.onError === 'function') {
+                    options.onError('Nie udało się połączyć z serwerem. Spróbuj ponownie później.');
+                }
+
+                return;
             }
 
-            const response = await fetch(options.api + '?' + params.toString(), {
-                credentials: 'same-origin',
-                headers: { 'Accept': 'application/json' }
-            });
             let data = {};
 
             try {
                 data = await response.json();
             } catch {
                 data = {};
+            }
+
+            // Kryteria mogły się zmienić w trakcie żądania — taki wynik odrzucamy.
+            if (buildParams().toString() !== expectedKey) {
+                return;
             }
 
             if (!response.ok || data.success !== true || !Array.isArray(data[options.itemsKey])) {
@@ -443,11 +479,18 @@
 
         function refresh() {
             if (pending !== null) {
+                // Kryteria zmieniły się w trakcie pobierania — powtórzymy po nim.
+                queued = true;
                 return pending;
             }
 
-            pending = fetchList().finally(function () {
+            pending = fetchList(buildParams().toString()).finally(function () {
                 pending = null;
+
+                if (queued) {
+                    queued = false;
+                    refresh();
+                }
             });
 
             return pending;

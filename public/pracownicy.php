@@ -36,9 +36,10 @@ if ($statusFilter !== 'all') {
     $paginationParams['status'] = $statusFilter;
 }
 
-$headerActions = $hasAvailableAccounts
-    ? [['label' => 'Dodaj pracownika', 'drawer' => 'employee-drawer']]
-    : [];
+// Link jest zawsze renderowany; JavaScript pokazuje go, gdy konto wróci do listy.
+$headerActions = [
+    ['label' => 'Dodaj pracownika', 'drawer' => 'employee-drawer', 'hidden' => !$hasAvailableAccounts]
+];
 
 panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
 ?>
