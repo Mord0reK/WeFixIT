@@ -64,9 +64,14 @@ $statusLabels = [
     'inactive' => 'Nieaktywne',
 ];
 $roleFilterOptions = [['value' => 'all', 'label' => 'Wszystkie']];
+$roleOptionsForJs = [];
 
 foreach (UZYTKOWNIK_ROLES as $roleOption) {
     $roleFilterOptions[] = [
+        'value' => $roleOption,
+        'label' => $roleLabels[$roleOption] ?? $roleOption,
+    ];
+    $roleOptionsForJs[] = [
         'value' => $roleOption,
         'label' => $roleLabels[$roleOption] ?? $roleOption,
     ];
@@ -82,9 +87,12 @@ foreach (UZYTKOWNIK_STATUS_FILTERS as $statusOption) {
 }
 
 panel_layout_head($user, 'Użytkownicy — WeFixIT', 'users');
+$roleOptionsJson = htmlspecialchars(json_encode($roleOptionsForJs, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
 ?>
 <section id="users-page" class="<?= PANEL_CARD_WIDE_CLASS ?>"
-    data-api="<?= htmlspecialchars($usersApi, ENT_QUOTES, 'UTF-8') ?>">
+    data-api="<?= htmlspecialchars($usersApi, ENT_QUOTES, 'UTF-8') ?>"
+    data-user-id="<?= (int) $user['id'] ?>"
+    data-role-options="<?= $roleOptionsJson ?>">
     <?php
     panel_section_header(
         'Użytkownicy',
@@ -114,10 +122,9 @@ panel_layout_head($user, 'Użytkownicy — WeFixIT', 'users');
 
             <div class="flex flex-wrap items-center gap-2 sm:items-end">
                 <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
-                <?php if ($hasFilters): ?>
-                    <a href="<?= htmlspecialchars($usersUrl, ENT_QUOTES, 'UTF-8') ?>"
-                        class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
-                <?php endif; ?>
+                <a href="<?= htmlspecialchars($usersUrl, ENT_QUOTES, 'UTF-8') ?>"
+                    data-clear-filters="1"<?= $hasFilters ? '' : ' hidden' ?>
+                    class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
             </div>
         </form>
 
@@ -162,7 +169,7 @@ panel_layout_head($user, 'Użytkownicy — WeFixIT', 'users');
                                     panel_empty_state(
                                         'Brak wyników',
                                         'Żadne konto nie spełnia wybranych filtrów ani frazy wyszukiwania. Zmień kryteria i spróbuj ponownie.',
-                                        ['label' => 'Wyczyść filtry', 'href' => $usersUrl]
+                                        ['label' => 'Wyczyść filtry', 'href' => $usersUrl, 'clear' => true]
                                     );
                                 } else {
                                     panel_empty_state(
@@ -279,7 +286,9 @@ panel_layout_head($user, 'Użytkownicy — WeFixIT', 'users');
                 </tbody>
             </table>
         </div>
-        <?php panel_pagination($basePath, '/uzytkownicy', $paginationParams, $userPage); ?>
+        <div data-list-pagination>
+            <?php panel_pagination($basePath, '/uzytkownicy', $paginationParams, $userPage); ?>
+        </div>
 
         <p id="users-error" role="alert" class="mt-3 hidden text-sm text-red-600 dark:text-red-400"></p>
     <?php endif; ?>
@@ -289,4 +298,4 @@ panel_layout_head($user, 'Użytkownicy — WeFixIT', 'users');
     </noscript>
 </section>
 
-<?php panel_layout_foot('users.js'); ?>
+<?php panel_layout_foot(['panel-list.js', 'users.js']); ?>

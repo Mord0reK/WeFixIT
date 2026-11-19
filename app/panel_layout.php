@@ -178,17 +178,22 @@ function panel_section_header(string $title, string $description = '', array $ac
                     $label = $action['label'] ?? '';
                     $href = $action['href'] ?? '';
                     $drawer = $action['drawer'] ?? '';
+                    $clear = (bool) ($action['clear'] ?? false);
+                    $hidden = (bool) ($action['hidden'] ?? false);
                     $hasDrawer = is_string($drawer) && $drawer !== '';
 
                     if (!is_string($label) || $label === ''
-                        || (!$hasDrawer && (!is_string($href) || $href === ''))) {
+                        || (!$hasDrawer && (!$clear && (!is_string($href) || $href === '')))) {
                         continue;
                     }
 
                     $actionHref = $hasDrawer ? '#' . $drawer : $href;
                     ?>
                     <a href="<?= htmlspecialchars($actionHref, ENT_QUOTES, 'UTF-8') ?>"
-                        class="<?= panel_button_classes('primary') ?>"
+                        class="<?= panel_button_classes($clear ? 'secondary' : 'primary') ?>"<?= $hidden ? ' hidden' : '' ?>
+                        <?php if ($clear): ?>
+                            data-clear-filters="1"
+                        <?php endif; ?>
                         <?php if ($hasDrawer): ?>
                             data-drawer-open="<?= htmlspecialchars($drawer, ENT_QUOTES, 'UTF-8') ?>"
                             aria-haspopup="dialog" aria-controls="<?= htmlspecialchars($drawer, ENT_QUOTES, 'UTF-8') ?>"
@@ -350,7 +355,7 @@ function panel_layout_head(array $user, string $title, string $active): void
     <?php
 }
 
-function panel_layout_foot(string $pageScript = ''): void
+function panel_layout_foot(string|array $pageScripts = ''): void
 {
     $confirmCancelClass = panel_button_classes('secondary');
     $confirmDangerClass = panel_button_classes('danger');
@@ -377,8 +382,12 @@ function panel_layout_foot(string $pageScript = ''): void
 
     layout_script('panel.js');
 
-    if ($pageScript !== '') {
-        layout_script($pageScript);
+    $scripts = is_array($pageScripts) ? $pageScripts : [$pageScripts];
+
+    foreach ($scripts as $pageScript) {
+        if (is_string($pageScript) && $pageScript !== '') {
+            layout_script($pageScript);
+        }
     }
 
     layout_foot();

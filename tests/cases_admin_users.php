@@ -232,10 +232,10 @@ test('100. ostatni administrator jest chroniony, a drugi admin pozwala na zmian�
     }
 });
 
-test('101. endpoint przyjmuje tylko PATCH i wymaga Content-Type', function (): void {
+test('101. endpoint przyjmuje GET i PATCH, a POST i DELETE dają 405', function (): void {
     $cookies = [];
 
-    foreach (['GET', 'POST', 'DELETE'] as $method) {
+    foreach (['POST', 'DELETE'] as $method) {
         $response = http_request($cookies, $method, '/api/admin/users.php');
         assert_status(405, $response, $method . ' na endpoint użytkowników powinien dać 405');
 
@@ -243,8 +243,11 @@ test('101. endpoint przyjmuje tylko PATCH i wymaga Content-Type', function (): v
         assert_true(is_string($allow) && $allow !== '', $method . ' powinien zwrócić nagłówek Allow');
 
         $methods = array_values(array_filter(array_map('trim', explode(',', $allow))));
-        assert_same(['PATCH'], $methods, 'Allow powinno zawierać wyłącznie PATCH');
+        assert_same(['GET', 'PATCH'], $methods, 'Allow powinno zawierać wyłącznie GET i PATCH');
     }
+
+    $anonymousGet = http_request($cookies, 'GET', '/api/admin/users.php');
+    assert_status(401, $anonymousGet, 'GET bez logowania powinien dać 401');
 
     admin_users_reset_base();
     $session = admin_users_admin_session();
@@ -256,6 +259,54 @@ test('101. endpoint przyjmuje tylko PATCH i wymaga Content-Type', function (): v
 
     $row = test_db()->query('SELECT rola FROM uzytkownicy WHERE id = 4')->fetch();
     assert_same('klient', (string) $row['rola'], 'PATCH bez Content-Type nie może zmienić roli');
+});
+
+test('101a. GET zwraca listę kont z filtrami i paginacją', function (): void {
+    admin_users_reset_base();
+    $session = admin_users_admin_session();
+
+    $all = http_request($session['cookies'], 'GET', '/api/admin/users.php');
+    assert_status(200, $all, 'GET listy użytkowników powinien dać 200');
+    $body = json_body($all);
+    assert_array_key($body, 'success', 'Odpowiedź powinna zawierać success');
+    assert_same(true, $body['success'], 'GET listy powinien zakończyć się sukcesem');
+    assert_array_key($body, 'uzytkownicy', 'Odpowiedź powinna zawierać listę użytkowników');
+    assert_true(is_array($body['uzytkownicy']), 'Lista użytkowników powinna być tablicą');
+    assert_same(7, count($body['uzytkownicy']), 'Baza startowa ma siedem kont');
+    assert_array_key($body, 'paginacja', 'Odpowiedź powinna zawierać paginację');
+    assert_same(1, $body['paginacja']['strona'], 'Domyślna strona to 1');
+    assert_same(25, $body['paginacja']['rozmiar'], 'Domyślny rozmiar to 25');
+    assert_same(1, $body['paginacja']['stron'], 'Siedem kont mieści się na jednej stronie');
+    assert_same(7, $body['paginacja']['razem'], 'Paginacja powinna zliczyć wszystkie konta');
+    assert_array_has_not_key($body['uzytkownicy'][0], 'haslo_hash', 'Lista nie może ujawniać hasy haseł');
+
+    $roleFilter = http_request($session['cookies'], 'GET', '/api/admin/users.php?rola=klient');
+    assert_status(200, $roleFilter, 'Filtr roli powinien dać 200');
+    $roleBody = json_body($roleFilter);
+    assert_same(3, count($roleBody['uzytkownicy']), 'Filtr roli klient ma zwrócić trzy konta');
+    assert_same(3, $roleBody['paginacja']['razem'], 'Paginacja powinna uwzględniać filtr roli');
+
+    foreach ($roleBody['uzytkownicy'] as $managedUser) {
+        assert_same('klient', $managedUser['rola'], 'Filtr roli może zwracać wyłącznie klientów');
+    }
+
+    $search = http_request($session['cookies'], 'GET', '/api/admin/users.php?szukaj=Kowalski');
+    assert_status(200, $search, 'Wyszukiwanie powinno dać 200');
+    $searchBody = json_body($search);
+    assert_same(1, count($searchBody['uzytkownicy']), 'Fraza Kowalski powinna znaleźć jedno konto');
+    assert_same('jan.kowalski@example.com', $searchBody['uzytkownicy'][0]['email'], 'Wyszukiwanie działa po nazwisku');
+
+    $paged = http_request($session['cookies'], 'GET', '/api/admin/users.php?size=2&page=2');
+    assert_status(200, $paged, 'Paginacja powinna dać 200');
+    $pagedBody = json_body($paged);
+    assert_same(2, count($pagedBody['uzytkownicy']), 'Rozmiar strony ogranicza liczbę wyników');
+    assert_same(2, $pagedBody['paginacja']['strona'], 'Odpowiedź powinna informować o drugiej stronie');
+    assert_same(4, $pagedBody['paginacja']['stron'], 'Siedem kont przy rozmiarze 2 to cztery strony');
+
+    $client = login_as('jan.kowalski@example.com');
+    assert_status(200, $client['response'], 'Logowanie klienta powinno się udać');
+    $forbidden = http_request($client['cookies'], 'GET', '/api/admin/users.php');
+    assert_status(403, $forbidden, 'Klient nie może pobierać listy kont');
 });
 
 test('102. walidacja identyfikatora, roli, aktywności i pustego body', function (): void {

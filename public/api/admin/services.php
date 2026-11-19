@@ -4,9 +4,10 @@ declare(strict_types=1);
 /*
     Endpoint administracyjny usług.
 
-    Obsługuje POST (utworzenie), PATCH (edycja lub zmiana aktywności)
-    i DELETE (usunięcie). Operacje rozdziela metoda HTTP, a identyfikator
-    pochodzi z body. Uprawnienia sprawdzamy wyłącznie po stronie serwera.
+    Obsługuje GET (lista z filtrami), POST (utworzenie), PATCH (edycja lub
+    zmiana aktywności) i DELETE (usunięcie). Operacje rozdziela metoda HTTP,
+    a identyfikator pochodzi z body. Uprawnienia sprawdzamy wyłącznie po
+    stronie serwera.
 */
 require_once __DIR__ . '/../../../app/json.php';
 require_once __DIR__ . '/../../../app/auth.php';
@@ -14,7 +15,7 @@ require_once __DIR__ . '/../../../app/uslugi.php';
 require_once __DIR__ . '/../../../app/log.php';
 
 $method = $_SERVER['REQUEST_METHOD'] ?? '';
-json_require_method(['POST', 'PATCH', 'DELETE']);
+json_require_method(['GET', 'POST', 'PATCH', 'DELETE']);
 
 if ($method === 'POST' || $method === 'PATCH') {
     json_require_content_type();
@@ -24,6 +25,33 @@ $user = require_api_login();
 
 if (($user['rola'] ?? '') !== 'admin') {
     json_response(403, ['error' => 'Brak uprawnień do zarządzania usługami.']);
+}
+
+if ($method === 'GET') {
+    $page = pagination_page($_GET['page'] ?? null);
+    $size = pagination_size($_GET['size'] ?? null);
+    $result = uslugi_list_paginated(
+        usluga_filter_category_id($_GET['id_kategorii'] ?? null),
+        usluga_filter_status($_GET['status'] ?? null),
+        pagination_search_value($_GET['szukaj'] ?? null),
+        $page,
+        $size
+    );
+
+    if ($result === null) {
+        json_response(500, ['error' => 'Nie udało się pobrać usług. Wystąpił problem z serwerem.']);
+    }
+
+    json_response(200, [
+        'success' => true,
+        'uslugi' => $result['items'],
+        'paginacja' => [
+            'strona' => $result['page'],
+            'rozmiar' => $result['size'],
+            'stron' => $result['pages'],
+            'razem' => $result['total'],
+        ],
+    ]);
 }
 
 if (!csrf_verify(csrf_token_from_request())) {

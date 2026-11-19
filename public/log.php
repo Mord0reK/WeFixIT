@@ -66,6 +66,14 @@ $levelVariants = [
     'warning' => 'warning',
     'critical' => 'danger',
 ];
+$levelsForJs = [];
+
+foreach (LOG_VIEW_LEVELS as $levelOption) {
+    $levelsForJs[$levelOption] = [
+        'label' => $levelLabels[$levelOption] ?? $levelOption,
+        'variant' => $levelVariants[$levelOption] ?? 'neutral',
+    ];
+}
 $actionFilterOptions = [['value' => '', 'label' => 'Wszystkie akcje']];
 
 foreach (LOG_VIEW_ACTIONS as $actionOption) {
@@ -94,15 +102,19 @@ foreach (LOG_VIEW_OBJECT_TYPES as $objectOption) {
 }
 
 panel_layout_head($user, 'Dziennik zdarzeń — WeFixIT', 'log');
+$levelsJson = htmlspecialchars(json_encode($levelsForJs, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
 ?>
-<section class="<?= PANEL_CARD_WIDE_CLASS ?>">
+<section id="log-page" class="<?= PANEL_CARD_WIDE_CLASS ?>"
+    data-api="<?= htmlspecialchars($basePath . '/api/admin/log', ENT_QUOTES, 'UTF-8') ?>"
+    data-log-url="<?= htmlspecialchars($logUrl, ENT_QUOTES, 'UTF-8') ?>"
+    data-levels="<?= $levelsJson ?>">
     <?php
     panel_section_header(
         'Dziennik zdarzeń',
         'Historia operacji administracyjnych i zmian w serwisie.',
         $filtersActive
-            ? [['label' => 'Wyczyść filtry', 'href' => $logUrl]]
-            : []
+            ? [['label' => 'Wyczyść filtry', 'href' => $logUrl, 'clear' => true]]
+            : [['label' => 'Wyczyść filtry', 'href' => $logUrl, 'clear' => true, 'hidden' => true]]
     );
     ?>
 
@@ -155,7 +167,7 @@ panel_layout_head($user, 'Dziennik zdarzeń — WeFixIT', 'log');
                                     panel_empty_state(
                                         'Brak zdarzeń dla wybranych filtrów',
                                         'Zmień zakres dat lub pozostałe filtry, aby zobaczyć inne wpisy.',
-                                        ['label' => 'Wyczyść filtry', 'href' => $logUrl]
+                                        ['label' => 'Wyczyść filtry', 'href' => $logUrl, 'clear' => true]
                                     );
                                 } else {
                                     panel_empty_state(
@@ -236,7 +248,9 @@ panel_layout_head($user, 'Dziennik zdarzeń — WeFixIT', 'log');
                 </tbody>
             </table>
         </div>
-        <?php panel_pagination($basePath, '/log', $paginationParams, $logPage); ?>
+        <div data-list-pagination>
+            <?php panel_pagination($basePath, '/log', $paginationParams, $logPage); ?>
+        </div>
     <?php endif; ?>
 </section>
-<?php panel_layout_foot(); ?>
+<?php panel_layout_foot(['panel-list.js', 'log.js']); ?>

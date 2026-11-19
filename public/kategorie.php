@@ -34,7 +34,9 @@ if ($statusFilter !== 'all') {
 
 panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
 ?>
-<section class="<?= PANEL_CARD_WIDE_CLASS ?>">
+<section class="<?= PANEL_CARD_WIDE_CLASS ?>"
+    data-api="<?= htmlspecialchars($categoriesApi, ENT_QUOTES, 'UTF-8') ?>"
+    data-categories-url="<?= htmlspecialchars($categoriesUrl, ENT_QUOTES, 'UTF-8') ?>">
     <?php
     panel_section_header(
         'Kategorie',
@@ -64,10 +66,9 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
 
             <div class="flex flex-wrap items-center gap-2 sm:items-end">
                 <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
-                <?php if ($hasFilters): ?>
-                    <a href="<?= htmlspecialchars($categoriesUrl, ENT_QUOTES, 'UTF-8') ?>"
-                        class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
-                <?php endif; ?>
+                <a href="<?= htmlspecialchars($categoriesUrl, ENT_QUOTES, 'UTF-8') ?>"
+                    data-clear-filters="1"<?= $hasFilters ? '' : ' hidden' ?>
+                    class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
             </div>
         </form>
 
@@ -105,7 +106,7 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
                                     panel_empty_state(
                                         'Brak kategorii dla wybranej frazy',
                                         'Zmień frazę wyszukiwania, aby zobaczyć inne kategorie.',
-                                        ['label' => 'Wyczyść wyszukiwanie', 'href' => $categoriesUrl]
+                                        ['label' => 'Wyczyść wyszukiwanie', 'href' => $categoriesUrl, 'clear' => true]
                                     );
                                 } else {
                                     panel_empty_state(
@@ -181,7 +182,9 @@ panel_layout_head($user, 'Kategorie — WeFixIT', 'categories');
                 </tbody>
             </table>
         </div>
-        <?php panel_pagination($basePath, '/kategorie', $paginationParams, $categoryPage); ?>
+        <div data-list-pagination>
+            <?php panel_pagination($basePath, '/kategorie', $paginationParams, $categoryPage); ?>
+        </div>
     <?php endif; ?>
 </section>
 
@@ -231,4 +234,4 @@ panel_drawer_start(
     <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby zarządzać kategoriami.</p>
 </noscript>
 
-<?php panel_layout_foot('categories.js'); ?>
+<?php panel_layout_foot(['panel-list.js', 'categories.js']); ?>
