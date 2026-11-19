@@ -42,11 +42,18 @@ if ($method === 'GET') {
         json_response(500, ['error' => 'Nie udało się pobrać pracowników. Wystąpił problem z serwerem.']);
     }
 
+    // Formularz dodawania korzysta z aktualnej listy kont bez profilu.
+    // null oznacza błąd zapytania — nie wolno go zwrócić jako udanej odpowiedzi.
+    $accounts = pracownicy_available_accounts();
+
+    if ($accounts === null) {
+        json_response(500, ['error' => 'Nie udało się pobrać kont dostępnych do powiązania. Wystąpił problem z serwerem.']);
+    }
+
     json_response(200, [
         'success' => true,
         'pracownicy' => $result['items'],
-        // Formularz dodawania korzysta z aktualnej listy kont bez profilu.
-        'konta_dostepne' => pracownicy_available_accounts(),
+        'konta_dostepne' => $accounts,
         'paginacja' => [
             'strona' => $result['page'],
             'rozmiar' => $result['size'],

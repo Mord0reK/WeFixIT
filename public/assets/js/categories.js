@@ -370,7 +370,6 @@
 
         operationBusy = true;
         deleteButton.disabled = true;
-        let completed = false;
 
         try {
             const result = await sendCategoryRequest('DELETE', {
@@ -387,16 +386,14 @@
                 return;
             }
 
-            completed = true;
             window.showToast('Kategoria została usunięta.', 'success');
             await refreshCategoryList();
         } catch {
             window.showToast('Nie udało się połączyć z serwerem. Spróbuj ponownie.', 'error');
         } finally {
-            if (!completed) {
-                deleteButton.disabled = false;
-            }
-
+            // Po udanym odświeżeniu przycisk jest odłączony, a po błędzie GET
+            // zostaje w starym wierszu — w obu przypadkach go zwalniamy.
+            deleteButton.disabled = false;
             operationBusy = false;
         }
     });

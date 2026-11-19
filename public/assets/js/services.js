@@ -407,7 +407,6 @@
 
         operationBusy = true;
         toggleButton.disabled = true;
-        let completed = false;
 
         try {
             const result = await sendServiceRequest('PATCH', {
@@ -425,7 +424,6 @@
                 return;
             }
 
-            completed = true;
             window.showToast(
                 isActive ? 'Usługa została dezaktywowana.' : 'Usługa została aktywowana.',
                 'success'
@@ -434,10 +432,9 @@
         } catch {
             window.showToast('Nie udało się połączyć z serwerem. Spróbuj ponownie.', 'error');
         } finally {
-            if (!completed) {
-                toggleButton.disabled = false;
-            }
-
+            // Po udanym odświeżeniu przycisk jest odłączony, a po błędzie GET
+            // zostaje w starym wierszu — w obu przypadkach go zwalniamy.
+            toggleButton.disabled = false;
             operationBusy = false;
         }
     });
@@ -461,7 +458,6 @@
 
         operationBusy = true;
         deleteButton.disabled = true;
-        let completed = false;
 
         try {
             const result = await sendServiceRequest('DELETE', {
@@ -478,16 +474,14 @@
                 return;
             }
 
-            completed = true;
             window.showToast('Usługa została usunięta.', 'success');
             await refreshServiceList();
         } catch {
             window.showToast('Nie udało się połączyć z serwerem. Spróbuj ponownie.', 'error');
         } finally {
-            if (!completed) {
-                deleteButton.disabled = false;
-            }
-
+            // Po udanym odświeżeniu przycisk jest odłączony, a po błędzie GET
+            // zostaje w starym wierszu — w obu przypadkach go zwalniamy.
+            deleteButton.disabled = false;
             operationBusy = false;
         }
     });

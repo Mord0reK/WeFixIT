@@ -209,12 +209,16 @@
     }
 
     // Eksport ma korzystać z filtrów widocznej listy, nie ze stanu z wejścia na stronę.
+    // Neutralna wartość "0" dotyczy wyłącznie filtrów identyfikatorów — fraza "0" jest poprawna.
+    const neutralIdFilters = new Set(['pracownik_id', 'usluga_id', 'uzytkownik_id']);
+
     function buildExportUrl(params) {
         const exportParams = new URLSearchParams();
         exportParams.set('typ', 'rezerwacje');
 
         for (const [key, value] of params) {
-            if (key === 'size' || key === 'page' || value === '' || value === '0') continue;
+            if (key === 'size' || key === 'page' || value === '') continue;
+            if (neutralIdFilters.has(key) && value === '0') continue;
             exportParams.append(key, value);
         }
 
