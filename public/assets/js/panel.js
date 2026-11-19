@@ -426,7 +426,7 @@
     const form = document.getElementById('logout-form');
     const error = document.getElementById('logout-error');
     const button = form.querySelector('button[type="submit"]');
-    const loginUrl = form.dataset.loginUrl || '';
+    const homeUrl = form.dataset.homeUrl || '';
 
     form.addEventListener('submit', async function (event) {
         event.preventDefault();
@@ -452,7 +452,7 @@
                 return;
             }
 
-            window.location.href = loginUrl;
+            window.location.href = homeUrl;
         } catch {
             error.textContent = 'Nie udało się połączyć z serwerem. Spróbuj ponownie.';
             error.classList.remove('hidden');

@@ -242,19 +242,28 @@ WeFixIT to system rezerwacji dla serwisu komputerowego z trzema rolami: klient, 
 
 | Rola | Dostęp |
 |------|--------|
-| Niezalogowany | `/login`, `/register`, `/oferta`, `/usluga?id=…`, `POST /api/auth/login`, `POST /api/auth/register` |
-| Klient (`klient`) | `/oferta`, `/usluga?id=…`, `/rezerwacja`, `/panel`, `/profil`, `GET /api/me`, `PATCH /api/profile`, `GET /api/availability`, `POST /api/reservations`, `PATCH /api/client-reservations` |
-| Pracownik (`pracownik`) | `/oferta`, `/usluga?id=…`, `/panel`, `/pracownik`, `/profil`, `GET /api/me`, `PATCH /api/profile`, `GET /api/availability`, `PATCH /api/employee-reservations` |
-| Administrator (`admin`) | jak pracownik oraz `/rezerwacja`, `/admin`, `/kategorie`, `/uslugi`, `/pracownicy`, `/pracownicy-uslugi?id=…`, `/pracownicy-dostepnosc?id=…`, `/uzytkownicy`, `/rezerwacje`, `/log`, `/eksport?typ=rezerwacje`, `/eksport?typ=uzytkownicy` i `/api/admin/*` |
+| Niezalogowany | `/`, `/login`, `/register`, `/oferta`, `/usluga?id=…`, `POST /api/auth/login`, `POST /api/auth/register` |
+| Klient (`klient`) | `/`, `/oferta`, `/usluga?id=…`, `/rezerwacja`, `/panel`, `/profil`, `GET /api/me`, `PATCH /api/profile`, `GET /api/availability`, `POST /api/reservations`, `PATCH /api/client-reservations` |
+| Pracownik (`pracownik`) | `/`, `/oferta`, `/usluga?id=…`, `/panel`, `/pracownik`, `/profil`, `GET /api/me`, `PATCH /api/profile`, `GET /api/availability`, `PATCH /api/employee-reservations` |
+| Administrator (`admin`) | `/`, jak pracownik oraz `/rezerwacja`, `/admin`, `/kategorie`, `/uslugi`, `/pracownicy`, `/pracownicy-uslugi?id=…`, `/pracownicy-dostepnosc?id=…`, `/uzytkownicy`, `/rezerwacje`, `/log`, `/eksport?typ=rezerwacje`, `/eksport?typ=uzytkownicy` i `/api/admin/*` |
+
+Strona główna `/` jest publicznym landingiem serwisu i nie przekierowuje na
+`/login` — widzą ją goście oraz użytkownicy każdej roli. Gość widzi w nagłówku
+przyciski „Zaloguj się” i „Zarejestruj się” oraz CTA „Zaloguj się i zarezerwuj
+wizytę”, a zalogowany — imię i nazwisko z odnośnikiem do panelu właściwego dla
+roli oraz CTA „Przejdź do panelu”. Niezależnie od sesji strona
+pokazuje krótki opis działania serwisu, aktywne kategorie oferty z linkami do
+`/oferta?kategoria=…` i trzy kroki rezerwacji.
 
 Rola jest sprawdzana po stronie serwera na każdej chronionej stronie przez
 `require_role()` i na każdym chronionym endpointcie przez `require_api_login()`
 oraz porównanie pola `rola`. Widoczność pozycji w menu (`panel_menu_items()`)
 jest tylko wygodą interfejsu. Klient i pracownik, którzy ręcznie wpiszą adres
 `/admin`, `/kategorie`, `/uzytkownicy` lub innej strony administracyjnej,
-otrzymają odpowiedź 403. Bez sesji strona przekierowuje na `/login`, a endpoint
-API zwraca 401. `auth_base_path()` sprawia, że linki i przekierowania działają
-także w podkatalogu XAMPP.
+otrzymają odpowiedź 403. Bez sesji chroniona strona przekierowuje na `/login`,
+a endpoint API zwraca 401. Strona główna `/` jest wyjątkiem i pozostaje
+dostępna dla każdego. `auth_base_path()` sprawia, że linki i przekierowania
+działają także w podkatalogu XAMPP.
 
 Konto klienta powstaje wyłącznie przez rejestrację. Rolę zawsze ustala serwer,
 więc pola `rola` i `aktywny` przesłane w formularzu są ignorowane. Strona
