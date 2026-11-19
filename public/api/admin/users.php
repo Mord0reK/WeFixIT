@@ -4,9 +4,10 @@ declare(strict_types=1);
 /*
     Endpoint administracyjny kont użytkowników.
 
-    Obsługuje wyłącznie PATCH: zmianę roli i/lub flagi aktywności po id.
-    Nie tworzy, nie usuwa kont i nie zmienia haseł. Tożsamość aktora pochodzi
-    wyłącznie z sesji, a reguły spójności sprawdza warstwa danych.
+    Obsługuje GET (lista z filtrami) oraz PATCH: zmianę roli i/lub flagi
+    aktywności po id. Nie tworzy, nie usuwa kont i nie zmienia haseł.
+    Tożsamość aktora pochodzi wyłącznie z sesji, a reguły spójności sprawdza
+    warstwa danych.
 */
 require_once __DIR__ . '/../../../app/json.php';
 require_once __DIR__ . '/../../../app/auth.php';
@@ -14,7 +15,7 @@ require_once __DIR__ . '/../../../app/uzytkownicy.php';
 require_once __DIR__ . '/../../../app/log.php';
 
 $method = $_SERVER['REQUEST_METHOD'] ?? '';
-json_require_method(['PATCH']);
+json_require_method(['GET', 'PATCH']);
 
 if ($method === 'PATCH') {
     json_require_content_type();
@@ -24,6 +25,33 @@ $user = require_api_login();
 
 if (($user['rola'] ?? '') !== 'admin') {
     json_response(403, ['error' => 'Brak uprawnień do zarządzania użytkownikami.']);
+}
+
+if ($method === 'GET') {
+    $page = pagination_page($_GET['page'] ?? null);
+    $size = pagination_size($_GET['size'] ?? null);
+    $result = uzytkownicy_list_paginated(
+        uzytkownik_role_filter($_GET['rola'] ?? null),
+        uzytkownik_status_filter($_GET['status'] ?? null),
+        pagination_search_value($_GET['szukaj'] ?? null),
+        $page,
+        $size
+    );
+
+    if ($result === null) {
+        json_response(500, ['error' => 'Nie udało się pobrać użytkowników. Wystąpił problem z serwerem.']);
+    }
+
+    json_response(200, [
+        'success' => true,
+        'uzytkownicy' => $result['items'],
+        'paginacja' => [
+            'strona' => $result['page'],
+            'rozmiar' => $result['size'],
+            'stron' => $result['pages'],
+            'razem' => $result['total'],
+        ],
+    ]);
 }
 
 if (!csrf_verify(csrf_token_from_request())) {

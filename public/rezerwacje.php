@@ -139,10 +139,36 @@ foreach (REZERWACJA_STATUSES as $statusOption) {
     ];
 }
 
+// Mapy dla renderowania wierszy po stronie JavaScript.
+$transitionsForJs = [];
+
+foreach (REZERWACJA_STATUSES as $statusOption) {
+    $transitionsForJs[$statusOption] = rezerwacja_transition_targets($statusOption);
+}
+
+$statusesForJs = [];
+
+foreach (REZERWACJA_STATUSES as $statusOption) {
+    $statusesForJs[$statusOption] = [
+        'label' => $statusLabels[$statusOption] ?? $statusOption,
+        'variant' => $statusVariants[$statusOption] ?? 'neutral',
+        'targets' => array_map(
+            static fn (string $target): array => [
+                'value' => $target,
+                'label' => $targetLabels[$target] ?? $target,
+            ],
+            $transitionsForJs[$statusOption]
+        ),
+    ];
+}
+
 panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
+$statusesJson = htmlspecialchars(json_encode($statusesForJs, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
 ?>
 <section id="reservations-page" class="<?= PANEL_CARD_WIDE_CLASS ?>"
-    data-api="<?= htmlspecialchars($reservationsApi, ENT_QUOTES, 'UTF-8') ?>">
+    data-api="<?= htmlspecialchars($reservationsApi, ENT_QUOTES, 'UTF-8') ?>"
+    data-reservations-url="<?= htmlspecialchars($reservationsUrl, ENT_QUOTES, 'UTF-8') ?>"
+    data-statuses="<?= $statusesJson ?>">
     <?php
     panel_section_header(
         'Rezerwacje',
@@ -173,10 +199,9 @@ panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
 
             <div class="flex flex-wrap items-center gap-2 sm:items-end">
                 <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
-                <?php if ($filtersActive): ?>
-                    <a href="<?= htmlspecialchars($reservationsUrl, ENT_QUOTES, 'UTF-8') ?>"
-                        class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
-                <?php endif; ?>
+                <a href="<?= htmlspecialchars($reservationsUrl, ENT_QUOTES, 'UTF-8') ?>"
+                    data-clear-filters="1"<?= $filtersActive ? '' : ' hidden' ?>
+                    class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
             </div>
         </form>
 
@@ -259,7 +284,7 @@ panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
                                     panel_empty_state(
                                         'Brak rezerwacji dla wybranych filtrów',
                                         'Zmień zakres dat, filtry lub frazę wyszukiwania, aby zobaczyć inne rezerwacje.',
-                                        ['label' => 'Wyczyść filtry', 'href' => $reservationsUrl]
+                                        ['label' => 'Wyczyść filtry', 'href' => $reservationsUrl, 'clear' => true]
                                     );
                                 } else {
                                     panel_empty_state(
@@ -355,7 +380,9 @@ panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
                 </tbody>
             </table>
         </div>
-        <?php panel_pagination($basePath, '/rezerwacje', $paginationParams, $reservationPage); ?>
+        <div data-list-pagination>
+            <?php panel_pagination($basePath, '/rezerwacje', $paginationParams, $reservationPage); ?>
+        </div>
     <?php endif; ?>
 
     <p id="reservations-error" role="alert" class="mt-3 hidden text-sm text-red-600 dark:text-red-400"></p>
@@ -365,4 +392,4 @@ panel_layout_head($user, 'Rezerwacje — WeFixIT', 'reservations');
     </noscript>
 </section>
 
-<?php panel_layout_foot('reservations.js'); ?>
+<?php panel_layout_foot(['panel-list.js', 'reservations.js']); ?>

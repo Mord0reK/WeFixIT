@@ -350,21 +350,74 @@ test('50. PATCH z tymi samymi wartościami usługi daje 200', function (): void 
     assert_status(200, $response, 'Zapis bez zmiany wartości powinien dać 200, a nie 404');
 });
 
-test('51. GET endpointu usług daje 405 z nagłówkiem Allow', function (): void {
+test('51. GET endpointu usług daje 401 bez logowania i 200 dla administratora', function (): void {
     $cookies = [];
     $response = http_request($cookies, 'GET', '/api/admin/services.php');
 
-    assert_status(405, $response, 'GET na endpoint usług powinien dać 405');
+    assert_status(401, $response, 'GET bez logowania powinien dać 401');
 
-    $allow = header_value($response, 'allow');
-    assert_true(is_string($allow) && $allow !== '', 'Odpowiedź 405 powinna zawierać nagłówek Allow');
+    $forbidden = login_as('jan.kowalski@example.com');
+    assert_status(200, $forbidden['response'], 'Logowanie klienta powinno się udać');
+    $clientGet = http_request($forbidden['cookies'], 'GET', '/api/admin/services.php');
+    assert_status(403, $clientGet, 'Klient nie może pobierać listy usług');
 
-    foreach (['POST', 'PATCH', 'DELETE'] as $method) {
-        assert_true(
-            strpos($allow, $method) !== false,
-            'Nagłówek Allow powinien zawierać metodę ' . $method
-        );
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+    $listResponse = http_request($session['cookies'], 'GET', '/api/admin/services.php');
+    assert_status(200, $listResponse, 'GET zalogowanego administratora powinien dać 200');
+
+    $body = json_body($listResponse);
+    assert_array_key($body, 'success', 'Odpowiedź powinna zawierać success');
+    assert_same(true, $body['success'], 'GET listy usług powinien zakończyć się sukcesem');
+    assert_array_key($body, 'uslugi', 'Odpowiedź powinna zawierać listę usług');
+    assert_array_key($body, 'paginacja', 'Odpowiedź powinna zawierać paginację');
+});
+
+test('51a. GET usług obsługuje filtry i paginację', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $categoryTotal = (int) test_db()->query(
+        'SELECT COUNT(*) FROM uslugi WHERE kategoria_id = 2'
+    )->fetchColumn();
+    $categoryFilter = http_request($session['cookies'], 'GET', '/api/admin/services.php?id_kategorii=2');
+    assert_status(200, $categoryFilter, 'Filtr kategorii powinien dać 200');
+    $categoryBody = json_body($categoryFilter);
+    assert_same($categoryTotal, count($categoryBody['uslugi']), 'Filtr kategorii powinien zgadzać się z bazą');
+    assert_same($categoryTotal, (int) $categoryBody['paginacja']['razem'], 'Paginacja powinna uwzględniać filtr kategorii');
+
+    $inactiveTotal = (int) test_db()->query(
+        'SELECT COUNT(*) FROM uslugi WHERE aktywna = FALSE'
+    )->fetchColumn();
+    $statusFilter = http_request($session['cookies'], 'GET', '/api/admin/services.php?status=inactive');
+    assert_status(200, $statusFilter, 'Filtr statusu powinien dać 200');
+    $statusBody = json_body($statusFilter);
+    assert_same($inactiveTotal, count($statusBody['uslugi']), 'Filtr nieaktywnych powinien zgadzać się z bazą');
+
+    foreach ($statusBody['uslugi'] as $service) {
+        assert_same(false, $service['aktywna'], 'Filtr nieaktywnych może zwracać wyłącznie nieaktywne usługi');
     }
+
+    $searchTotal = (int) test_db()->query(
+        "SELECT COUNT(*) FROM uslugi WHERE nazwa LIKE '%matrycy%'"
+    )->fetchColumn();
+    $search = http_request($session['cookies'], 'GET', '/api/admin/services.php?szukaj=matrycy');
+    assert_status(200, $search, 'Wyszukiwanie powinno dać 200');
+    $searchBody = json_body($search);
+    assert_same($searchTotal, count($searchBody['uslugi']), 'Wyszukiwanie powinno zgadzać się z bazą');
+
+    $paged = http_request($session['cookies'], 'GET', '/api/admin/services.php?size=2&page=3');
+    assert_status(200, $paged, 'Paginacja powinna dać 200');
+    $pagedBody = json_body($paged);
+    assert_same(3, $pagedBody['paginacja']['strona'], 'Odpowiedź powinna informować o trzeciej stronie');
+
+    $total = (int) test_db()->query('SELECT COUNT(*) FROM uslugi')->fetchColumn();
+    assert_same(max(1, (int) ceil($total / 2)), (int) $pagedBody['paginacja']['stron'], 'Liczba stron powinna wynikać z liczby usług');
+    assert_same(
+        min(2, max(0, $total - 4)),
+        count($pagedBody['uslugi']),
+        'Trzecia strona przy rozmiarze 2 powinna zawierać pozostałe usługi'
+    );
 });
 
 test('52. POST bez Content-Type application/json daje 415 i nie tworzy rekordu', function (): void {

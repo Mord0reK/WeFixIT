@@ -114,10 +114,8 @@ function panel_filter_start(string $id, string $label, bool $active = false): vo
             aria-expanded="false" aria-haspopup="true" aria-controls="<?= $idSafe ?>-menu">
             <span class="flex items-center gap-1.5">
                 <span><?= $labelSafe ?></span>
-                <?php if ($active): ?>
-                    <span class="<?= PANEL_FILTER_ACTIVE_DOT_CLASS ?>" aria-hidden="true"></span>
-                    <span class="sr-only">Filtr aktywny</span>
-                <?php endif; ?>
+                <span class="<?= PANEL_FILTER_ACTIVE_DOT_CLASS ?>" aria-hidden="true" data-filter-dot<?= $active ? '' : ' hidden' ?>></span>
+                <span class="sr-only" data-filter-active-label<?= $active ? '' : ' hidden' ?>>Filtr aktywny</span>
             </span>
             <?= panel_icon('chevron-down', 'h-3.5 w-3.5 shrink-0') ?>
         </button>
@@ -204,9 +202,10 @@ function panel_empty_state(string $title, string $description, array $action = [
     $label = $action['label'] ?? '';
     $href = $action['href'] ?? '';
     $drawer = $action['drawer'] ?? '';
+    $clear = (bool) ($action['clear'] ?? false);
     $hasDrawer = is_string($drawer) && $drawer !== '';
     $hasAction = is_string($label) && $label !== ''
-        && ($hasDrawer || (is_string($href) && $href !== ''));
+        && ($hasDrawer || $clear || (is_string($href) && $href !== ''));
     $actionHref = $hasDrawer ? '#' . $drawer : $href;
     ?>
     <div class="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/60 p-8 text-center dark:border-zinc-800 dark:bg-zinc-950/50">
@@ -218,6 +217,9 @@ function panel_empty_state(string $title, string $description, array $action = [
         <?php if ($hasAction): ?>
             <a href="<?= htmlspecialchars($actionHref, ENT_QUOTES, 'UTF-8') ?>"
                 class="<?= panel_button_classes('secondary') ?> mt-4"
+                <?php if ($clear): ?>
+                    data-clear-filters="1"
+                <?php endif; ?>
                 <?php if ($hasDrawer): ?>
                     data-drawer-open="<?= htmlspecialchars($drawer, ENT_QUOTES, 'UTF-8') ?>"
                     aria-haspopup="dialog" aria-controls="<?= htmlspecialchars($drawer, ENT_QUOTES, 'UTF-8') ?>"

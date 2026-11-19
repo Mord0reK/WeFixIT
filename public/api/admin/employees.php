@@ -4,7 +4,8 @@ declare(strict_types=1);
 /*
     Endpoint administracyjny pracowników.
 
-    Obsługuje POST (utworzenie profilu), PATCH (opis i aktywność) oraz DELETE.
+    Obsługuje GET (lista z filtrami oraz konta dostępne do powiązania),
+    POST (utworzenie profilu), PATCH (opis i aktywność) oraz DELETE.
     Panel nie tworzy kont użytkowników — profil można utworzyć wyłącznie dla
     istniejącego, aktywnego konta z rolą pracownik. Uprawnienia sprawdzamy
     wyłącznie po stronie serwera.
@@ -15,7 +16,7 @@ require_once __DIR__ . '/../../../app/pracownicy.php';
 require_once __DIR__ . '/../../../app/log.php';
 
 $method = $_SERVER['REQUEST_METHOD'] ?? '';
-json_require_method(['POST', 'PATCH', 'DELETE']);
+json_require_method(['GET', 'POST', 'PATCH', 'DELETE']);
 
 if ($method === 'POST' || $method === 'PATCH') {
     json_require_content_type();
@@ -25,6 +26,41 @@ $user = require_api_login();
 
 if (($user['rola'] ?? '') !== 'admin') {
     json_response(403, ['error' => 'Brak uprawnień do zarządzania pracownikami.']);
+}
+
+if ($method === 'GET') {
+    $page = pagination_page($_GET['page'] ?? null);
+    $size = pagination_size($_GET['size'] ?? null);
+    $result = pracownicy_list_paginated(
+        pagination_search_value($_GET['szukaj'] ?? null),
+        $page,
+        $size,
+        pracownik_filter_status($_GET['status'] ?? null)
+    );
+
+    if ($result === null) {
+        json_response(500, ['error' => 'Nie udało się pobrać pracowników. Wystąpił problem z serwerem.']);
+    }
+
+    // Formularz dodawania korzysta z aktualnej listy kont bez profilu.
+    // null oznacza błąd zapytania — nie wolno go zwrócić jako udanej odpowiedzi.
+    $accounts = pracownicy_available_accounts();
+
+    if ($accounts === null) {
+        json_response(500, ['error' => 'Nie udało się pobrać kont dostępnych do powiązania. Wystąpił problem z serwerem.']);
+    }
+
+    json_response(200, [
+        'success' => true,
+        'pracownicy' => $result['items'],
+        'konta_dostepne' => $accounts,
+        'paginacja' => [
+            'strona' => $result['page'],
+            'rozmiar' => $result['size'],
+            'stron' => $result['pages'],
+            'razem' => $result['total'],
+        ],
+    ]);
 }
 
 if (!csrf_verify(csrf_token_from_request())) {

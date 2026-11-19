@@ -298,17 +298,26 @@
     window.panelOpenDrawer = openPanelDrawer;
     window.panelCloseDrawer = closePanelDrawer;
 
-    for (const trigger of document.querySelectorAll('[data-drawer-open]')) {
-        trigger.addEventListener('click', function (event) {
-            const drawerId = trigger.getAttribute('data-drawer-open');
-            const drawer = drawerId ? document.getElementById(drawerId) : null;
+    /*
+        Delegacja zamiast wiązania pojedynczych elementów: przyciski mogą
+        pojawiać się w DOM później, np. w pustym stanie renderowanym przez
+        panelList po pobraniu listy z API.
+    */
+    document.addEventListener('click', function (event) {
+        if (!(event.target instanceof Element)) return;
 
-            if (!drawer) return;
+        const trigger = event.target.closest('[data-drawer-open]');
 
-            event.preventDefault();
-            openPanelDrawer(drawer);
-        });
-    }
+        if (trigger === null) return;
+
+        const drawerId = trigger.getAttribute('data-drawer-open');
+        const drawer = drawerId ? document.getElementById(drawerId) : null;
+
+        if (!drawer) return;
+
+        event.preventDefault();
+        openPanelDrawer(drawer);
+    });
 
     for (const closeButton of document.querySelectorAll('[data-drawer-close]')) {
         closeButton.addEventListener('click', function () {
@@ -426,7 +435,7 @@
     const form = document.getElementById('logout-form');
     const error = document.getElementById('logout-error');
     const button = form.querySelector('button[type="submit"]');
-    const loginUrl = form.dataset.loginUrl || '';
+    const homeUrl = form.dataset.homeUrl || '';
 
     form.addEventListener('submit', async function (event) {
         event.preventDefault();
@@ -452,7 +461,7 @@
                 return;
             }
 
-            window.location.href = loginUrl;
+            window.location.href = homeUrl;
         } catch {
             error.textContent = 'Nie udało się połączyć z serwerem. Spróbuj ponownie.';
             error.classList.remove('hidden');

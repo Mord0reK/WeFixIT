@@ -57,7 +57,9 @@ if ($search !== '') {
 
 panel_layout_head($user, 'Usługi — WeFixIT', 'services');
 ?>
-<section class="<?= PANEL_CARD_WIDE_CLASS ?>">
+<section class="<?= PANEL_CARD_WIDE_CLASS ?>"
+    data-api="<?= htmlspecialchars($servicesApi, ENT_QUOTES, 'UTF-8') ?>"
+    data-services-url="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>">
     <?php
     panel_section_header(
         'Usługi',
@@ -87,10 +89,9 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
 
             <div class="flex flex-wrap items-center gap-2 sm:items-end">
                 <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
-                <?php if ($filtersActive): ?>
-                    <a href="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>"
-                        class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
-                <?php endif; ?>
+                <a href="<?= htmlspecialchars($servicesUrl, ENT_QUOTES, 'UTF-8') ?>"
+                    data-clear-filters="1"<?= $filtersActive ? '' : ' hidden' ?>
+                    class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
             </div>
         </form>
 
@@ -140,7 +141,7 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
                                     panel_empty_state(
                                         'Brak usług dla wybranych filtrów',
                                         'Zmień kategorię, status lub frazę wyszukiwania, aby zobaczyć inne usługi.',
-                                        ['label' => 'Wyczyść filtry', 'href' => $servicesUrl]
+                                        ['label' => 'Wyczyść filtry', 'href' => $servicesUrl, 'clear' => true]
                                     );
                                 } else {
                                     panel_empty_state(
@@ -224,7 +225,9 @@ panel_layout_head($user, 'Usługi — WeFixIT', 'services');
                 </tbody>
             </table>
         </div>
-        <?php panel_pagination($basePath, '/uslugi', $paginationParams, $servicePage); ?>
+        <div data-list-pagination>
+            <?php panel_pagination($basePath, '/uslugi', $paginationParams, $servicePage); ?>
+        </div>
     <?php endif; ?>
 </section>
 
@@ -318,4 +321,4 @@ panel_drawer_start(
     <p class="mt-4 text-sm text-red-600 dark:text-red-400">Włącz JavaScript, aby zarządzać usługami.</p>
 </noscript>
 
-<?php panel_layout_foot('services.js'); ?>
+<?php panel_layout_foot(['panel-list.js', 'services.js']); ?>

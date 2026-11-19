@@ -36,13 +36,17 @@ if ($statusFilter !== 'all') {
     $paginationParams['status'] = $statusFilter;
 }
 
-$headerActions = $hasAvailableAccounts
-    ? [['label' => 'Dodaj pracownika', 'drawer' => 'employee-drawer']]
-    : [];
+// Link jest zawsze renderowany; JavaScript pokazuje go, gdy konto wróci do listy.
+$headerActions = [
+    ['label' => 'Dodaj pracownika', 'drawer' => 'employee-drawer', 'hidden' => !$hasAvailableAccounts]
+];
 
 panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
 ?>
-<section class="<?= PANEL_CARD_WIDE_CLASS ?>">
+<section id="employees-page" class="<?= PANEL_CARD_WIDE_CLASS ?>"
+    data-api="<?= htmlspecialchars($employeesApi, ENT_QUOTES, 'UTF-8') ?>"
+    data-employees-url="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
+    data-base-path="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>">
     <?php
     panel_section_header(
         'Pracownicy',
@@ -70,10 +74,9 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
 
             <div class="flex flex-wrap items-center gap-2 sm:items-end">
                 <button type="submit" class="<?= panel_button_classes('secondary') ?>">Szukaj</button>
-                <?php if ($hasFilters): ?>
-                    <a href="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
-                        class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
-                <?php endif; ?>
+                <a href="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
+                    data-clear-filters="1"<?= $hasFilters ? '' : ' hidden' ?>
+                    class="<?= panel_button_classes('ghost') ?>">Wyczyść</a>
             </div>
         </form>
 
@@ -111,7 +114,7 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                                     panel_empty_state(
                                         'Brak pracowników dla wybranej frazy',
                                         'Zmień frazę wyszukiwania, aby zobaczyć inne profile.',
-                                        ['label' => 'Wyczyść wyszukiwanie', 'href' => $employeesUrl]
+                                        ['label' => 'Wyczyść wyszukiwanie', 'href' => $employeesUrl, 'clear' => true]
                                     );
                                 } elseif ($availableAccounts === []) {
                                     panel_empty_state(
@@ -212,7 +215,9 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                 </tbody>
             </table>
         </div>
-        <?php panel_pagination($basePath, '/pracownicy', $paginationParams, $employeePage); ?>
+        <div data-list-pagination>
+            <?php panel_pagination($basePath, '/pracownicy', $paginationParams, $employeePage); ?>
+        </div>
     <?php endif; ?>
 </section>
 
@@ -223,7 +228,7 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
         </div>
     </section>
 <?php elseif ($availableAccounts === [] && $hasEmployees): ?>
-    <section class="<?= PANEL_CARD_WIDE_CLASS ?> mt-6">
+    <section class="<?= PANEL_CARD_WIDE_CLASS ?> mt-6" data-employee-accounts-empty>
         <?php
         panel_empty_state(
             'Brak kont do powiązania',
@@ -309,4 +314,4 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
     </noscript>
 <?php endif; ?>
 
-<?php panel_layout_foot('employees.js'); ?>
+<?php panel_layout_foot(['panel-list.js', 'employees.js']); ?>

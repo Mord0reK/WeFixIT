@@ -105,6 +105,11 @@ test('Dodatkowo: karta użytkownika w sidebarze prowadzi do profilu', function (
         preg_match('/<a href="\/profil"[^>]*title="Przejdź do Mojego profilu"/s', $panel['body']) === 1,
         'Karta użytkownika w sidebarze powinna linkować do /profil'
     );
+    assert_true(
+        strpos($panel['body'], 'id="logout-form"') !== false
+            && strpos($panel['body'], 'data-home-url="/"') !== false,
+        'Wylogowanie w panelu powinno kierować na stronę główną'
+    );
 
     $profile = http_request($session['cookies'], 'GET', '/profil.php');
     assert_status(200, $profile, 'Klient powinien zobaczyć profil');
@@ -203,5 +208,43 @@ test('Dodatkowo: administrator widzi właściwą aktywną pozycję menu na podgl
     assert_true(
         preg_match('/<a href="\/admin"[^>]*aria-current="page"/s', $employee['body']) !== 1,
         'Na /pracownik.php Dashboard nie powinien być aktywny'
+    );
+});
+
+test_group('Strona główna', 'database/database.sql');
+
+test('Dodatkowo: strona główna bez sesji wyświetla przyciski logowania', function (): void {
+    $cookies = [];
+    $response = http_request($cookies, 'GET', '/index.php');
+
+    assert_status(200, $response, 'Strona główna powinna być dostępna bez logowania');
+    assert_true(
+        strpos($response['body'], 'Zaloguj się') !== false,
+        'Strona główna bez sesji powinna zawierać przycisk „Zaloguj się”'
+    );
+});
+
+test('Dodatkowo: strona główna po zalogowaniu pokazuje panel i dane użytkownika', function (): void {
+    $session = login_as('jan.kowalski@example.com');
+    assert_status(200, $session['response'], 'Logowanie klienta powinno się udać');
+
+    $response = http_request($session['cookies'], 'GET', '/index.php');
+
+    assert_status(200, $response, 'Strona główna powinna być dostępna także po zalogowaniu');
+    assert_true(
+        strpos($response['body'], 'Przejdź do panelu') !== false,
+        'Zalogowany klient powinien widzieć CTA „Przejdź do panelu”'
+    );
+    assert_true(
+        strpos($response['body'], 'Jan Kowalski') !== false,
+        'Nagłówek strony głównej powinien zawierać imię i nazwisko klienta'
+    );
+    assert_true(
+        strpos($response['body'], 'id="home-logout-form"') !== false,
+        'Przy nazwie konta powinien być przycisk wylogowania'
+    );
+    assert_true(
+        strpos($response['body'], 'data-home-url="/"') !== false,
+        'Po wylogowaniu powinno następować przekierowanie na stronę główną'
     );
 });

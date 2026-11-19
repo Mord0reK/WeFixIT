@@ -334,3 +334,75 @@ test('140. eksport neutralizuje komentarz rozpoczynający się od LF', function 
         'Komentarz zaczynający się od LF powinien być poprzedzony apostrofem'
     );
 });
+
+test('141. endpoint dziennika przyjmuje tylko GET', function (): void {
+    $cookies = [];
+
+    foreach (['POST', 'PATCH', 'DELETE'] as $method) {
+        $response = http_request($cookies, $method, '/api/admin/log.php');
+        assert_status(405, $response, $method . ' na endpoint dziennika powinien dać 405');
+
+        $allow = header_value($response, 'allow');
+        assert_true(is_string($allow) && $allow !== '', $method . ' powinien zwrócić nagłówek Allow');
+
+        $methods = array_values(array_filter(array_map('trim', explode(',', $allow))));
+        assert_same(['GET'], $methods, 'Allow powinno zawierać wyłącznie GET');
+    }
+
+    $anonymous = http_request($cookies, 'GET', '/api/admin/log.php');
+    assert_status(401, $anonymous, 'GET bez logowania powinien dać 401');
+});
+
+test('142. endpoint dziennika zwraca zdarzenia z filtrami i paginacją', function (): void {
+    log_export_clear_logs();
+    log_export_insert_log(1, 'usluga_utworzona', 'info', 'usluga', 1, 'ALFA', '{"pole":"wartosc"}');
+    log_export_insert_log(1, 'rezerwacja_anulowana', 'warning', 'rezerwacja', 2, 'BETA', null);
+    log_export_insert_log(1, 'pracownik_usuniety', 'critical', 'pracownik', 3, 'GAMMA', null);
+    $session = log_export_admin_session();
+
+    $forbidden = login_as('jan.kowalski@example.com');
+    assert_status(200, $forbidden['response'], 'Logowanie klienta powinno się udać');
+    $clientGet = http_request($forbidden['cookies'], 'GET', '/api/admin/log.php');
+    assert_status(403, $clientGet, 'Klient nie może pobierać dziennika');
+
+    $all = http_request($session['cookies'], 'GET', '/api/admin/log.php');
+    assert_status(200, $all, 'GET dziennika powinien dać 200');
+    $body = json_body($all);
+    assert_array_key($body, 'success', 'Odpowiedź powinna zawierać success');
+    assert_same(true, $body['success'], 'GET dziennika powinien zakończyć się sukcesem');
+    assert_array_key($body, 'zdarzenia', 'Odpowiedź powinna zawierać listę zdarzeń');
+    assert_array_key($body, 'paginacja', 'Odpowiedź powinna zawierać paginację');
+    assert_same(3, count($body['zdarzenia']), 'Wstawiliśmy trzy zdarzenia');
+    assert_same(3, $body['paginacja']['razem'], 'Paginacja powinna zliczyć wszystkie zdarzenia');
+
+    // Najnowsze zdarzenie jest pierwsze, jak w widoku renderowanym przez serwer.
+    assert_same('GAMMA', $body['zdarzenia'][0]['opis'], 'Zdarzenia powinny być posortowane malejąco');
+
+    $byLevel = http_request($session['cookies'], 'GET', '/api/admin/log.php?poziom=critical');
+    assert_status(200, $byLevel, 'Filtr poziomu powinien dać 200');
+    $levelBody = json_body($byLevel);
+    assert_same(1, count($levelBody['zdarzenia']), 'Filtr poziomu critical ma jedno zdarzenie');
+    assert_same('GAMMA', $levelBody['zdarzenia'][0]['opis'], 'Filtr poziomu zwraca właściwe zdarzenie');
+
+    $byAction = http_request($session['cookies'], 'GET', '/api/admin/log.php?akcja=usluga_utworzona');
+    assert_status(200, $byAction, 'Filtr akcji powinien dać 200');
+    $actionBody = json_body($byAction);
+    assert_same(1, count($actionBody['zdarzenia']), 'Filtr akcji ma jedno zdarzenie');
+    assert_same(
+        ['pole' => 'wartosc'],
+        $actionBody['zdarzenia'][0]['szczegoly'],
+        'Szczegóły powinny być zwracane jako obiekt'
+    );
+
+    $paged = http_request($session['cookies'], 'GET', '/api/admin/log.php?size=2&page=2');
+    assert_status(200, $paged, 'Paginacja powinna dać 200');
+    $pagedBody = json_body($paged);
+    assert_same(1, count($pagedBody['zdarzenia']), 'Druga strony przy rozmiarze 2 ma jedno zdarzenie');
+    assert_same(2, $pagedBody['paginacja']['strona'], 'Odpowiedź powinna informować o drugiej stronie');
+    assert_same(2, $pagedBody['paginacja']['stron'], 'Trzy zdarzenia przy rozmiarze 2 to dwie strony');
+
+    $invalid = http_request($session['cookies'], 'GET', '/api/admin/log.php?akcja=nieznana&poziom=zly');
+    assert_status(200, $invalid, 'Nieprawidłowe filtry powinny dać 200');
+    $invalidBody = json_body($invalid);
+    assert_same(3, count($invalidBody['zdarzenia']), 'Nieprawidłowe filtry wracają do pełnej listy');
+});

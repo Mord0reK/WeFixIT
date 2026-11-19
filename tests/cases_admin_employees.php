@@ -352,21 +352,76 @@ test('62. konto testowe bez profilu jest widoczne w select i znika po utworzeniu
     );
 });
 
-test('63. GET endpointu pracowników daje 405 z nagłówkiem Allow', function (): void {
+test('63. GET endpointu pracowników daje 401 bez logowania i 200 dla administratora', function (): void {
     $cookies = [];
     $response = http_request($cookies, 'GET', '/api/admin/employees.php');
 
-    assert_status(405, $response, 'GET na endpoint pracowników powinien dać 405');
+    assert_status(401, $response, 'GET bez logowania powinien dać 401');
 
-    $allow = header_value($response, 'allow');
-    assert_true(is_string($allow) && $allow !== '', 'Odpowiedź 405 powinna zawierać nagłówek Allow');
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+    $listResponse = http_request($session['cookies'], 'GET', '/api/admin/employees.php');
+    assert_status(200, $listResponse, 'GET zalogowanego administratora powinien dać 200');
 
-    foreach (['POST', 'PATCH', 'DELETE'] as $method) {
+    $body = json_body($listResponse);
+    assert_array_key($body, 'success', 'Odpowiedź powinna zawierać success');
+    assert_same(true, $body['success'], 'GET listy pracowników powinien zakończyć się sukcesem');
+    assert_array_key($body, 'pracownicy', 'Odpowiedź powinna zawierać listę pracowników');
+    assert_array_key($body, 'konta_dostepne', 'Odpowiedź powinna zawierać konta dostępne do powiązania');
+    assert_array_key($body, 'paginacja', 'Odpowiedź powinna zawierać paginację');
+
+    // Konta dostępne muszą zgadzać się z bazą i nie mogą mieć profili.
+    $available = test_db()->query(
+        "SELECT COUNT(*) FROM uzytkownicy u
+         LEFT JOIN pracownicy p ON p.uzytkownik_id = u.id
+         WHERE u.rola = 'pracownik' AND u.aktywny = TRUE AND p.id IS NULL"
+    )->fetchColumn();
+    assert_same((int) $available, count($body['konta_dostepne']), 'Lista kont dostępnych powinna zgadzać się z bazą');
+
+    $profileIds = test_db()->query('SELECT uzytkownik_id FROM pracownicy')->fetchAll(PDO::FETCH_COLUMN);
+
+    foreach ($body['konta_dostepne'] as $account) {
         assert_true(
-            strpos($allow, $method) !== false,
-            'Nagłówek Allow powinien zawierać metodę ' . $method
+            !in_array((string) $account['id'], array_map('strval', $profileIds), true),
+            'Konto z profilem nie może być proponowane do powiązania'
         );
     }
+});
+
+test('63a. GET pracowników obsługuje filtry i paginację', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $activeTotal = (int) test_db()->query(
+        'SELECT COUNT(*) FROM pracownicy p JOIN uzytkownicy u ON u.id = p.uzytkownik_id WHERE p.aktywny = TRUE'
+    )->fetchColumn();
+    $statusFilter = http_request($session['cookies'], 'GET', '/api/admin/employees.php?status=active');
+    assert_status(200, $statusFilter, 'Filtr statusu powinien dać 200');
+    $statusBody = json_body($statusFilter);
+    assert_same($activeTotal, (int) $statusBody['paginacja']['razem'], 'Filtr aktywnych powinien zgadzać się z bazą');
+
+    foreach ($statusBody['pracownicy'] as $employee) {
+        assert_same(true, $employee['aktywny'], 'Filtr aktywnych może zwracać wyłącznie aktywnych pracowników');
+    }
+
+    $searchTotal = (int) test_db()->query(
+        "SELECT COUNT(*) FROM pracownicy p JOIN uzytkownicy u ON u.id = p.uzytkownik_id
+         WHERE u.nazwisko LIKE '%Elektronik%' OR u.imie LIKE '%Elektronik%'"
+    )->fetchColumn();
+    $search = http_request($session['cookies'], 'GET', '/api/admin/employees.php?szukaj=Elektronik');
+    assert_status(200, $search, 'Wyszukiwanie powinno dać 200');
+    $searchBody = json_body($search);
+    assert_same($searchTotal, count($searchBody['pracownicy']), 'Wyszukiwanie powinno zgadzać się z bazą');
+
+    $paged = http_request($session['cookies'], 'GET', '/api/admin/employees.php?size=1&page=2');
+    assert_status(200, $paged, 'Paginacja powinna dać 200');
+    $pagedBody = json_body($paged);
+    assert_same(1, count($pagedBody['pracownicy']), 'Rozmiar strony ogranicza liczbę wyników');
+    assert_same(2, $pagedBody['paginacja']['strona'], 'Odpowiedź powinna informować o drugiej stronie');
+
+    $total = (int) test_db()->query('SELECT COUNT(*) FROM pracownicy')->fetchColumn();
+    $expectedPages = max(1, (int) ceil($total / 1));
+    assert_same($expectedPages, (int) $pagedBody['paginacja']['stron'], 'Liczba stron powinna wynikać z liczby pracowników');
 });
 
 test('64. POST bez Content-Type application/json daje 415 i nie tworzy profilu', function (): void {

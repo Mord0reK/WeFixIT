@@ -178,17 +178,22 @@ function panel_section_header(string $title, string $description = '', array $ac
                     $label = $action['label'] ?? '';
                     $href = $action['href'] ?? '';
                     $drawer = $action['drawer'] ?? '';
+                    $clear = (bool) ($action['clear'] ?? false);
+                    $hidden = (bool) ($action['hidden'] ?? false);
                     $hasDrawer = is_string($drawer) && $drawer !== '';
 
                     if (!is_string($label) || $label === ''
-                        || (!$hasDrawer && (!is_string($href) || $href === ''))) {
+                        || (!$hasDrawer && (!$clear && (!is_string($href) || $href === '')))) {
                         continue;
                     }
 
                     $actionHref = $hasDrawer ? '#' . $drawer : $href;
                     ?>
                     <a href="<?= htmlspecialchars($actionHref, ENT_QUOTES, 'UTF-8') ?>"
-                        class="<?= panel_button_classes('primary') ?>"
+                        class="<?= panel_button_classes($clear ? 'secondary' : 'primary') ?>"<?= $hidden ? ' hidden' : '' ?>
+                        <?php if ($clear): ?>
+                            data-clear-filters="1"
+                        <?php endif; ?>
                         <?php if ($hasDrawer): ?>
                             data-drawer-open="<?= htmlspecialchars($drawer, ENT_QUOTES, 'UTF-8') ?>"
                             aria-haspopup="dialog" aria-controls="<?= htmlspecialchars($drawer, ENT_QUOTES, 'UTF-8') ?>"
@@ -229,7 +234,7 @@ function panel_layout_head(array $user, string $title, string $active): void
 {
     $basePath = auth_base_path();
     $logoutUrl = htmlspecialchars($basePath . '/api/auth/logout', ENT_QUOTES, 'UTF-8');
-    $loginUrl = htmlspecialchars($basePath . '/login', ENT_QUOTES, 'UTF-8');
+    $homeUrl = htmlspecialchars($basePath . '/', ENT_QUOTES, 'UTF-8');
 
     $fullName = htmlspecialchars(trim($user['imie'] . ' ' . $user['nazwisko']), ENT_QUOTES, 'UTF-8');
     $email = htmlspecialchars((string) ($user['email'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -327,7 +332,7 @@ function panel_layout_head(array $user, string $title, string $active): void
                         </span>
                     </a>
                     <form id="logout-form" action="<?= $logoutUrl ?>" method="post" class="shrink-0"
-                        data-login-url="<?= $loginUrl ?>">
+                        data-home-url="<?= $homeUrl ?>">
                         <button type="submit" title="Wyloguj" aria-label="Wyloguj"
                             class="inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-wait disabled:opacity-60 dark:text-zinc-400 dark:hover:bg-red-950/30 dark:hover:text-red-400">
                             <?= panel_icon('logout', 'h-4 w-4 shrink-0') ?>
@@ -350,7 +355,7 @@ function panel_layout_head(array $user, string $title, string $active): void
     <?php
 }
 
-function panel_layout_foot(string $pageScript = ''): void
+function panel_layout_foot(string|array $pageScripts = ''): void
 {
     $confirmCancelClass = panel_button_classes('secondary');
     $confirmDangerClass = panel_button_classes('danger');
@@ -377,8 +382,12 @@ function panel_layout_foot(string $pageScript = ''): void
 
     layout_script('panel.js');
 
-    if ($pageScript !== '') {
-        layout_script($pageScript);
+    $scripts = is_array($pageScripts) ? $pageScripts : [$pageScripts];
+
+    foreach ($scripts as $pageScript) {
+        if (is_string($pageScript) && $pageScript !== '') {
+            layout_script($pageScript);
+        }
     }
 
     layout_foot();

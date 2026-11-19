@@ -224,21 +224,64 @@ test('36. strona kategorii zawiera tabelę i akcję, a dashboard link do kategor
     );
 });
 
-test('37. GET endpointu kategorii daje 405 z nagłówkiem Allow', function (): void {
+test('37. GET endpointu kategorii daje 401 bez logowania i 200 dla administratora', function (): void {
     $cookies = [];
     $response = http_request($cookies, 'GET', '/api/admin/categories.php');
 
-    assert_status(405, $response, 'GET na endpoint kategorii powinien dać 405');
+    assert_status(401, $response, 'GET bez logowania powinien dać 401');
 
-    $allow = header_value($response, 'allow');
-    assert_true(is_string($allow) && $allow !== '', 'Odpowiedź 405 powinna zawierać nagłówek Allow');
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+    $listResponse = http_request($session['cookies'], 'GET', '/api/admin/categories.php');
+    assert_status(200, $listResponse, 'GET zalogowanego administratora powinien dać 200');
 
-    foreach (['POST', 'PATCH', 'DELETE'] as $method) {
-        assert_true(
-            strpos($allow, $method) !== false,
-            'Nagłówek Allow powinien zawierać metodę ' . $method
-        );
+    $body = json_body($listResponse);
+    assert_array_key($body, 'success', 'Odpowiedź powinna zawierać success');
+    assert_same(true, $body['success'], 'GET listy kategorii powinien zakończyć się sukcesem');
+    assert_array_key($body, 'kategorie', 'Odpowiedź powinna zawierać listę kategorii');
+    assert_array_key($body, 'paginacja', 'Odpowiedź powinna zawierać paginację');
+
+    $total = (int) test_db()->query('SELECT COUNT(*) FROM kategorie_uslug')->fetchColumn();
+    assert_same($total, count($body['kategorie']), 'GET powinien zwrócić wszystkie kategorie');
+    assert_same($total, (int) $body['paginacja']['razem'], 'Paginacja powinna zliczyć wszystkie kategorie');
+});
+
+test('37a. GET kategorii obsługuje filtry i paginację', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+
+    $inactiveTotal = (int) test_db()->query(
+        'SELECT COUNT(*) FROM kategorie_uslug WHERE aktywna = FALSE'
+    )->fetchColumn();
+    $statusFilter = http_request($session['cookies'], 'GET', '/api/admin/categories.php?status=inactive');
+    assert_status(200, $statusFilter, 'Filtr statusu powinien dać 200');
+    $statusBody = json_body($statusFilter);
+    assert_same($inactiveTotal, count($statusBody['kategorie']), 'Filtr nieaktywnych powinien zgadzać się z bazą');
+    assert_same($inactiveTotal, (int) $statusBody['paginacja']['razem'], 'Paginacja powinna uwzględniać filtr statusu');
+
+    foreach ($statusBody['kategorie'] as $category) {
+        assert_same(false, $category['aktywna'], 'Filtr nieaktywnych może zwracać wyłącznie nieaktywne kategorie');
     }
+
+    $searchTotal = (int) test_db()->query(
+        "SELECT COUNT(*) FROM kategorie_uslug WHERE nazwa LIKE '%Oprogramowanie%'"
+    )->fetchColumn();
+    $search = http_request($session['cookies'], 'GET', '/api/admin/categories.php?szukaj=Oprogramowanie');
+    assert_status(200, $search, 'Wyszukiwanie powinno dać 200');
+    $searchBody = json_body($search);
+    assert_same($searchTotal, count($searchBody['kategorie']), 'Wyszukiwanie powinno zgadzać się z bazą');
+
+    $total = (int) test_db()->query('SELECT COUNT(*) FROM kategorie_uslug')->fetchColumn();
+    $paged = http_request($session['cookies'], 'GET', '/api/admin/categories.php?size=2&page=2');
+    assert_status(200, $paged, 'Paginacja powinna dać 200');
+    $pagedBody = json_body($paged);
+    assert_same(2, $pagedBody['paginacja']['strona'], 'Odpowiedź powinna informować o drugiej stronie');
+    assert_same(max(1, (int) ceil($total / 2)), (int) $pagedBody['paginacja']['stron'], 'Liczba stron powinna wynikać z liczby kategorii');
+    assert_same(
+        min(2, max(0, $total - 2)),
+        count($pagedBody['kategorie']),
+        'Druga strona przy rozmiarze 2 powinna zawierać pozostałe kategorie'
+    );
 });
 
 test('38. POST bez Content-Type application/json daje 415 i nie tworzy rekordu', function (): void {
