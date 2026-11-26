@@ -4,8 +4,9 @@ declare(strict_types=1);
 /*
     Endpoint POST /api/reservations.
 
-    Tworzy rezerwację zalogowanego użytkownika. Identyfikator klienta pochodzi
-    wyłącznie z sesji, a cenę, status i czas zakończenia ustala serwer.
+    Tworzy rezerwację zalogowanego klienta lub administratora. Identyfikator
+    rezerwującego pochodzi wyłącznie z sesji, a cenę, status i czas zakończenia
+    ustala serwer.
 */
 require_once __DIR__ . '/../../app/json.php';
 require_once __DIR__ . '/../../app/auth.php';
@@ -17,7 +18,7 @@ json_require_content_type();
 
 $user = require_api_login();
 
-if (($user['rola'] ?? '') !== 'klient') {
+if (!in_array(($user['rola'] ?? ''), ['klient', 'admin'], true)) {
     json_response(403, ['error' => 'Brak uprawnień do utworzenia rezerwacji.']);
 }
 

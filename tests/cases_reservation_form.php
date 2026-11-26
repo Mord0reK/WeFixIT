@@ -175,8 +175,16 @@ test('203. CTA na stronie usługi zależy od roli użytkownika', function (): vo
     $workerPage = http_request($worker['cookies'], 'GET', '/usluga.php?id=2');
     assert_status(200, $workerPage, 'Szczegóły usługi dla pracownika powinny zwrócić 200');
     assert_true(
-        strpos($workerPage['body'], '/pracownik') !== false,
-        'Pracownik powinien dostać link do swojego panelu'
+        strpos($workerPage['body'], 'id="panel-shell"') !== false,
+        'Szczegóły usługi zalogowanego pracownika powinny renderować się wewnątrz panelu'
+    );
+    assert_true(
+        strpos($workerPage['body'], 'Zarezerwuj termin') === false,
+        'Pracownik nie może dostawać przycisku rezerwacji na stronie usługi'
+    );
+    assert_true(
+        strpos($workerPage['body'], 'Wróć do oferty') !== false,
+        'Pracownik powinien dostać link z powrotem do oferty'
     );
     assert_true(
         strpos($workerPage['body'], '/login') === false,

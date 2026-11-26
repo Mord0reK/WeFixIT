@@ -638,25 +638,18 @@ test('192. POST przyjmuje wolny termin poza przesuniętą listą slotów', funct
     assert_status(201, $second, 'Wolny termin poza listą nadal powinien dać 201');
 });
 
-test('193. administrator i pracownik nie mogą tworzyć rezerwacji klienta', function (): void {
-    $accounts = [
-        ['email' => 'admin@wefixit.pl', 'label' => 'administratora'],
-        ['email' => 'tomasz.serwisant@wefixit.pl', 'label' => 'pracownika'],
-    ];
+test('193. pracownik nie może tworzyć rezerwacji klienta', function (): void {
+    $session = login_as('tomasz.serwisant@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie pracownika powinno się udać');
+    $csrf = csrf_from_page($session['cookies'], '/profil.php');
+    $response = post_json(
+        $session['cookies'],
+        '/api/reservations.php',
+        reservations_payload(1, 1, date('Y-m-d'), '09:00:00'),
+        $csrf
+    );
 
-    foreach ($accounts as $account) {
-        $session = login_as($account['email']);
-        assert_status(200, $session['response'], 'Logowanie ' . $account['label'] . ' powinno się udać');
-        $csrf = csrf_from_page($session['cookies'], '/profil.php');
-        $response = post_json(
-            $session['cookies'],
-            '/api/reservations.php',
-            reservations_payload(1, 1, date('Y-m-d'), '09:00:00'),
-            $csrf
-        );
-
-        assert_status(403, $response, 'Konto ' . $account['label'] . ' nie może tworzyć rezerwacji');
-    }
+    assert_status(403, $response, 'Konto pracownika nie może tworzyć rezerwacji');
 });
 
 test('194. równoległe POST różnych klientów nie przekraczają blokady pracownika', function (): void {
@@ -707,4 +700,38 @@ test('194. równoległe POST różnych klientów nie przekraczają blokady praco
         'czas_zakonczenia' => $partsA['end'],
     ]);
     assert_same(1, (int) $statement->fetchColumn(), 'W bazie powinna być dokładnie jedna kolidująca rezerwacja');
+});
+
+test('195. administrator może tworzyć rezerwację na własne konto', function (): void {
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+    $session['csrf'] = csrf_from_page($session['cookies'], '/profil.php');
+
+    $found = reservations_find_slots($session, 1, 1);
+    assert_true($found !== null, 'Powinien istnieć wolny termin dla pracownika 1 i usługi 1');
+
+    if ($found === null) {
+        return;
+    }
+
+    $parts = reservations_slot_parts($found['slots'][0]);
+    $response = post_json(
+        $session['cookies'],
+        '/api/reservations.php',
+        reservations_payload(1, 1, $parts['date'], $parts['time']),
+        $session['csrf']
+    );
+
+    assert_status(201, $response, 'Administrator powinien móc utworzyć rezerwację jak klient');
+
+    $data = json_body($response);
+    assert_same(true, $data['success'] ?? null, 'Odpowiedź powinna zawierać success: true');
+
+    $reservationId = (int) ($data['id'] ?? 0);
+    assert_true($reservationId > 0, 'Odpowiedź powinna zawierać identyfikator rezerwacji');
+
+    $statement = test_db()->prepare('SELECT uzytkownik_id FROM rezerwacje WHERE id = :id');
+    $statement->execute(['id' => $reservationId]);
+    $ownerId = (int) $statement->fetchColumn();
+    assert_same(1, $ownerId, 'Rezerwacja administratora powinna należeć do jego konta');
 });

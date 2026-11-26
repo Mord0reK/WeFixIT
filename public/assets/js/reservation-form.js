@@ -388,7 +388,14 @@
                 return;
             }
 
-            showGeneralError('Nie udało się utworzyć rezerwacji. Wystąpił problem z serwerem.');
+            // Nieobsłużone statusy (np. 403 przy wygasłym tokenie CSRF lub
+            // braku roli) niosą czytelny komunikat z serwera — pokazujemy go
+            // zamiast mylącej informacji o problemie serwera.
+            const message = typeof data.error === 'string' && data.error !== ''
+                ? data.error
+                : 'Nie udało się utworzyć rezerwacji. Wystąpił problem z serwerem.';
+
+            showGeneralError(message);
         } catch {
             showGeneralError('Nie udało się połączyć z serwerem. Spróbuj ponownie.');
         } finally {

@@ -385,6 +385,13 @@
         confirmOk.textContent = typeof settings.confirmLabel === 'string' && settings.confirmLabel !== ''
             ? settings.confirmLabel
             : 'Potwierdź';
+
+        // Przy akcji „Anuluj rezerwację” domyślny przycisk odrzucenia „Anuluj”
+        // myliłby się z nią, więc wywołujący może nadać mu własną etykietę.
+        confirmCancel.textContent = typeof settings.cancelLabel === 'string' && settings.cancelLabel !== ''
+            ? settings.cancelLabel
+            : 'Anuluj';
+
         setConfirmVariant(settings.danger === true);
         confirmDialog.returnValue = '';
         confirmClosing = false;
