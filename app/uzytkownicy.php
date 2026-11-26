@@ -76,6 +76,7 @@ function uzytkownik_row(array $row): array
         'aktywny' => (int) $row['aktywny'] === 1,
         'utworzono' => (string) $row['utworzono'],
         'ma_profil_pracownika' => $hasEmployeeProfile,
+        'profil_pracownika_id' => $hasEmployeeProfile ? (int) $row['pracownik_id'] : null,
         'profil_pracownika_aktywny' => $hasEmployeeProfile
             ? (int) $row['pracownik_aktywny'] === 1
             : null,
@@ -359,7 +360,12 @@ function uzytkownik_update(int $targetId, array $data, int $actorId): array
             $errors['aktywny'] = UZYTKOWNIK_SELF_ACTIVE_ERROR;
         }
 
-        if (!isset($errors['rola']) && $roleChanged && $targetRole === 'klient' && is_array($profile)) {
+        // Nieaktywny profil nie blokuje zmiany roli — to stan docelowy
+        // popupu dezaktywacji w panelu użytkowników. Blokujemy wyłącznie
+        // profil aktywny, zgodnie z treścią UZYTKOWNIK_EMPLOYEE_PROFILE_ROLE_ERROR.
+        $profileActive = is_array($profile) && (int) $profile['aktywny'] === 1;
+
+        if (!isset($errors['rola']) && $roleChanged && $targetRole === 'klient' && $profileActive) {
             $errors['rola'] = UZYTKOWNIK_EMPLOYEE_PROFILE_ROLE_ERROR;
         }
 

@@ -169,36 +169,47 @@
         openFilterDropdown = dropdown;
     }
 
-    for (const dropdown of document.querySelectorAll('[data-filter-dropdown]')) {
-        const toggle = dropdown.querySelector('[data-filter-toggle]');
-        const menu = dropdown.querySelector('[data-filter-menu]');
+    /*
+        Obsługa dropdownów przez delegację na dokumencie: menu mogą pojawić
+        się w DOM później, np. w wierszach tabel przebudowanych po pobraniu
+        listy z API. Klik w toggle przełącza menu, klik poza otwartym
+        dropdownem je zamyka, a klik w samo menu nie.
+    */
+    document.addEventListener('click', function (event) {
+        const target = event.target instanceof Element ? event.target : null;
 
-        if (!toggle || !menu) continue;
+        if (target === null) return;
 
-        toggle.addEventListener('click', function (event) {
-            event.stopPropagation();
+        const toggle = target.closest('[data-filter-toggle]');
 
-            if (openFilterDropdown === dropdown) {
-                closeFilterDropdown(dropdown, false);
-                return;
+        if (toggle !== null) {
+            const dropdown = toggle.closest('[data-filter-dropdown]');
+
+            if (dropdown !== null) {
+                if (openFilterDropdown === dropdown) {
+                    closeFilterDropdown(dropdown, false);
+                    return;
+                }
+
+                openFilterDropdownMenu(dropdown);
             }
 
-            openFilterDropdownMenu(dropdown);
-        });
+            return;
+        }
 
-        menu.addEventListener('click', function (event) {
-            event.stopPropagation();
-        });
+        if (openFilterDropdown === null) return;
 
-        // Po wybraniu opcji menu zamyka się; filtry dodatkowo wysyłają formularz.
-        menu.addEventListener('change', function () {
-            closeFilterDropdown(dropdown, true);
-        });
-    }
+        if (target.closest('[data-filter-dropdown]') === openFilterDropdown) return;
 
-    document.addEventListener('click', function () {
-        if (openFilterDropdown !== null) {
-            closeFilterDropdown(openFilterDropdown, false);
+        closeFilterDropdown(openFilterDropdown, false);
+    });
+
+    // Po wybraniu opcji menu zamyka się; filtry dodatkowo wysyłają formularz.
+    document.addEventListener('change', function (event) {
+        if (openFilterDropdown === null) return;
+
+        if (event.target instanceof Node && openFilterDropdown.contains(event.target)) {
+            closeFilterDropdown(openFilterDropdown, true);
         }
     });
 

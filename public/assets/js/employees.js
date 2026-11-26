@@ -2,10 +2,12 @@
     Zarządzanie profilami pracowników: lista pobierana z API, formularz
     w wysuwanym panelu oraz akcje edycji, zmiany statusu i usuwania.
 
-    Adres API pochodzi z data-api formularza, dzięki czemu działa również
-    w instalacji w podkatalogu. Po każdej operacji lista i lista kont
-    dostępnych do powiązania są odświeżane przez panelList bez przeładowania
-    strony.
+    Aktywacja profilu konta bez roli pracownik wymaga dwóch potwierdzeń:
+    najpierw zmiany roli (endpoint użytkowników), a dopiero potem samej
+    aktywacji. Adresy API pochodzą z data-api formularza i data-users-api
+    sekcji, dzięki czemu działają również w instalacji w podkatalogu.
+    Po każdej operacji lista i lista kont dostępnych do powiązania są
+    odświeżane przez panelList bez przeładowania strony.
 */
 (function () {
     const page = document.getElementById('employees-page');
@@ -28,6 +30,7 @@
     const employeeAccountReadonly = document.getElementById('employee-account-readonly');
     const accountsEmptySection = page.querySelector('[data-employee-accounts-empty]');
     const employeesApi = employeeForm ? employeeForm.dataset.api || '' : '';
+    const usersApi = page.dataset.usersApi || '';
     const employeesUrl = page.dataset.employeesUrl || '';
     const basePath = page.dataset.basePath || '';
     const csrfMeta = document.querySelector('meta[name="csrf-token"]');
@@ -187,6 +190,8 @@
         toggleButton.setAttribute('data-employee-toggle', '1');
         toggleButton.dataset.id = String(employee.id);
         toggleButton.dataset.name = name;
+        toggleButton.dataset.userId = String(employee.uzytkownik_id || '0');
+        toggleButton.dataset.accountRole = String(employee.rola || '');
         toggleButton.dataset.active = isActive ? '1' : '0';
         toggleButton.title = isActive ? 'Dezaktywuj' : 'Aktywuj';
         toggleButton.setAttribute('aria-label', isActive ? 'Dezaktywuj' : 'Aktywuj');
@@ -306,8 +311,8 @@
         }
     }
 
-    async function sendEmployeeRequest(method, payload) {
-        const response = await fetch(employeesApi, {
+    async function sendEmployeeRequest(method, payload, url) {
+        const response = await fetch(url || employeesApi, {
             method: method,
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
@@ -417,6 +422,52 @@
 
         const isActive = toggleButton.dataset.active === '1';
         const name = toggleButton.dataset.name || 'tego pracownika';
+
+        /*
+            Aktywacja profilu konta bez roli pracownik wymaga najpierw
+            zmiany roli — sekwencja jak w panelu użytkowników: popup
+            zmiany roli, a dopiero po niej popup samej aktywacji.
+        */
+        let roleChanged = false;
+
+        if (!isActive && toggleButton.dataset.accountRole !== 'pracownik') {
+            const roleConfirmed = await window.panelConfirm({
+                title: 'Zmiana roli',
+                message: 'Konto „' + name + '” nie ma roli pracownik. Aktywacja profilu wymaga najpierw zmiany roli konta. Czy zmienić rolę na Pracownik?',
+                confirmLabel: 'Zmień rolę'
+            });
+
+            if (!roleConfirmed) return;
+
+            operationBusy = true;
+            toggleButton.disabled = true;
+
+            try {
+                const result = await sendEmployeeRequest('PATCH', {
+                    id: Number(toggleButton.dataset.userId || '0'),
+                    rola: 'pracownik'
+                }, usersApi);
+
+                if (!result.response.ok || result.data.success !== true) {
+                    window.showToast(
+                        typeof result.data.error === 'string' && result.data.error !== ''
+                            ? result.data.error
+                            : 'Nie udało się zmienić roli konta.',
+                        'error'
+                    );
+                    return;
+                }
+
+                roleChanged = true;
+            } catch {
+                window.showToast('Nie udało się połączyć z serwerem. Spróbuj ponownie.', 'error');
+                return;
+            } finally {
+                toggleButton.disabled = false;
+                operationBusy = false;
+            }
+        }
+
         const confirmed = await window.panelConfirm({
             title: isActive ? 'Dezaktywować pracownika?' : 'Aktywować pracownika?',
             message: isActive
@@ -426,7 +477,15 @@
             danger: false
         });
 
-        if (!confirmed) return;
+        // Rola mogła zostać już zmieniona, więc przy anulowanej aktywacji
+        // odświeżamy listę, żeby wiersz pokazywał prawdziwy stan.
+        if (!confirmed) {
+            if (roleChanged) {
+                await refreshEmployeeList();
+            }
+
+            return;
+        }
 
         operationBusy = true;
         toggleButton.disabled = true;
@@ -444,6 +503,11 @@
                         : 'Nie udało się zmienić statusu pracownika.',
                     'error'
                 );
+
+                if (roleChanged) {
+                    await refreshEmployeeList();
+                }
+
                 return;
             }
 

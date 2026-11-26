@@ -216,6 +216,16 @@ if ($hasUserId && $newUserId !== $current['uzytkownik_id']) {
 
 $activeAfter = $hasActive ? $data['aktywny'] : $current['aktywny'];
 
+// Aktywny profil może należeć wyłącznie do konta z rolą pracownik.
+// Reaktywacja profilu byłego pracownika, który jest już klientem lub
+// administratorem, wymaga najpierw zmiany roli w panelu użytkowników.
+if ($activeAfter === true && $current['aktywny'] !== true && $current['rola'] !== 'pracownik') {
+    json_response(422, [
+        'error' => PRACOWNIK_ACTIVATE_ROLE_ERROR,
+        'errors' => ['aktywny' => PRACOWNIK_ACTIVATE_ROLE_ERROR],
+    ]);
+}
+
 if ($hasDescription) {
     try {
         $updated = pracownik_update($employeeId, [

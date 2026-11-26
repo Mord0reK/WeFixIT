@@ -6,7 +6,8 @@ declare(strict_types=1);
 
     Obejmują tworzenie profilu dla istniejącego konta, kontrolę dostępu, CSRF,
     walidację konta i opisu, niezmienność powiązania, blokadę usunięcia
-    profilu z zależnościami, dezaktywację oraz brak wycieku danych technicznych.
+    profilu z zależnościami, dezaktywację, wymóg zmiany roli przy aktywacji
+    profilu konta bez roli pracownik oraz brak wycieku danych technicznych.
 */
 
 test_group('Panel: pracownicy', 'database/database.sql');
@@ -466,6 +467,57 @@ test('65. PATCH z tymi samymi wartościami pracownika daje 200', function (): vo
     $after = test_db()->query('SELECT opis, aktywny FROM pracownicy WHERE id = 1')->fetch();
     assert_same($row['opis'] ?? null, $after['opis'] ?? null, 'Opis po zapisie powinien być identyczny');
     assert_same((int) $row['aktywny'], (int) $after['aktywny'], 'Flaga aktywności po zapisie powinna być identyczna');
+});
+
+test('65a. aktywacja profilu konta bez roli pracownik wymaga zmiany roli', function (): void {
+    $statement = test_db()->prepare('UPDATE uzytkownicy SET rola = :rola WHERE id = 3');
+    $statement->execute(['rola' => 'klient']);
+    $statement = test_db()->prepare('UPDATE pracownicy SET aktywny = FALSE WHERE id = 2');
+    $statement->execute();
+
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+    $csrf = csrf_from_page($session['cookies'], '/pracownicy.php');
+
+    try {
+        $blocked = patch_json($session['cookies'], '/api/admin/employees.php', [
+            'id' => 2,
+            'aktywny' => true,
+        ], $csrf);
+        assert_status(422, $blocked, 'Aktywacja profilu konta klienta powinna dać 422');
+
+        $data = json_body($blocked);
+        $message = $data['errors']['aktywny'] ?? '';
+        assert_true(is_string($message) && $message !== '', 'Odpowiedź powinna zawierać errors.aktywny');
+        assert_true(
+            strpos($message, 'rol') !== false,
+            'Komunikat powinien wskazywać potrzebę zmiany roli konta'
+        );
+
+        $row = test_db()->query('SELECT aktywny FROM pracownicy WHERE id = 2')->fetch();
+        assert_same(0, (int) $row['aktywny'], 'Profil nie może się aktywować przed zmianą roli');
+
+        // Popup w panelu najpierw zmienia rolę konta — po niej aktywacja przechodzi.
+        $roleResponse = patch_json($session['cookies'], '/api/admin/users.php', [
+            'id' => 3,
+            'rola' => 'pracownik',
+        ], $csrf);
+        assert_status(200, $roleResponse, 'Zmiana roli konta na pracownik powinna dać 200');
+
+        $activated = patch_json($session['cookies'], '/api/admin/employees.php', [
+            'id' => 2,
+            'aktywny' => true,
+        ], $csrf);
+        assert_status(200, $activated, 'Aktywacja po zmianie roli powinna dać 200');
+
+        $row = test_db()->query('SELECT aktywny FROM pracownicy WHERE id = 2')->fetch();
+        assert_same(1, (int) $row['aktywny'], 'Profil powinien być aktywny po zmianie roli');
+    } finally {
+        $statement = test_db()->prepare('UPDATE uzytkownicy SET rola = :rola WHERE id = 3');
+        $statement->execute(['rola' => 'pracownik']);
+        $statement = test_db()->prepare('UPDATE pracownicy SET aktywny = TRUE WHERE id = 2');
+        $statement->execute();
+    }
 });
 
 test('Dodatkowo: DELETE pracownika nie wymaga Content-Type application/json', function (): void {

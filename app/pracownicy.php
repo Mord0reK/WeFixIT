@@ -20,6 +20,7 @@ require_once __DIR__ . '/pagination.php';
 const PRACOWNIK_USER_TAKEN_ERROR = 'To konto ma już profil pracownika.';
 const PRACOWNIK_USER_CHANGE_ERROR = 'Powiązanie konta jest niezmienne. Zmiana konta wymaga utworzenia nowego profilu.';
 const PRACOWNIK_HAS_DEPENDENCIES_ERROR = 'Pracownik ma powiązane usługi, godziny pracy, nieobecności lub rezerwacje. Zamiast usuwać, dezaktywuj profil.';
+const PRACOWNIK_ACTIVATE_ROLE_ERROR = 'Aktywacja profilu wymaga zmiany roli konta na pracownik.';
 
 function pracownicy_db(): ?PDO
 {
