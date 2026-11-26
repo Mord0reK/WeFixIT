@@ -61,6 +61,7 @@
             const confirmed = await window.panelConfirm({
                 title: 'Anulować rezerwację?',
                 message: 'Rezerwacja „' + label + '” zostanie anulowana. Pozostanie w historii jako anulowana.',
+                cancelLabel: 'Wróć',
                 confirmLabel: 'Anuluj rezerwację',
                 danger: true
             });

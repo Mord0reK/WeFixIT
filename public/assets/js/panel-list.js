@@ -10,6 +10,7 @@
 (function () {
     // Ikony to stałe, zaufane fragmenty SVG — odpowiedniki app/panel_ui.php.
     const ICON_PATHS = {
+        'chevron-down': '<path d="m6 9 6 6 6-6"/>',
         'trash': '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
         'circle-slash': '<circle cx="12" cy="12" r="10"/><line x1="9" x2="15" y1="15" y2="9"/>',
         'circle-check': '<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>',
@@ -271,9 +272,12 @@
                 if (!toggle || !menu) continue;
 
                 let active = false;
+                let ownsFormControls = false;
 
                 for (const radios of filterGroups(form).values()) {
                     if (radios.length === 0 || !menu.contains(radios[0])) continue;
+
+                    ownsFormControls = true;
 
                     if (groupHasFilter(radios)) {
                         active = true;
@@ -283,10 +287,16 @@
                 for (const control of form.elements) {
                     if (control.type !== 'date' || !menu.contains(control)) continue;
 
+                    ownsFormControls = true;
+
                     if (control.value !== '') {
                         active = true;
                     }
                 }
+
+                // Dropdown akcji w wierszu nie jest filtrem, więc kropka
+                // aktywności mu nie przysługuje.
+                if (!ownsFormControls) continue;
 
                 let dot = toggle.querySelector('[data-filter-dot]');
 

@@ -242,9 +242,9 @@ function reservation_form_services(): ?array
     instrukcją transakcji, przed jakimkolwiek odczytem niemodyfikującym:
     dzięki temu stan dostępności jest czytany dopiero po przejęciu blokady
     i dwie równoległe sesje nie mogą obie zobaczyć tego samego terminu jako
-    wolnego. W tej samej transakcji blokujemy też konto klienta i wiersz
-    usługi, żeby ich dezaktywacja w trakcie żądania nie pozwoliła zapisać
-    rezerwacji.
+    wolnego. W tej samej transakcji blokujemy też konto rezerwującego
+    (klienta lub administratora) i wiersz usługi, żeby ich dezaktywacja
+    w trakcie żądania nie pozwoliła zapisać rezerwacji.
 */
 function reservation_create(int $userId, array $data): array
 {
@@ -291,10 +291,13 @@ function reservation_create(int $userId, array $data): array
         $statement->execute(['id' => $userId]);
         $client = $statement->fetch(PDO::FETCH_ASSOC);
 
+        // Rezerwację może utworzyć klient lub administrator; pracownikowi
+        // odmawiamy jeszcze raz w transakcji, bo rola mogła się zmienić
+        // po wejściu na stronę formularza.
         if (
             !is_array($client)
             || (int) $client['aktywny'] !== 1
-            || (string) $client['rola'] !== 'klient'
+            || !in_array((string) $client['rola'], ['klient', 'admin'], true)
         ) {
             $pdo->rollBack();
             return ['status' => 'forbidden'];

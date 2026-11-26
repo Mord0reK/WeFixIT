@@ -4,10 +4,11 @@ declare(strict_types=1);
 /*
     Strona administracji kontami użytkowników.
 
-    Wyświetla listę kont z filtrami, wyszukiwaniem i paginacją, zmianą roli
-    oraz aktywacją lub dezaktywacją przez window.panelConfirm. Widok nie
+    Wyświetla listę kont z filtrami, wyszukiwaniem i paginacją oraz zmianą
+    roli z dropdownu z popupem potwierdzenia. Zmiana roli na klient przy
+    aktywnym profilu pracownika najpierw dezaktywuje profil. Widok nie
     wykonuje SQL ani operacji zapisu — korzysta z app/uzytkownicy.php
-    i endpointu JSON.
+    i endpointów JSON.
 */
 require_once dirname(__DIR__) . '/app/panel_layout.php';
 require_once dirname(__DIR__) . '/app/uzytkownicy.php';
@@ -16,6 +17,7 @@ $user = require_role(['admin']);
 $basePath = auth_base_path();
 $usersUrl = $basePath . '/uzytkownicy';
 $usersApi = $basePath . '/api/admin/users';
+$employeesApi = $basePath . '/api/admin/employees';
 $roleFilter = uzytkownik_role_filter($_GET['rola'] ?? null);
 $statusFilter = uzytkownik_status_filter($_GET['status'] ?? null);
 $search = pagination_search_value($_GET['szukaj'] ?? null);
@@ -91,6 +93,7 @@ $roleOptionsJson = htmlspecialchars(json_encode($roleOptionsForJs, JSON_UNESCAPE
 ?>
 <section id="users-page" class="<?= PANEL_CARD_WIDE_CLASS ?>"
     data-api="<?= htmlspecialchars($usersApi, ENT_QUOTES, 'UTF-8') ?>"
+    data-employees-api="<?= htmlspecialchars($employeesApi, ENT_QUOTES, 'UTF-8') ?>"
     data-user-id="<?= (int) $user['id'] ?>"
     data-role-options="<?= $roleOptionsJson ?>">
     <?php
@@ -230,54 +233,50 @@ $roleOptionsJson = htmlspecialchars(json_encode($roleOptionsForJs, JSON_UNESCAPE
                             <td class="<?= PANEL_TD_CLASS ?>">
                                 <?php if ($isSelf): ?>
                                     <span class="text-xs text-zinc-500 dark:text-zinc-400">
-                                        Nie możesz zmienić roli ani dezaktywować własnego konta.
+                                        Nie możesz zmienić roli własnego konta.
                                     </span>
                                 <?php else: ?>
-                                    <div class="flex flex-col items-stretch gap-3">
-                                        <form class="flex flex-col gap-1"
-                                            data-user-role-form
+                                    <div class="flex flex-col items-start gap-1">
+                                        <?php
+                                        // Dropdown roli wykorzystuje mechanizm menu filtra
+                                        // z nagłówków tabel, więc pozycjonowaniem i animacją
+                                        // zajmuje się panel.js.
+                                        ?>
+                                        <div class="relative" data-filter-dropdown data-user-role
                                             data-id="<?= $managedUserId ?>"
-                                            method="post"
-                                            action="<?= htmlspecialchars($usersApi, ENT_QUOTES, 'UTF-8') ?>"
-                                            novalidate>
-                                            <div class="flex items-center gap-2">
-                                                <label for="user-role-<?= $managedUserId ?>" class="sr-only">Rola</label>
-                                                <select id="user-role-<?= $managedUserId ?>" name="rola"
-                                                    class="<?= LAYOUT_INPUT_CLASS ?> h-9">
-                                                    <?php foreach (UZYTKOWNIK_ROLES as $roleOption): ?>
-                                                        <option value="<?= htmlspecialchars($roleOption, ENT_QUOTES, 'UTF-8') ?>"
-                                                            <?= $managedUser['rola'] === $roleOption ? 'selected' : '' ?>
-                                                            <?= $hasEmployeeProfile && $roleOption === 'klient' ? 'disabled' : '' ?>>
-                                                            <?= htmlspecialchars($roleLabels[$roleOption] ?? $roleOption, ENT_QUOTES, 'UTF-8') ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                                <button type="submit" class="<?= panel_button_classes('secondary') ?>">
-                                                    Zmień rolę
-                                                </button>
-                                            </div>
-                                            <?php if ($hasEmployeeProfile): ?>
-                                                <p class="<?= LAYOUT_HINT_CLASS ?>">
-                                                    Zmiana na klienta wymaga wcześniejszej dezaktywacji profilu pracownika.
-                                                </p>
-                                            <?php endif; ?>
-                                            <?= panel_field_error('user-error-rola-' . $managedUserId) ?>
-                                        </form>
-
-                                        <div class="flex flex-col items-start gap-1">
+                                            data-name="<?= htmlspecialchars($managedUserName, ENT_QUOTES, 'UTF-8') ?>"
+                                            data-current-role="<?= htmlspecialchars($managedUser['rola'], ENT_QUOTES, 'UTF-8') ?>"
+                                            data-employee-id="<?= $hasEmployeeProfile ? (int) $managedUser['profil_pracownika_id'] : 0 ?>"
+                                            data-profile-active="<?= $employeeProfileActive ? '1' : '0' ?>">
                                             <button type="button" class="<?= panel_button_classes('secondary') ?>"
-                                                data-user-toggle
-                                                data-id="<?= $managedUserId ?>"
-                                                data-active="<?= $managedUser['aktywny'] ? '1' : '0' ?>"
-                                                data-name="<?= htmlspecialchars($managedUserName, ENT_QUOTES, 'UTF-8') ?>"
-                                                title="<?= $managedUser['aktywny'] ? 'Dezaktywuj' : 'Aktywuj' ?>"
-                                                aria-label="<?= $managedUser['aktywny'] ? 'Dezaktywuj' : 'Aktywuj' ?>">
-                                                <?= $managedUser['aktywny']
-                                                    ? 'Dezaktywuj'
-                                                    : panel_icon('circle-check', 'h-4 w-4 shrink-0') ?>
+                                                data-filter-toggle aria-expanded="false" aria-haspopup="true"
+                                                aria-controls="user-role-<?= $managedUserId ?>-menu">
+                                                <span>Zmień rolę</span>
+                                                <?= panel_icon('chevron-down', 'h-4 w-4 shrink-0') ?>
                                             </button>
-                                            <?= panel_field_error('user-error-aktywny-' . $managedUserId) ?>
+                                            <div id="user-role-<?= $managedUserId ?>-menu"
+                                                class="<?= PANEL_FILTER_MENU_CLASS ?>" data-filter-menu>
+                                                <p class="<?= PANEL_FILTER_MENU_TITLE_CLASS ?>" aria-hidden="true">
+                                                    Wybierz nową rolę
+                                                </p>
+                                                <fieldset>
+                                                    <legend class="sr-only">Nowa rola konta</legend>
+                                                    <?php foreach (UZYTKOWNIK_ROLES as $roleOption): ?>
+                                                        <label class="<?= PANEL_FILTER_OPTION_CLASS ?>">
+                                                            <input type="radio" name="rola-<?= $managedUserId ?>"
+                                                                value="<?= htmlspecialchars($roleOption, ENT_QUOTES, 'UTF-8') ?>"
+                                                                class="<?= PANEL_FILTER_RADIO_CLASS ?>"
+                                                                data-user-role-option
+                                                                <?= $managedUser['rola'] === $roleOption ? 'checked' : '' ?>>
+                                                            <span class="min-w-0 break-words">
+                                                                <?= htmlspecialchars($roleLabels[$roleOption] ?? $roleOption, ENT_QUOTES, 'UTF-8') ?>
+                                                            </span>
+                                                        </label>
+                                                    <?php endforeach; ?>
+                                                </fieldset>
+                                            </div>
                                         </div>
+                                        <?= panel_field_error('user-error-rola-' . $managedUserId) ?>
                                     </div>
                                 <?php endif; ?>
                             </td>

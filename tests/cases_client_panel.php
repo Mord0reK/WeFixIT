@@ -463,43 +463,62 @@ test('221. anulowanie przeszłej rezerwacji daje 409 i nie zmienia stanu', funct
     assert_same(null, $row['anulowano'], 'Przeszła rezerwacja nie może dostać daty anulowania');
 });
 
-test('222. administrator i pracownik nie mogą anulować rezerwacji przez endpoint klienta', function (): void {
-    $accounts = [
-        ['email' => 'admin@wefixit.pl', 'label' => 'administratora', 'user_id' => 1],
-        ['email' => 'tomasz.serwisant@wefixit.pl', 'label' => 'pracownika', 'user_id' => 2],
-    ];
+test('222. pracownik nie może anulować rezerwacji przez endpoint klienta', function (): void {
+    $reservationId = client_panel_future_reservation_for(2, 'Rezerwacja pracownika');
+    $session = login_as('tomasz.serwisant@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie pracownika powinno się udać');
+    $csrf = csrf_from_page($session['cookies'], '/profil.php');
 
-    foreach ($accounts as $account) {
-        $reservationId = client_panel_future_reservation_for(
-            $account['user_id'],
-            'Rezerwacja ' . $account['label']
-        );
-        $session = login_as($account['email']);
-        assert_status(200, $session['response'], 'Logowanie ' . $account['label'] . ' powinno się udać');
-        $csrf = csrf_from_page($session['cookies'], '/profil.php');
+    $response = patch_json(
+        $session['cookies'],
+        '/api/client-reservations.php',
+        ['id' => $reservationId],
+        $csrf
+    );
 
-        $response = patch_json(
-            $session['cookies'],
-            '/api/client-reservations.php',
-            ['id' => $reservationId],
-            $csrf
-        );
+    assert_status(
+        403,
+        $response,
+        'Konto pracownika nie może anulować rezerwacji przez endpoint klienta'
+    );
 
-        assert_status(
-            403,
-            $response,
-            'Konto ' . $account['label'] . ' nie może anulować rezerwacji przez endpoint klienta'
-        );
+    $statement = test_db()->prepare(
+        'SELECT status_rezerwacji FROM rezerwacje WHERE id = :id'
+    );
+    $statement->execute(['id' => $reservationId]);
 
-        $statement = test_db()->prepare(
-            'SELECT status_rezerwacji FROM rezerwacje WHERE id = :id'
-        );
-        $statement->execute(['id' => $reservationId]);
+    assert_same(
+        'oczekujaca',
+        (string) $statement->fetchColumn(),
+        'Rezerwacja pracownika nie może zmienić statusu'
+    );
+});
 
-        assert_same(
-            'oczekujaca',
-            (string) $statement->fetchColumn(),
-            'Rezerwacja ' . $account['label'] . ' nie może zmienić statusu'
-        );
-    }
+test('223. administrator anuluje własną rezerwację przez endpoint klienta', function (): void {
+    $reservationId = client_panel_future_reservation_for(1, 'Rezerwacja administratora');
+    $session = login_as('admin@wefixit.pl');
+    assert_status(200, $session['response'], 'Logowanie administratora powinno się udać');
+    $csrf = csrf_from_page($session['cookies'], '/profil.php');
+
+    $response = patch_json(
+        $session['cookies'],
+        '/api/client-reservations.php',
+        ['id' => $reservationId],
+        $csrf
+    );
+
+    assert_status(200, $response, 'Administrator powinien móc anulować własną rezerwację');
+    $data = json_body($response);
+    assert_same('anulowana', $data['status'] ?? null, 'Odpowiedź powinna zwrócić status anulowana');
+
+    $statement = test_db()->prepare(
+        'SELECT status_rezerwacji FROM rezerwacje WHERE id = :id'
+    );
+    $statement->execute(['id' => $reservationId]);
+
+    assert_same(
+        'anulowana',
+        (string) $statement->fetchColumn(),
+        'Rezerwacja administratora powinna być anulowana w bazie'
+    );
 });

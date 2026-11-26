@@ -10,6 +10,7 @@ declare(strict_types=1);
     logiki HTTP.
 */
 require_once __DIR__ . '/../public/config.php';
+require_once __DIR__ . '/pagination.php';
 
 function oferta_db(): ?PDO
 {
@@ -125,7 +126,7 @@ function oferta_service_row(array $row): array
     ];
 }
 
-function oferta_uslugi(int $categoryId = 0): ?array
+function oferta_uslugi(int $categoryId = 0, string $search = ''): ?array
 {
     $pdo = oferta_db();
 
@@ -133,6 +134,7 @@ function oferta_uslugi(int $categoryId = 0): ?array
         return null;
     }
 
+    $search = pagination_search_value($search);
     $conditions = [
         'u.aktywna = TRUE',
         'k.aktywna = TRUE',
@@ -142,6 +144,12 @@ function oferta_uslugi(int $categoryId = 0): ?array
     if ($categoryId > 0) {
         $conditions[] = 'u.kategoria_id = :kategoria_id';
         $params['kategoria_id'] = $categoryId;
+    }
+
+    // Fraza dopasowujemy po nazwie, jak w tabeli usług panelu.
+    if ($search !== '') {
+        $conditions[] = 'u.nazwa LIKE CONCAT(\'%\', :szukaj, \'%\')';
+        $params['szukaj'] = pagination_like_pattern($search);
     }
 
     try {

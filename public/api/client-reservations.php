@@ -2,10 +2,10 @@
 declare(strict_types=1);
 
 /*
-    Endpoint klienta do anulowania własnej rezerwacji.
+    Endpoint do anulowania własnej rezerwacji (klient lub administrator).
 
     Przyjmuje wyłącznie PATCH z identyfikatorem rezerwacji. Identyfikator
-    klienta pochodzi z sesji, a ownership rezerwacji weryfikuje moduł
+    rezerwującego pochodzi z sesji, a ownership rezerwacji weryfikuje moduł
     rezerwacji klienta. Sukces trafia do dziennika zdarzeń po zakończeniu
     transakcji.
 */
@@ -19,7 +19,9 @@ json_require_content_type();
 
 $user = require_api_login();
 
-if (($user['rola'] ?? '') !== 'klient') {
+// Anulować można wyłącznie własną rezerwację, więc dajemy dostęp tym samym
+// rolom, które mogą rezerwacje tworzyć.
+if (!in_array(($user['rola'] ?? ''), ['klient', 'admin'], true)) {
     json_response(403, ['error' => 'Brak uprawnień do anulowania rezerwacji.']);
 }
 

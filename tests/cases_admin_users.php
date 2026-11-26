@@ -182,29 +182,39 @@ test('98. administrator nie może odebrać sobie roli ani dezaktywować konta', 
     assert_same(1, (int) $row['aktywny'], 'Konto administratora nie może zostać dezaktywowane');
 });
 
-test('99. zmiana roli na klient przy profilu pracownika jest blokowana', function (): void {
+test('99. zmiana roli na klient wymaga dezaktywacji profilu pracownika', function (): void {
     admin_users_reset_base();
     $session = admin_users_admin_session();
 
     try {
-        foreach ([true, false] as $profileActive) {
-            admin_users_set_profile_active(2, $profileActive);
+        admin_users_set_profile_active(2, true);
 
-            $response = admin_users_patch($session, 2, ['rola' => 'klient']);
-            assert_status(422, $response, 'Zmiana roli przy profilu pracownika powinna dać 422');
+        $response = admin_users_patch($session, 2, ['rola' => 'klient']);
+        assert_status(422, $response, 'Zmiana roli na klient przy aktywnym profilu powinna dać 422');
 
-            $data = json_body($response);
-            $message = $data['errors']['rola'] ?? '';
-            assert_true(is_string($message) && $message !== '', 'Odpowiedź powinna zawierać errors.rola');
-            assert_true(
-                strpos($message, 'dezaktyw') !== false,
-                'Komunikat powinien wskazywać potrzebę dezaktywacji profilu pracownika'
-            );
+        $data = json_body($response);
+        $message = $data['errors']['rola'] ?? '';
+        assert_true(is_string($message) && $message !== '', 'Odpowiedź powinna zawierać errors.rola');
+        assert_true(
+            strpos($message, 'dezaktyw') !== false,
+            'Komunikat powinien wskazywać potrzebę dezaktywacji profilu pracownika'
+        );
 
-            $row = test_db()->query('SELECT rola FROM uzytkownicy WHERE id = 2')->fetch();
-            assert_same('pracownik', (string) $row['rola'], 'Rola pracownika nie może się zmienić');
-        }
+        $row = test_db()->query('SELECT rola FROM uzytkownicy WHERE id = 2')->fetch();
+        assert_same('pracownik', (string) $row['rola'], 'Rola przy aktywnym profilu nie może się zmienić');
+
+        // Nieaktywny profil jest stanem docelowym popupu dezaktywacji,
+        // więc nie może blokować zmiany roli na klient.
+        admin_users_set_profile_active(2, false);
+
+        $response = admin_users_patch($session, 2, ['rola' => 'klient']);
+        assert_status(200, $response, 'Zmiana roli na klient przy nieaktywnym profilu powinna dać 200');
+        assert_same('klient', json_body($response)['rola'] ?? null, 'Odpowiedź powinna zawierać nową rolę');
+
+        $row = test_db()->query('SELECT rola FROM uzytkownicy WHERE id = 2')->fetch();
+        assert_same('klient', (string) $row['rola'], 'Rola przy nieaktywnym profilu powinna stać się klient');
     } finally {
+        admin_users_set_user(2, 'pracownik', true);
         admin_users_set_profile_active(2, true);
     }
 });
@@ -441,6 +451,18 @@ test('104. lista filtruje role i status, a błędny filtr nie powoduje błędu',
     assert_true(
         strpos($activeClients['body'], 'data-filter-toggle') !== false,
         'Filtr powinien być rozwijany z nagłówka tabeli'
+    );
+    assert_true(
+        strpos($activeClients['body'], 'data-user-role') !== false,
+        'Zmiana roli powinna być dropdownem w wierszach tabeli'
+    );
+    assert_true(
+        strpos($activeClients['body'], 'data-user-toggle') === false,
+        'Przycisk dezaktywacji konta nie powinien być renderowany w wierszach'
+    );
+    assert_true(
+        strpos($activeClients['body'], 'data-employees-api') !== false,
+        'Strona powinna przekazywać endpoint pracowników do skryptu'
     );
     assert_true(
         strpos($activeClients['body'], 'href="/uzytkownicy"') !== false,

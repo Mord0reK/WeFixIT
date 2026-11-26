@@ -7,7 +7,8 @@ declare(strict_types=1);
     Lista, wyszukiwanie i paginacja oraz formularze korzystają z
     app/pracownicy.php. Panel tworzy wyłącznie profile powiązane z istniejącymi
     kontami o roli pracownik — nie zakłada nowych kont użytkowników.
-    Widok nie wykonuje SQL ani operacji zapisu.
+    Aktywacja profilu konta bez roli pracownik wymaga najpierw zmiany roli
+    (popup jak w panelu użytkowników). Widok nie wykonuje SQL ani zapisu.
 */
 require_once dirname(__DIR__) . '/app/panel_layout.php';
 require_once dirname(__DIR__) . '/app/pracownicy.php';
@@ -45,6 +46,7 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
 ?>
 <section id="employees-page" class="<?= PANEL_CARD_WIDE_CLASS ?>"
     data-api="<?= htmlspecialchars($employeesApi, ENT_QUOTES, 'UTF-8') ?>"
+    data-users-api="<?= htmlspecialchars($basePath . '/api/admin/users', ENT_QUOTES, 'UTF-8') ?>"
     data-employees-url="<?= htmlspecialchars($employeesUrl, ENT_QUOTES, 'UTF-8') ?>"
     data-base-path="<?= htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8') ?>">
     <?php
@@ -192,6 +194,8 @@ panel_layout_head($user, 'Pracownicy — WeFixIT', 'employees');
                                         data-employee-toggle
                                         data-id="<?= $employee['id'] ?>"
                                         data-name="<?= htmlspecialchars($employee['imie'] . ' ' . $employee['nazwisko'], ENT_QUOTES, 'UTF-8') ?>"
+                                        data-user-id="<?= (int) $employee['uzytkownik_id'] ?>"
+                                        data-account-role="<?= htmlspecialchars($employee['rola'], ENT_QUOTES, 'UTF-8') ?>"
                                         data-active="<?= $employee['aktywny'] ? '1' : '0' ?>"
                                         title="<?= $employee['aktywny'] ? 'Dezaktywuj' : 'Aktywuj' ?>"
                                         aria-label="<?= $employee['aktywny'] ? 'Dezaktywuj' : 'Aktywuj' ?>">

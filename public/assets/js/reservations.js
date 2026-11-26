@@ -293,12 +293,15 @@
         let title = 'Zmienić status rezerwacji?';
         let message = 'Status rezerwacji zmieni się z „' + currentLabel + '” na „' + targetLabel + '”.';
         let confirmLabel = 'Zmień status';
+        let cancelLabel = 'Anuluj';
         let danger = false;
 
         if (target === 'anulowana') {
             title = 'Anulować rezerwację?';
             message = 'Rezerwacja pozostanie w bazie jako anulowana. Nie zostanie usunięta.';
             confirmLabel = 'Anuluj rezerwację';
+            // „Wróć” zamiast „Anuluj”, żeby odrzucenie nie myliło się z akcją.
+            cancelLabel = 'Wróć';
             danger = true;
         } else if (current === 'anulowana') {
             title = 'Cofnąć anulowanie?';
@@ -310,6 +313,7 @@
             title: title,
             message: message,
             confirmLabel: confirmLabel,
+            cancelLabel: cancelLabel,
             danger: danger
         });
 
